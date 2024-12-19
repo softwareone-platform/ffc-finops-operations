@@ -1,97 +1,71 @@
-from collections.abc import Sequence
+from typing import TypeVar, get_args
 from uuid import UUID
 
 from fastapi import HTTPException
 from fastapi import status as http_status
 from fastapi_pagination.ext.sqlmodel import paginate
 from fastapi_pagination.limit_offset import LimitOffsetPage, LimitOffsetParams
-from sqlmodel import SQLModel, col, delete, select
-from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlmodel import SQLModel
 
-from app.models import Entitlement, EntitlementCreate, EntitlementUpdate, UUIDModel
+from app.models import (
+    Entitlement,
+    EntitlementCreate,
+    EntitlementUpdate,
+    Organization,
+    UUIDModel,
+)
+from app.repositories import NotFoundError, Repository
+
+ModelT = TypeVar("ModelT", bound=UUIDModel)
+ModelCreateT = TypeVar("ModelCreateT", bound=SQLModel)
+ModelUpdateT = TypeVar("ModelUpdateT", bound=SQLModel)
 
 
-class BaseCollection[ModelT: UUIDModel, ModelCreateT: SQLModel, ModelUpdateT: SQLModel]:
-    def __init__(self, session: AsyncSession):
-        self.session = session
+class BaseCollection[ModelT]:
+    model_cls: type[ModelT]
 
-    @classmethod
-    def _get_generic_cls_args(cls):
-        return next(
-            base_cls.__args__
-            for base_cls in cls.__orig_bases__
-            if base_cls.__origin__ is BaseCollection
-        )
+    def __init__(self, repository: Repository[ModelT]):
+        self.repository = repository
 
-    @property
-    def model_cls(self) -> type[ModelT]:
-        return self._get_generic_cls_args()[0]
-
-    @property
-    def model_create_cls(self) -> type[ModelCreateT]:  # pragma: no cover
-        return self._get_generic_cls_args()[1]
-
-    @property
-    def model_update_cls(self) -> type[ModelCreateT]:  # pragma: no cover
-        return self._get_generic_cls_args()[2]
-
-    async def create(self, data: ModelCreateT) -> ModelT:
-        obj = self.model_cls(**data.model_dump())
-        self.session.add(obj)
-        await self.session.commit()
-        await self.session.refresh(obj)
-
-        return obj
+    def __init_subclass__(cls) -> None:
+        cls.model_cls = get_args(cls.__orig_bases__[0])[0]
 
     async def get(self, id: str | UUID) -> ModelT:
-        obj = await self.session.get(self.model_cls, id)
-
-        if obj is None:
+        try:
+            return await self.repository.get(id)
+        except NotFoundError as e:
             raise HTTPException(
                 status_code=http_status.HTTP_404_NOT_FOUND,
-                detail=f"{self.model_cls.__name__} with ID {str(id)} wasn't found",
-            )
-
-        return obj
-
-    async def fetch_all(self) -> Sequence[ModelT]:
-        results = await self.session.exec(select(self.model_cls))
-        return results.all()
+                detail=str(e),
+            ) from e
 
     async def fetch_page(
         self, pagination_params: LimitOffsetParams | None = None
     ) -> LimitOffsetPage[ModelT]:
-        return await paginate(self.session, self.model_cls, pagination_params)
-
-    async def update(self, id: str | UUID, data: ModelUpdateT) -> ModelT:
-        statement = select(self.model_cls).where(self.model_cls.id == id)
-        results = await self.session.exec(statement)
-
-        obj: ModelT | None = results.first()
-
-        if obj is None:
-            raise HTTPException(
-                status_code=http_status.HTTP_404_NOT_FOUND,
-                detail=f"{self.model_cls.__name__} with ID {str(id)} wasn't found",
-            )
-
-        for key, value in data.model_dump(exclude_unset=True).items():
-            setattr(obj, key, value)
-
-        self.session.add(obj)
-        await self.session.commit()
-        await self.session.refresh(obj)
-
-        return obj
-
-    async def delete(self, id: str | UUID) -> bool:
-        statement = delete(self.model_cls).where(col(self.model_cls.id) == id)
-
-        await self.session.execute(statement=statement)
-        await self.session.commit()
-
-        return True
+        return await paginate(
+            self.repository.session,
+            self.repository.model_cls,
+            pagination_params,
+        )
 
 
-class EntitlementCollection(BaseCollection[Entitlement, EntitlementCreate, EntitlementUpdate]):
+class CreateMixin[ModelT, ModelCreateT]:
+    async def create(self: BaseCollection, data: ModelCreateT) -> ModelT:
+        return await self.repository.create(self.model_cls(**data.model_dump()))
+
+
+class UpdateMixin[ModelT, ModelUpdateT]:
+    async def update(self: BaseCollection, id: str | UUID, data: ModelUpdateT) -> ModelT:
+        return await self.repository.update(await self.get(id), data)
+
+
+class EntitlementCollection(
+    BaseCollection[Entitlement],
+    CreateMixin[Entitlement, EntitlementCreate],
+    UpdateMixin[Entitlement, EntitlementUpdate],
+):
+    pass
+
+
+class OrganizationCollection(BaseCollection[Organization]):
     pass
