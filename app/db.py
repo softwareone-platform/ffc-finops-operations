@@ -1,4 +1,3 @@
-import sys
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Annotated
@@ -11,11 +10,9 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app import settings
 
-running_tests = "pytest" in sys.modules
-
 db_engine = create_async_engine(
     str(settings.postgres_async_url),
-    echo=False if running_tests else settings.debug,
+    echo=settings.debug,
     future=True,
 )
 

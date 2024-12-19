@@ -73,3 +73,16 @@ class EntitlementUpdate(EntitlementBase):
     sponsor_name: str | None = None
     sponsor_external_id: str | None = None
     sponsor_container_id: str | None = None
+
+
+class OrganizationBase(SQLModel):
+    name: str = Field(max_length=255, nullable=False)
+    external_id: str = Field(max_length=255, nullable=False, index=True, unique=True)
+
+
+class Organization(OrganizationBase, TimestampModel, UUIDModel, table=True):
+    __tablename__ = "organizations"
+
+
+class OrganizationRead(OrganizationBase, UUIDModel):
+    pass
