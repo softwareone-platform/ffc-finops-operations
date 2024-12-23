@@ -4,8 +4,8 @@ from httpx import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.collections import EntitlementCollection
-from app.models import Entitlement, EntitlementCreate
+from app.models import Entitlement
+from tests.conftest import ModelFactory
 from tests.utils import assert_json_contains_model
 
 # ====================
@@ -84,22 +84,19 @@ async def test_get_all_entitlements_single_page(
 
 
 async def test_get_all_entitlements_multiple_pages(
-    entitlements_collection: EntitlementCollection,
+    entitlement_factory: ModelFactory[Entitlement],
     api_client: AsyncClient,
     fastapi_app,
 ):
     for index in range(10):
-        await entitlements_collection.create(
-            EntitlementCreate(
-                sponsor_name="AWS",
-                sponsor_external_id=f"EXTERNAL_ID_{index}",
-                sponsor_container_id=f"CONTAINER_ID_{index}",
-            )
+        await entitlement_factory(
+            sponsor_name="AWS",
+            sponsor_external_id=f"EXTERNAL_ID_{index}",
+            sponsor_container_id=f"CONTAINER_ID_{index}",
         )
 
     first_page_response = await api_client.get("/entitlements/", params={"limit": 5})
     first_page_data = first_page_response.json()
-
     assert first_page_response.status_code == 200
     assert first_page_data["total"] == 10
     assert len(first_page_data["items"]) == 5
