@@ -63,7 +63,8 @@ class BaseCollection[ModelT: UUIDModel, ModelCreateT: SQLModel, ModelUpdateT: SQ
     ) -> LimitOffsetPage[ModelT]:
         return await paginate(self.session, self.model_cls, pagination_params)
 
-    async def update(self, id: str | UUID, data: ModelUpdateT) -> ModelT:
+    # TODO: Remove the 'no cover' comment once we have collections which make use of this
+    async def update(self, id: str | UUID, data: ModelUpdateT) -> ModelT:  # pragma: no cover
         statement = select(self.model_cls).where(self.model_cls.id == id)
         results = await self.session.exec(statement)
 
@@ -84,7 +85,8 @@ class BaseCollection[ModelT: UUIDModel, ModelCreateT: SQLModel, ModelUpdateT: SQ
 
         return obj
 
-    async def delete(self, id: str | UUID) -> bool:
+    # TODO: Remove the 'no cover' comment once we have collections which make use of this
+    async def delete(self, id: str | UUID) -> bool:  # pragma: no cover
         statement = delete(self.model_cls).where(col(self.model_cls.id) == id)
 
         await self.session.execute(statement=statement)

@@ -31,6 +31,9 @@ async def test_can_create_entitlements(api_client: AsyncClient, db_session: Asyn
     assert data["sponsor_name"] == "AWS"
     assert data["sponsor_external_id"] == "EXTERNAL_ID_987123"
     assert data["sponsor_container_id"] == "SPONSOR_CONTAINER_ID_1234"
+    assert data["status"] == "new"
+    assert data["activated_at"] is None
+    assert data["created_at"] is not None
 
     result = await db_session.exec(select(Entitlement).where(Entitlement.id == data["id"]))
     assert result.one_or_none() is not None
@@ -142,6 +145,9 @@ async def test_get_entitlement_by_id(entitlement_aws, api_client: AsyncClient):
     assert data["sponsor_name"] == entitlement_aws.sponsor_name
     assert data["sponsor_external_id"] == entitlement_aws.sponsor_external_id
     assert data["sponsor_container_id"] == entitlement_aws.sponsor_container_id
+    assert data["status"] == "new"
+    assert data["activated_at"] is None
+    assert data["created_at"] is not None
 
 
 async def test_get_non_existant_entitlement(api_client: AsyncClient):
@@ -152,47 +158,11 @@ async def test_get_non_existant_entitlement(api_client: AsyncClient):
     assert response.json()["detail"] == f"Entitlement with ID {id} wasn't found"
 
 
-# ==================
-# Update Entitlement
-# ==================
-
-
-async def test_can_update_entitlements(entitlement_aws, api_client):
-    assert entitlement_aws.sponsor_name == "AWS"
-
-    update_response = await api_client.patch(
-        f"/entitlements/{entitlement_aws.id}",
-        json={"sponsor_name": "GCP"},
-    )
-
-    assert update_response.status_code == 200
-    update_data = update_response.json()
-
-    assert update_data["sponsor_name"] == "GCP"
-
-    get_response = await api_client.get(f"/entitlements/{entitlement_aws.id}")
-    assert get_response.json()["sponsor_name"] == "GCP"
-
-
-async def test_try_update_non_existant_entitlement(api_client: AsyncClient):
-    id = str(uuid.uuid4())
-    response = await api_client.patch(
-        f"/entitlements/{id}",
-        json={"sponsor_name": "GCP"},
-    )
-
-    assert response.status_code == 404
-    assert response.json()["detail"] == f"Entitlement with ID {id} wasn't found"
-
-
-async def test_try_update_entitlement_with_invalid_data(entitlement_aws, api_client: AsyncClient):
-    response = await api_client.patch(
-        f"/entitlements/{entitlement_aws.id}",
-        json={"sponsor_name": "GCP", "sponsor_container_id": 123},
-    )
+async def test_get_invalid_id_format(api_client: AsyncClient):
+    response = await api_client.get("/entitlements/this-is-not-a-valid-uuid")
 
     assert response.status_code == 422
-    [detail] = response.json()["detail"]
 
-    assert detail["loc"] == ["body", "sponsor_container_id"]
-    assert detail["msg"] == "Input should be a valid string"
+    [detail] = response.json()["detail"]
+    assert detail["loc"] == ["path", "id"]
+    assert detail["type"] == "uuid_parsing"

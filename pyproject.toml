@@ -24,6 +24,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "alembic-postgresql-enum>=1.4.0",
     "bandit>=1.8.0,<2.0",
     "httpx>=0.27.2,<1.0",
     "ipython>=8.30.0,<9.0",

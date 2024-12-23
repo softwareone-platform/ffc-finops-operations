@@ -20,6 +20,19 @@ wheels = [
 ]
 
 [[package]]
+name = "alembic-postgresql-enum"
+version = "1.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "alembic" },
+    { name = "sqlalchemy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/bc/df/5171230d05b17751fbf4242ff111cf6c568395b5fae8f64e74aa5765a056/alembic_postgresql_enum-1.4.0.tar.gz", hash = "sha256:fb0af50059891bf3fb9638d4c32a61b4eee116c302a90e0c74ed3f5f396153f4", size = 14637 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fd/25/cef69bfcf865d2cd6a46ed7a04320cd7fda36de3d33bc1b923abaa159b06/alembic_postgresql_enum-1.4.0-py3-none-any.whl", hash = "sha256:c9eb20cb594085a48175aabcc5ffb448e6abfcc3f34cd9d03a1b7d5cc35457b8", size = 22228 },
+]
+
+[[package]]
 name = "annotated-types"
 version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -559,6 +572,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "alembic-postgresql-enum" },
     { name = "bandit" },
     { name = "httpx" },
     { name = "ipython" },
@@ -587,6 +601,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "alembic-postgresql-enum", specifier = ">=1.4.0" },
     { name = "bandit", specifier = ">=1.8.0,<2.0" },
     { name = "httpx", specifier = ">=0.27.2,<1.0" },
     { name = "ipython", specifier = ">=8.30.0,<9.0" },
