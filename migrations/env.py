@@ -6,17 +6,16 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import AsyncEngine
-from sqlmodel import SQLModel
 
 from app import settings as app_settings
-from app.models import *  # noqa: F403
+from app.db.models import Base
 
 config = context.config
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-target_metadata = SQLModel.metadata
+target_metadata = Base.metadata
 
 target_metadata.naming_convention = {
     "ix": "ix_%(column_0_label)s",

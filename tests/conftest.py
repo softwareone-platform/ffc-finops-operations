@@ -1,23 +1,26 @@
 import os
+import secrets
 from collections.abc import AsyncGenerator, Awaitable, Callable
+from datetime import UTC, datetime, timedelta
+from typing import TypeVar
 
 import fastapi_pagination
+import jwt
 import pytest
 from faker import Faker
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from pytest_asyncio import is_async_test
 from pytest_mock import MockerFixture
-from sqlalchemy.ext.asyncio import async_sessionmaker
-from sqlmodel import SQLModel
-from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db import db_engine
-from app.db.handlers import EntitlementHandler, OrganizationHandler
+from app.db.models import Actor, Base, Entitlement, Organization, System
+from app.enums import ActorType
 from app.main import app
-from app.models import Entitlement, Organization, UUIDModel
 
-type ModelFactory[T: UUIDModel] = Callable[..., Awaitable[T]]
+ModelT = TypeVar("ModelT", bound=Base)
+ModelFactory = Callable[..., Awaitable[ModelT]]
 
 
 def pytest_collection_modifyitems(items):
@@ -34,23 +37,23 @@ def fastapi_app() -> FastAPI:
 
 
 @pytest.fixture(autouse=True)
-async def db_session() -> AsyncGenerator[AsyncSession]:
-    session = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
+async def db_session() -> AsyncGenerator[AsyncSession, None]:
+    session = async_sessionmaker(db_engine, expire_on_commit=False)
 
     async with session() as s:
         async with db_engine.begin() as conn:
-            await conn.run_sync(SQLModel.metadata.create_all)
+            await conn.run_sync(Base.metadata.create_all)
 
         yield s
 
     async with db_engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.drop_all)
+        await conn.run_sync(Base.metadata.drop_all)
 
     await db_engine.dispose()
 
 
 @pytest.fixture
-async def api_client(fastapi_app: FastAPI) -> AsyncGenerator[AsyncClient]:
+async def api_client(fastapi_app: FastAPI):
     async with AsyncClient(
         transport=ASGITransport(app=fastapi_app), base_url="http://v1/"
     ) as client:
@@ -58,33 +61,36 @@ async def api_client(fastapi_app: FastAPI) -> AsyncGenerator[AsyncClient]:
 
 
 @pytest.fixture
-def entitlements_handler(db_session: AsyncSession) -> EntitlementHandler:
-    return EntitlementHandler(db_session)
-
-
-@pytest.fixture
-def entitlement_factory(
-    faker: Faker, entitlements_handler: EntitlementHandler
-) -> ModelFactory[Entitlement]:
+def entitlement_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory[Entitlement]:
     async def _entitlement(
         sponsor_name: str | None = None,
         sponsor_external_id: str | None = None,
         sponsor_container_id: str | None = None,
+        created_by: Actor | None = None,
+        updated_by: Actor | None = None,
     ) -> Entitlement:
-        return await entitlements_handler.create(
-            Entitlement(
-                sponsor_name=sponsor_name or "AWS",
-                sponsor_external_id=sponsor_external_id or "ACC-1234-5678",
-                sponsor_container_id=sponsor_container_id or faker.uuid4(),
-            )
+        entitlement = Entitlement(
+            sponsor_name=sponsor_name or "AWS",
+            sponsor_external_id=sponsor_external_id or "ACC-1234-5678",
+            sponsor_container_id=sponsor_container_id or faker.uuid4(),
+            created_by=created_by,
+            updated_by=updated_by,
         )
+        db_session.add(entitlement)
+        await db_session.commit()
+        await db_session.refresh(entitlement)
+        return entitlement
 
     return _entitlement
 
 
 @pytest.fixture
-async def entitlement_aws(entitlement_factory: ModelFactory[Entitlement]) -> Entitlement:
-    return await entitlement_factory(sponsor_name="AWS")
+async def entitlement_aws(
+    entitlement_factory: ModelFactory[Entitlement], gcp_extension: System
+) -> Entitlement:
+    return await entitlement_factory(
+        sponsor_name="AWS", created_by=gcp_extension, updated_by=gcp_extension
+    )
 
 
 @pytest.fixture
@@ -93,26 +99,21 @@ async def entitlement_gcp(entitlement_factory: ModelFactory[Entitlement]) -> Ent
 
 
 @pytest.fixture
-def organizations_handler(db_session: AsyncSession) -> OrganizationHandler:
-    return OrganizationHandler(db_session)
-
-
-@pytest.fixture
-def organization_factory(
-    faker: Faker, organizations_handler: OrganizationHandler
-) -> ModelFactory[Organization]:
+def organization_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory[Organization]:
     async def _organization(
         name: str | None = None,
         external_id: str | None = None,
         organization_id: str | None = None,
     ) -> Organization:
-        return await organizations_handler.create(
-            Organization(
-                name=name or faker.company(),
-                external_id=external_id or "ACC-1234-5678",
-                organization_id=organization_id,
-            )
+        organization = Organization(
+            name=name or faker.company(),
+            external_id=external_id or "ACC-1234-5678",
+            organization_id=organization_id,
         )
+        db_session.add(organization)
+        await db_session.commit()
+        await db_session.refresh(organization)
+        return organization
 
     return _organization
 
@@ -126,3 +127,92 @@ def mock_settings(mocker: MockerFixture) -> None:
             "FFC_OPERATIONS_API_MODIFIER_JWT_SECRET": "test_jwt_secret",
         },
     )
+
+
+@pytest.fixture
+def system_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory[System]:
+    async def _system(
+        name: str | None = None,
+        external_id: str | None = None,
+        jwt_secret: str | None = None,
+    ) -> System:
+        system = System(
+            name=name or faker.company(),
+            external_id=external_id or "GCP",
+            jwt_secret=jwt_secret or secrets.token_hex(32),
+        )
+        db_session.add(system)
+        await db_session.commit()
+        await db_session.refresh(system)
+        return system
+
+    return _system
+
+
+@pytest.fixture
+def jwt_token_factory() -> (
+    Callable[[str, str, datetime | None, datetime | None, datetime | None], str]
+):
+    def _jwt_token(
+        subject: str,
+        secret: str,
+        exp: datetime | None = None,
+        nbf: datetime | None = None,
+        iat: datetime | None = None,
+    ) -> str:
+        now = datetime.now(UTC)
+        return jwt.encode(
+            {
+                "sub": subject,
+                "iat": iat or now,
+                "nbf": nbf or now,
+                "exp": exp or now + timedelta(minutes=5),
+            },
+            secret,
+            algorithm="HS256",
+        )
+
+    return _jwt_token
+
+
+@pytest.fixture
+def system_jwt_token_factory(
+    jwt_token_factory: Callable[[str, str, datetime | None, datetime | None, datetime | None], str],
+) -> Callable[[System], str]:
+    def _system_jwt_token(system: System) -> str:
+        now = datetime.now(UTC)
+
+        return jwt_token_factory(
+            str(system.id),
+            system.jwt_secret,
+            now + timedelta(minutes=5),
+            now,
+            now,
+        )
+
+    return _system_jwt_token
+
+
+@pytest.fixture
+async def gcp_extension(system_factory: ModelFactory[System]) -> System:
+    return await system_factory(external_id="GCP")
+
+
+@pytest.fixture
+def gcp_jwt_token(system_jwt_token_factory: Callable[[System], str], gcp_extension: System) -> str:
+    return system_jwt_token_factory(gcp_extension)
+
+
+@pytest.fixture
+async def test_actor(db_session: AsyncSession) -> Actor:
+    actor = Actor(type=ActorType.USER)
+    db_session.add(actor)
+    await db_session.commit()
+    await db_session.refresh(actor)
+    return actor
+
+
+@pytest.fixture
+def authenticated_client(api_client: AsyncClient, gcp_jwt_token: str) -> AsyncClient:
+    api_client.headers["Authorization"] = f"Bearer {gcp_jwt_token}"
+    return api_client
