@@ -27,12 +27,12 @@ async def lifespan(app: FastAPI):  # pragma: no cover
 
 tags_metadata = [
     {
-        "name": "Entitlements",
-        "description": "Operations with entitlements",
+        "name": "Billing",
+        "description": "Endpoints to manage billing data",
     },
     {
-        "name": "Organizations",
-        "description": "Operations with organizations",
+        "name": "Provisioning and Account Management",
+        "description": "Endpoints for account provisioning and management",
     },
 ]
 
@@ -51,5 +51,9 @@ fastapi_pagination.add_pagination(app)
 
 # TODO: Add healthcheck
 
-app.include_router(entitlements.router, prefix="/entitlements", tags=["Entitlements"])
-app.include_router(organizations.router, prefix="/organizations", tags=["Organizations"])
+app.include_router(entitlements.router, prefix="/billing/entitlements", tags=["Billing"])
+app.include_router(
+    organizations.router,
+    prefix="/account/organizations",
+    tags=["Provisioning and Account Management"],
+)

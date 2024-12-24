@@ -15,7 +15,7 @@ from tests.utils import assert_json_contains_model
 
 async def test_can_create_entitlements(api_client: AsyncClient, db_session: AsyncSession):
     response = await api_client.post(
-        "/entitlements/",
+        "/billing/entitlements/",
         json={
             "sponsor_name": "AWS",
             "sponsor_external_id": "EXTERNAL_ID_987123",
@@ -41,7 +41,7 @@ async def test_can_create_entitlements(api_client: AsyncClient, db_session: Asyn
 
 async def test_create_entitlement_with_incomplete_data(api_client: AsyncClient):
     response = await api_client.post(
-        "/entitlements/",
+        "/billing/entitlements/",
         json={
             "sponsor_name": "AWS",
             "sponsor_external_id": "EXTERNAL_ID_987123",
@@ -61,7 +61,7 @@ async def test_create_entitlement_with_incomplete_data(api_client: AsyncClient):
 
 
 async def test_get_all_entitlements_empty_db(api_client: AsyncClient):
-    response = await api_client.get("/entitlements/")
+    response = await api_client.get("/billing/entitlements/")
 
     assert response.status_code == 200
     assert response.json()["total"] == 0
@@ -71,7 +71,7 @@ async def test_get_all_entitlements_empty_db(api_client: AsyncClient):
 async def test_get_all_entitlements_single_page(
     entitlement_aws, entitlement_gcp, api_client: AsyncClient
 ):
-    response = await api_client.get("/entitlements/")
+    response = await api_client.get("/billing/entitlements/")
 
     assert response.status_code == 200
     data = response.json()
@@ -95,7 +95,7 @@ async def test_get_all_entitlements_multiple_pages(
             sponsor_container_id=f"CONTAINER_ID_{index}",
         )
 
-    first_page_response = await api_client.get("/entitlements/", params={"limit": 5})
+    first_page_response = await api_client.get("/billing/entitlements/", params={"limit": 5})
     first_page_data = first_page_response.json()
     assert first_page_response.status_code == 200
     assert first_page_data["total"] == 10
@@ -103,7 +103,9 @@ async def test_get_all_entitlements_multiple_pages(
     assert first_page_data["limit"] == 5
     assert first_page_data["offset"] == 0
 
-    second_page_response = await api_client.get("/entitlements/", params={"limit": 3, "offset": 5})
+    second_page_response = await api_client.get(
+        "/billing/entitlements/", params={"limit": 3, "offset": 5}
+    )
     second_page_data = second_page_response.json()
 
     assert second_page_response.status_code == 200
@@ -112,7 +114,7 @@ async def test_get_all_entitlements_multiple_pages(
     assert second_page_data["limit"] == 3
     assert second_page_data["offset"] == 5
 
-    third_page_response = await api_client.get("/entitlements/", params={"offset": 8})
+    third_page_response = await api_client.get("/billing/entitlements/", params={"offset": 8})
     third_page_data = third_page_response.json()
 
     assert third_page_response.status_code == 200
@@ -133,7 +135,7 @@ async def test_get_all_entitlements_multiple_pages(
 
 
 async def test_get_entitlement_by_id(entitlement_aws, api_client: AsyncClient):
-    response = await api_client.get(f"/entitlements/{entitlement_aws.id}")
+    response = await api_client.get(f"/billing/entitlements/{entitlement_aws.id}")
 
     assert response.status_code == 200
     data = response.json()
@@ -149,14 +151,14 @@ async def test_get_entitlement_by_id(entitlement_aws, api_client: AsyncClient):
 
 async def test_get_non_existant_entitlement(api_client: AsyncClient):
     id = str(uuid.uuid4())
-    response = await api_client.get(f"/entitlements/{id}")
+    response = await api_client.get(f"/billing/entitlements/{id}")
 
     assert response.status_code == 404
     assert response.json()["detail"] == f"Entitlement with ID {id} wasn't found"
 
 
 async def test_get_invalid_id_format(api_client: AsyncClient):
-    response = await api_client.get("/entitlements/this-is-not-a-valid-uuid")
+    response = await api_client.get("/billing/entitlements/this-is-not-a-valid-uuid")
 
     assert response.status_code == 422
 
