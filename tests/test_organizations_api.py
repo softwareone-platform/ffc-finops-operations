@@ -10,7 +10,7 @@ from tests.utils import assert_json_contains_model
 
 
 async def test_get_all_organizations_empty_db(api_client: AsyncClient):
-    response = await api_client.get("/organizations/")
+    response = await api_client.get("/account/organizations/")
 
     assert response.status_code == 200
     assert response.json()["total"] == 0
@@ -23,7 +23,7 @@ async def test_get_all_organizations_single_page(
     organization_1 = await organization_factory(external_id="EXTERNAL_ID_1")
     organization_2 = await organization_factory(external_id="EXTERNAL_ID_2")
 
-    response = await api_client.get("/organizations/")
+    response = await api_client.get("/account/organizations/")
 
     assert response.status_code == 200
     data = response.json()
@@ -44,7 +44,7 @@ async def test_get_all_organizations_multiple_pages(
             external_id=f"EXTERNAL_ID_{index}",
         )
 
-    first_page_response = await api_client.get("/organizations/", params={"limit": 5})
+    first_page_response = await api_client.get("/account/organizations/", params={"limit": 5})
     first_page_data = first_page_response.json()
 
     assert first_page_response.status_code == 200
@@ -53,7 +53,9 @@ async def test_get_all_organizations_multiple_pages(
     assert first_page_data["limit"] == 5
     assert first_page_data["offset"] == 0
 
-    second_page_response = await api_client.get("/organizations/", params={"limit": 3, "offset": 5})
+    second_page_response = await api_client.get(
+        "/account/organizations/", params={"limit": 3, "offset": 5}
+    )
     second_page_data = second_page_response.json()
 
     assert second_page_response.status_code == 200
@@ -62,7 +64,7 @@ async def test_get_all_organizations_multiple_pages(
     assert second_page_data["limit"] == 3
     assert second_page_data["offset"] == 5
 
-    third_page_response = await api_client.get("/organizations/", params={"offset": 8})
+    third_page_response = await api_client.get("/account/organizations/", params={"offset": 8})
     third_page_data = third_page_response.json()
 
     assert third_page_response.status_code == 200
