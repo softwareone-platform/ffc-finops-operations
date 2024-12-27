@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 from httpx import AsyncClient
 from pytest_httpx import HTTPXMock
@@ -201,3 +203,41 @@ async def test_create_organization_api_modifier_error(
 
     [detail] = response.json()["detail"]
     assert detail == "Error creating organization in FinOps for Cloud: 500 - Internal Server Error."
+
+
+# =====================
+# Get Organization by ID
+# ======================
+
+
+async def test_get_organization_by_id(
+    organization_factory: ModelFactory[Organization], api_client: AsyncClient
+):
+    org = await organization_factory()
+    response = await api_client.get(f"/organizations/{org.id}")
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["id"] == str(org.id)
+    assert data["name"] == org.name
+    assert data["external_id"] == org.external_id
+    assert data["created_at"] is not None
+
+
+async def test_get_non_existant_organization(api_client: AsyncClient):
+    id = str(uuid.uuid4())
+    response = await api_client.get(f"/organizations/{id}")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == f"Organization with ID {id} wasn't found"
+
+
+async def test_get_invalid_id_format(api_client: AsyncClient):
+    response = await api_client.get("/organizations/this-is-not-a-valid-uuid")
+
+    assert response.status_code == 422
+
+    [detail] = response.json()["detail"]
+    assert detail["loc"] == ["path", "id"]
+    assert detail["type"] == "uuid_parsing"
