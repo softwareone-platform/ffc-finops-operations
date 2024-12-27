@@ -1,4 +1,9 @@
+import pytest
 from httpx import AsyncClient
+from pytest_httpx import HTTPXMock
+from pytest_mock import MockerFixture
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models import Organization
 from tests.conftest import ModelFactory
@@ -75,3 +80,124 @@ async def test_get_all_organizations_multiple_pages(
     all_external_ids = {item["external_id"] for item in all_items}
     assert len(all_items) == 10
     assert all_external_ids == {f"EXTERNAL_ID_{index}" for index in range(10)}
+
+
+# ====================
+# Create Organizations
+# ====================
+
+
+async def test_can_create_organizations(
+    mocker: MockerFixture,
+    httpx_mock: HTTPXMock,
+    mock_settings: None,
+    api_client: AsyncClient,
+    db_session: AsyncSession,
+):
+    mocker.patch("app.routers.organizations.get_api_modifier_jwt_token", return_value="test_token")
+
+    httpx_mock.add_response(
+        method="POST",
+        url="https://api-modifier.ffc.com/admin/organizations",
+        json={"id": "UUID-yyyy-yyyy-yyyy-yyyy"},
+        match_headers={"Authorization": "Bearer test_token"},
+    )
+
+    response = await api_client.post(
+        "/organizations/",
+        json={
+            "name": "My Organization",
+            "external_id": "ACC-1234-5678",
+            "user_id": "UUID-xxxx-xxxx-xxxx-xxxx",
+            "currency": "USD",
+        },
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+
+    assert data["id"] is not None
+    assert data["name"] == "My Organization"
+    assert data["external_id"] == "ACC-1234-5678"
+    assert data["organization_id"] == "UUID-yyyy-yyyy-yyyy-yyyy"
+    assert data["created_at"] is not None
+
+    result = await db_session.exec(select(Organization).where(Organization.id == data["id"]))
+    assert result.one_or_none() is not None
+
+
+@pytest.mark.parametrize("missing_field", ["name", "external_id", "user_id", "currency"])
+async def test_create_organization_with_incomplete_data(
+    api_client: AsyncClient, missing_field: str
+):
+    payload = {
+        "name": "My Organization",
+        "external_id": "ACC-1234-5678",
+        "user_id": "UUID-xxxx-xxxx-xxxx-xxxx",
+        "currency": "USD",
+    }
+    payload.pop(missing_field)
+
+    response = await api_client.post(
+        "/organizations/",
+        json=payload,
+    )
+
+    assert response.status_code == 422
+    [detail] = response.json()["detail"]
+
+    assert detail["type"] == "missing"
+    assert detail["loc"] == ["body", missing_field]
+
+
+async def test_create_organization_with_existing_external_id(
+    api_client: AsyncClient, organization_factory: ModelFactory[Organization]
+):
+    payload = {
+        "name": "My Organization",
+        "external_id": "ACC-1234-5678",
+        "user_id": "UUID-xxxx-xxxx-xxxx-xxxx",
+        "currency": "USD",
+    }
+
+    await organization_factory(external_id="ACC-1234-5678")
+
+    response = await api_client.post(
+        "/organizations/",
+        json=payload,
+    )
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert detail == "Organization with this external ID already exists: ACC-1234-5678."
+
+
+async def test_create_organization_api_modifier_error(
+    mocker: MockerFixture,
+    httpx_mock: HTTPXMock,
+    mock_settings: None,
+    api_client: AsyncClient,
+):
+    mocker.patch("app.routers.organizations.get_api_modifier_jwt_token", return_value="test_token")
+
+    httpx_mock.add_response(
+        method="POST",
+        url="https://api-modifier.ffc.com/admin/organizations",
+        status_code=500,
+        text="Internal Server Error",
+    )
+
+    response = await api_client.post(
+        "/organizations/",
+        json={
+            "name": "My Organization",
+            "external_id": "ACC-1234-5678",
+            "user_id": "UUID-xxxx-xxxx-xxxx-xxxx",
+            "currency": "USD",
+        },
+    )
+
+    assert response.status_code == 502
+
+    [detail] = response.json()["detail"]
+    assert detail == "Error creating organization in FinOps for Cloud: 500 - Internal Server Error."
