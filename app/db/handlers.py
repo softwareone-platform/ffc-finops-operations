@@ -34,15 +34,17 @@ class ModelHandler[T: UUIDModel]:
             await self.session.commit()
             await self.session.refresh(obj)
         except IntegrityError as e:
-            raise ConstraintViolationError(f"Failed to create {self.model_cls.__name__}: {e}")
+            raise ConstraintViolationError(
+                f"Failed to create {self.model_cls.__name__}: {e}"
+            ) from e
 
         return obj
 
     async def get(self, id: str | UUID) -> T:
         try:
             return await self.session.get_one(self.model_cls, id)
-        except NoResultFound:
-            raise NotFoundError(f"{self.model_cls.__name__} with ID {str(id)} wasn't found")
+        except NoResultFound as e:
+            raise NotFoundError(f"{self.model_cls.__name__} with ID {str(id)} wasn't found") from e
 
     async def update(self, id: str | UUID, data: BaseModel) -> T:  # pragma: no cover
         stmt = (
@@ -56,8 +58,8 @@ class ModelHandler[T: UUIDModel]:
             obj = result.scalars().one()
             await self.session.commit()
             return obj
-        except NoResultFound:
-            raise NotFoundError(f"{self.model_cls.__name__} with ID {str(id)} wasn't found")
+        except NoResultFound as e:
+            raise NotFoundError(f"{self.model_cls.__name__} with ID {str(id)} wasn't found") from e
 
     async def fetch_page(self, limit: int = 50, offset: int = 0) -> Sequence[T]:
         results = await self.session.exec(select(self.model_cls).offset(offset).limit(limit))

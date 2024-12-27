@@ -1,9 +1,11 @@
+from uuid import UUID
+
 import httpx
 from fastapi import APIRouter, HTTPException, status
 from fastapi_pagination.limit_offset import LimitOffsetPage
 
 from app import settings
-from app.db.handlers import ConstraintViolationError
+from app.db.handlers import ConstraintViolationError, NotFoundError
 from app.models import Organization, OrganizationCreate, OrganizationRead
 from app.pagination import paginate
 from app.repositories import OrganizationRepository
@@ -50,4 +52,15 @@ async def create_organization(data: OrganizationCreate, organization_repo: Organ
                 "Error creating organization in FinOps for Cloud: "
                 f"{e.response.status_code} - {e.response.text}.",
             ),
-        )
+        ) from e
+
+
+@router.get("/{id}", response_model=OrganizationRead)
+async def get_organization_by_id(id: UUID, organization_repo: OrganizationRepository):
+    try:
+        return await organization_repo.get(id=id)
+    except NotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e

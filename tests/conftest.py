@@ -102,12 +102,15 @@ def organization_factory(
     faker: Faker, organizations_handler: OrganizationHandler
 ) -> ModelFactory[Organization]:
     async def _organization(
-        name: str | None = None, external_id: str | None = None
+        name: str | None = None,
+        external_id: str | None = None,
+        organization_id: str | None = None,
     ) -> Organization:
         return await organizations_handler.create(
             Organization(
                 name=name or faker.company(),
                 external_id=external_id or "ACC-1234-5678",
+                organization_id=organization_id,
             )
         )
 
