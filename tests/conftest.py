@@ -1,3 +1,4 @@
+import os
 from collections.abc import AsyncGenerator, Awaitable, Callable
 
 import fastapi_pagination
@@ -6,6 +7,7 @@ from faker import Faker
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from pytest_asyncio import is_async_test
+from pytest_mock import MockerFixture
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -110,3 +112,14 @@ def organization_factory(
         )
 
     return _organization
+
+
+@pytest.fixture
+def mock_settings(mocker: MockerFixture) -> None:
+    mocker.patch.dict(
+        os.environ,
+        {
+            "FFC_OPERATIONS_API_MODIFIER_BASE_URL": "https://api-modifier.ffc.com",
+            "FFC_OPERATIONS_API_MODIFIER_JWT_SECRET": "test_jwt_secret",
+        },
+    )

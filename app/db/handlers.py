@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 from sqlalchemy import func
-from sqlalchemy.exc import NoResultFound
+from sqlalchemy.exc import IntegrityError, NoResultFound
 from sqlmodel import select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -18,16 +18,23 @@ class NotFoundError(DBError):
     pass
 
 
+class ConstraintViolationError(DBError):
+    pass
+
+
 class ModelHandler[T: UUIDModel]:
     def __init__(self, model_cls: type[T], session: AsyncSession) -> None:
         self.model_cls: type[T] = model_cls
         self.session: AsyncSession = session
 
     async def create(self, data: BaseModel) -> T:
-        obj = self.model_cls(**data.model_dump())
-        self.session.add(obj)
-        await self.session.commit()
-        await self.session.refresh(obj)
+        try:
+            obj = self.model_cls(**data.model_dump())
+            self.session.add(obj)
+            await self.session.commit()
+            await self.session.refresh(obj)
+        except IntegrityError as e:
+            raise ConstraintViolationError(f"Failed to create {self.model_cls.__name__}: {e}")
 
         return obj
 

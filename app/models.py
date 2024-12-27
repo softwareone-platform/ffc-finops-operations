@@ -76,6 +76,7 @@ class Entitlement(EntitlementBase, TimestampModel, UUIDModel, table=True):
 
 class EntitlementRead(EntitlementBase, UUIDModel):
     created_at: datetime.datetime
+    updated_at: datetime.datetime
     activated_at: datetime.datetime | None
     status: EntitlementStatus
 
@@ -98,6 +99,15 @@ class OrganizationBase(SQLModel):
 class Organization(OrganizationBase, TimestampModel, UUIDModel, table=True):
     __tablename__ = "organizations"
 
+    organization_id: str | None = Field(max_length=255, nullable=True, index=True)
+
 
 class OrganizationRead(OrganizationBase, UUIDModel):
-    pass
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+    organization_id: str | None
+
+
+class OrganizationCreate(OrganizationBase):
+    user_id: str
+    currency: str

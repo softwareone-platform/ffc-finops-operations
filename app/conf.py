@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     postgres_host: str
     postgres_port: int
 
+    api_modifier_base_url: str
+    api_modifier_jwt_secret: str
+
     debug: bool = False
 
     @computed_field
