@@ -1,35 +1,29 @@
 from collections.abc import Sequence
+from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel
-from sqlalchemy import func
-from sqlalchemy.exc import IntegrityError, NoResultFound
-from sqlmodel import select, update
-from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Entitlement, Organization, UUIDModel
+from app.db.models import Base, Entitlement, Organization, System
 
 
-class DBError(Exception):
+class NotFoundError(Exception):
     pass
 
 
-class NotFoundError(DBError):
+class ConstraintViolationError(Exception):
     pass
 
 
-class ConstraintViolationError(DBError):
-    pass
+class ModelHandler[M: Base]:
+    def __init__(self, session: AsyncSession, model_cls: type[M]) -> None:
+        self.session = session
+        self.model_cls = model_cls
 
-
-class ModelHandler[T: UUIDModel]:
-    def __init__(self, model_cls: type[T], session: AsyncSession) -> None:
-        self.model_cls: type[T] = model_cls
-        self.session: AsyncSession = session
-
-    async def create(self, data: BaseModel) -> T:
+    async def create(self, obj: M) -> M:
         try:
-            obj = self.model_cls(**data.model_dump())
             self.session.add(obj)
             await self.session.commit()
             await self.session.refresh(obj)
@@ -40,41 +34,41 @@ class ModelHandler[T: UUIDModel]:
 
         return obj
 
-    async def get(self, id: str | UUID) -> T:
-        try:
-            return await self.session.get_one(self.model_cls, id)
-        except NoResultFound as e:
-            raise NotFoundError(f"{self.model_cls.__name__} with ID {str(id)} wasn't found") from e
+    async def get(self, id: UUID | str) -> M:
+        result = await self.session.get(self.model_cls, id)
+        if result is None:
+            raise NotFoundError(f"{self.model_cls.__name__} with ID {str(id)} wasn't found")
+        return result
 
-    async def update(self, id: str | UUID, data: BaseModel) -> T:  # pragma: no cover
-        stmt = (
-            update(self.model_cls)
-            .where(self.model_cls.id == id)  # type: ignore[attr-defined, arg-type]
-            .values(**data.model_dump(exclude_unset=True))
-            .returning(self.model_cls)
-        )
-        try:
-            result = await self.session.exec(stmt)  # type: ignore[call-overload]
-            obj = result.scalars().one()
-            await self.session.commit()
-            return obj
-        except NoResultFound as e:
-            raise NotFoundError(f"{self.model_cls.__name__} with ID {str(id)} wasn't found") from e
+    async def update(self, id: str | UUID, data: dict[str, Any]) -> M:
+        # First fetch the object to ensure polymorphic loading
+        obj = await self.get(id)
+        # Update attributes
+        for key, value in data.items():
+            setattr(obj, key, value)
+        await self.session.commit()
+        await self.session.refresh(obj)
+        return obj
 
-    async def fetch_page(self, limit: int = 50, offset: int = 0) -> Sequence[T]:
-        results = await self.session.exec(select(self.model_cls).offset(offset).limit(limit))
-        return results.all()
+    async def fetch_page(self, limit: int = 50, offset: int = 0) -> Sequence[M]:
+        results = await self.session.execute(select(self.model_cls).offset(offset).limit(limit))
+        return results.scalars().all()
 
     async def count(self) -> int:
-        result = await self.session.exec(select(func.count(self.model_cls.id)))  # type: ignore[arg-type]
-        return result.one()
+        result = await self.session.execute(select(func.count(self.model_cls.id)))
+        return result.scalars().one()
 
 
 class EntitlementHandler(ModelHandler[Entitlement]):
     def __init__(self, session: AsyncSession) -> None:
-        super().__init__(Entitlement, session)
+        super().__init__(session, Entitlement)
 
 
 class OrganizationHandler(ModelHandler[Organization]):
     def __init__(self, session: AsyncSession) -> None:
-        super().__init__(Organization, session)
+        super().__init__(session, Organization)
+
+
+class SystemHandler(ModelHandler[System]):
+    def __init__(self, session: AsyncSession) -> None:
+        super().__init__(session, System)

@@ -21,6 +21,7 @@ class Settings(BaseSettings):
 
     api_modifier_base_url: str
     api_modifier_jwt_secret: str
+    secrets_encryption_key: str
 
     debug: bool = False
 

@@ -1,9 +1,9 @@
 from typing import Any
 
-from app.models import UUIDModel
+from app.schemas import BaseSchema
 
 
-def assert_json_contains_model(json: dict[str, Any], expected_model: UUIDModel) -> None:
+def assert_json_contains_model(json: dict[str, Any], expected_model: BaseSchema) -> None:
     assert all("id" in item for item in json["items"])
 
     items_by_id = {item["id"]: item for item in json["items"]}

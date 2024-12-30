@@ -169,3 +169,6 @@ bandit.json
 
 # vscode
 .devcontainer/
+
+# Postgres data
+pg_data/

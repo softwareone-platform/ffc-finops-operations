@@ -4,10 +4,11 @@ import pytest
 from httpx import AsyncClient
 from pytest_httpx import HTTPXMock
 from pytest_mock import MockerFixture
-from sqlmodel import select
-from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Organization
+from app.db.models import Organization
+from app.schemas import OrganizationRead, from_orm
 from tests.conftest import ModelFactory
 from tests.utils import assert_json_contains_model
 
@@ -16,8 +17,10 @@ from tests.utils import assert_json_contains_model
 # =================
 
 
-async def test_get_all_organizations_empty_db(api_client: AsyncClient):
-    response = await api_client.get("/organizations/")
+async def test_get_all_organizations_empty_db(api_client: AsyncClient, gcp_jwt_token: str):
+    response = await api_client.get(
+        "/organizations/", headers={"Authorization": f"Bearer {gcp_jwt_token}"}
+    )
 
     assert response.status_code == 200
     assert response.json()["total"] == 0
@@ -25,12 +28,15 @@ async def test_get_all_organizations_empty_db(api_client: AsyncClient):
 
 
 async def test_get_all_organizations_single_page(
-    organization_factory: ModelFactory[Organization], api_client: AsyncClient
+    organization_factory: ModelFactory[Organization], api_client: AsyncClient, gcp_jwt_token: str
 ):
     organization_1 = await organization_factory(external_id="EXTERNAL_ID_1")
     organization_2 = await organization_factory(external_id="EXTERNAL_ID_2")
 
-    response = await api_client.get("/organizations/")
+    response = await api_client.get(
+        "/organizations/",
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+    )
 
     assert response.status_code == 200
     data = response.json()
@@ -38,12 +44,12 @@ async def test_get_all_organizations_single_page(
     assert data["total"] == 2
     assert len(data["items"]) == data["total"]
 
-    assert_json_contains_model(data, organization_1)
-    assert_json_contains_model(data, organization_2)
+    assert_json_contains_model(data, from_orm(OrganizationRead, organization_1))
+    assert_json_contains_model(data, from_orm(OrganizationRead, organization_2))
 
 
 async def test_get_all_organizations_multiple_pages(
-    organization_factory: ModelFactory[Organization], api_client: AsyncClient
+    organization_factory: ModelFactory[Organization], api_client: AsyncClient, gcp_jwt_token: str
 ):
     for index in range(10):
         await organization_factory(
@@ -51,7 +57,11 @@ async def test_get_all_organizations_multiple_pages(
             external_id=f"EXTERNAL_ID_{index}",
         )
 
-    first_page_response = await api_client.get("/organizations/", params={"limit": 5})
+    first_page_response = await api_client.get(
+        "/organizations/",
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+        params={"limit": 5},
+    )
     first_page_data = first_page_response.json()
 
     assert first_page_response.status_code == 200
@@ -60,7 +70,11 @@ async def test_get_all_organizations_multiple_pages(
     assert first_page_data["limit"] == 5
     assert first_page_data["offset"] == 0
 
-    second_page_response = await api_client.get("/organizations/", params={"limit": 3, "offset": 5})
+    second_page_response = await api_client.get(
+        "/organizations/",
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+        params={"limit": 3, "offset": 5},
+    )
     second_page_data = second_page_response.json()
 
     assert second_page_response.status_code == 200
@@ -69,7 +83,11 @@ async def test_get_all_organizations_multiple_pages(
     assert second_page_data["limit"] == 3
     assert second_page_data["offset"] == 5
 
-    third_page_response = await api_client.get("/organizations/", params={"offset": 8})
+    third_page_response = await api_client.get(
+        "/organizations/",
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+        params={"offset": 8},
+    )
     third_page_data = third_page_response.json()
 
     assert third_page_response.status_code == 200
@@ -124,7 +142,7 @@ async def test_can_create_organizations(
     assert data["organization_id"] == "UUID-yyyy-yyyy-yyyy-yyyy"
     assert data["created_at"] is not None
 
-    result = await db_session.exec(select(Organization).where(Organization.id == data["id"]))
+    result = await db_session.execute(select(Organization).where(Organization.id == data["id"]))
     assert result.one_or_none() is not None
 
 

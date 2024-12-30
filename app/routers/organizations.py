@@ -1,29 +1,33 @@
 from uuid import UUID
 
 import httpx
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi_pagination.limit_offset import LimitOffsetPage
 
 from app import settings
+from app.auth import get_current_system
 from app.db.handlers import ConstraintViolationError, NotFoundError
-from app.models import Organization, OrganizationCreate, OrganizationRead
+from app.db.models import Organization, System
 from app.pagination import paginate
 from app.repositories import OrganizationRepository
+from app.schemas import OrganizationCreate, OrganizationRead, from_orm, to_orm
 from app.utils import get_api_modifier_jwt_token
 
 router = APIRouter()
 
 
 @router.get("/", response_model=LimitOffsetPage[OrganizationRead])
-async def get_organizations(organization_repo: OrganizationRepository):
-    return await paginate(organization_repo)
+async def get_organizations(
+    organization_repo: OrganizationRepository, system: System = Depends(get_current_system)
+):
+    return await paginate(organization_repo, OrganizationRead)
 
 
 @router.post("/", response_model=OrganizationRead, status_code=status.HTTP_201_CREATED)
 async def create_organization(data: OrganizationCreate, organization_repo: OrganizationRepository):
-    organization: Organization | None = None
+    db_organization: Organization | None = None
     try:
-        organization = await organization_repo.create(data)
+        db_organization = await organization_repo.create(to_orm(data, Organization))
     except ConstraintViolationError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -43,8 +47,13 @@ async def create_organization(data: OrganizationCreate, organization_repo: Organ
             )
             response.raise_for_status()
             ffc_organization = response.json()
-            organization.organization_id = ffc_organization["id"]
-            return await organization_repo.update(organization.id, organization)
+            db_organization = await organization_repo.update(
+                db_organization.id,
+                {
+                    "organization_id": ffc_organization["id"],
+                },
+            )
+            return from_orm(OrganizationRead, db_organization)
     except httpx.HTTPStatusError as e:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -58,7 +67,8 @@ async def create_organization(data: OrganizationCreate, organization_repo: Organ
 @router.get("/{id}", response_model=OrganizationRead)
 async def get_organization_by_id(id: UUID, organization_repo: OrganizationRepository):
     try:
-        return await organization_repo.get(id=id)
+        db_organization = await organization_repo.get(id=id)
+        return from_orm(OrganizationRead, db_organization)
     except NotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
