@@ -3,17 +3,21 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Base, Entitlement, Organization, System
 
 
-class NotFoundError(Exception):
+class DatabaseError(Exception):
     pass
 
 
-class ConstraintViolationError(Exception):
+class NotFoundError(DatabaseError):
+    pass
+
+
+class ConstraintViolationError(DatabaseError):
     pass
 
 
@@ -35,10 +39,15 @@ class ModelHandler[M: Base]:
         return obj
 
     async def get(self, id: UUID | str) -> M:
-        result = await self.session.get(self.model_cls, id)
-        if result is None:
-            raise NotFoundError(f"{self.model_cls.__name__} with ID {str(id)} wasn't found")
-        return result
+        try:
+            result = await self.session.get(self.model_cls, id)
+            if result is None:
+                raise NotFoundError(f"{self.model_cls.__name__} with ID {str(id)} wasn't found")
+            return result
+        except DBAPIError as e:
+            raise DatabaseError(
+                f"Failed to get {self.model_cls.__name__} with ID {str(id)}: {e}"
+            ) from e
 
     async def update(self, id: str | UUID, data: dict[str, Any]) -> M:
         # First fetch the object to ensure polymorphic loading

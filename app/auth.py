@@ -4,7 +4,7 @@ import jwt
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app.db.handlers import NotFoundError
+from app.db.handlers import DatabaseError
 from app.db.models import System
 from app.repositories import SystemRepository
 
@@ -22,7 +22,7 @@ class JWTBearer(HTTPBearer):
     def __init__(self):
         super().__init__(auto_error=False)
 
-    async def __call__(self, request: Request) -> HTTPAuthorizationCredentials | None:
+    async def __call__(self, request: Request) -> JWTCredentials:
         credentials = await super().__call__(request)
         if credentials:
             try:
@@ -55,7 +55,7 @@ async def get_current_system(
             algorithms=[JWT_ALGORITHM],
         )
         return system
-    except (jwt.InvalidTokenError, NotFoundError) as e:
+    except (jwt.InvalidTokenError, DatabaseError) as e:
         raise UNAUTHORIZED_EXCEPTION from e
 
 

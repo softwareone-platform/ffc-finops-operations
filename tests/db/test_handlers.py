@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.handlers import (
     ConstraintViolationError,
+    DatabaseError,
     EntitlementHandler,
     NotFoundError,
     OrganizationHandler,
@@ -446,3 +447,22 @@ async def test_update_system_jwt_secret(db_session: AsyncSession):
     updated = await system_handler.update(system.id, {"jwt_secret": "new-secret"})
 
     assert updated.jwt_secret == "new-secret"
+
+
+async def test_get_system_db_error(
+    db_session: AsyncSession,
+):
+    # Create directly in DB
+    system = System(
+        name="Test System",
+        external_id="test-system",
+        jwt_secret="secret",
+    )
+    db_session.add(system)
+    await db_session.commit()
+    await db_session.refresh(system)
+
+    system_handler = SystemHandler(db_session)
+    # Get using handl
+    with pytest.raises(DatabaseError):
+        await system_handler.get("abcd")
