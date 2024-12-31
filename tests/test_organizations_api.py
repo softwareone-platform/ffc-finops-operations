@@ -110,14 +110,15 @@ async def test_get_all_organizations_multiple_pages(
 async def test_can_create_organizations(
     mocker: MockerFixture,
     httpx_mock: HTTPXMock,
-    mock_settings: None,
     api_client: AsyncClient,
     db_session: AsyncSession,
+    gcp_jwt_token: str,
 ):
     mocker.patch("app.routers.organizations.get_api_modifier_jwt_token", return_value="test_token")
 
     httpx_mock.add_response(
         method="POST",
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
         url="https://api-modifier.ffc.com/admin/organizations",
         json={"id": "UUID-yyyy-yyyy-yyyy-yyyy"},
         match_headers={"Authorization": "Bearer test_token"},
@@ -125,6 +126,7 @@ async def test_can_create_organizations(
 
     response = await api_client.post(
         "/organizations/",
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
         json={
             "name": "My Organization",
             "external_id": "ACC-1234-5678",
@@ -148,7 +150,7 @@ async def test_can_create_organizations(
 
 @pytest.mark.parametrize("missing_field", ["name", "external_id", "user_id", "currency"])
 async def test_create_organization_with_incomplete_data(
-    api_client: AsyncClient, missing_field: str
+    api_client: AsyncClient, missing_field: str, gcp_jwt_token: str
 ):
     payload = {
         "name": "My Organization",
@@ -161,6 +163,7 @@ async def test_create_organization_with_incomplete_data(
     response = await api_client.post(
         "/organizations/",
         json=payload,
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
     )
 
     assert response.status_code == 422
@@ -171,7 +174,7 @@ async def test_create_organization_with_incomplete_data(
 
 
 async def test_create_organization_with_existing_external_id(
-    api_client: AsyncClient, organization_factory: ModelFactory[Organization]
+    api_client: AsyncClient, organization_factory: ModelFactory[Organization], gcp_jwt_token: str
 ):
     payload = {
         "name": "My Organization",
@@ -185,6 +188,7 @@ async def test_create_organization_with_existing_external_id(
     response = await api_client.post(
         "/organizations/",
         json=payload,
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
     )
 
     assert response.status_code == 400
@@ -197,6 +201,7 @@ async def test_create_organization_api_modifier_error(
     httpx_mock: HTTPXMock,
     mock_settings: None,
     api_client: AsyncClient,
+    gcp_jwt_token: str,
 ):
     mocker.patch("app.routers.organizations.get_api_modifier_jwt_token", return_value="test_token")
 
@@ -215,6 +220,7 @@ async def test_create_organization_api_modifier_error(
             "user_id": "UUID-xxxx-xxxx-xxxx-xxxx",
             "currency": "USD",
         },
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
     )
 
     assert response.status_code == 502
@@ -229,10 +235,12 @@ async def test_create_organization_api_modifier_error(
 
 
 async def test_get_organization_by_id(
-    organization_factory: ModelFactory[Organization], api_client: AsyncClient
+    organization_factory: ModelFactory[Organization], api_client: AsyncClient, gcp_jwt_token: str
 ):
     org = await organization_factory()
-    response = await api_client.get(f"/organizations/{org.id}")
+    response = await api_client.get(
+        f"/organizations/{org.id}", headers={"Authorization": f"Bearer {gcp_jwt_token}"}
+    )
 
     assert response.status_code == 200
     data = response.json()
@@ -243,16 +251,21 @@ async def test_get_organization_by_id(
     assert data["created_at"] is not None
 
 
-async def test_get_non_existant_organization(api_client: AsyncClient):
+async def test_get_non_existant_organization(api_client: AsyncClient, gcp_jwt_token: str):
     id = str(uuid.uuid4())
-    response = await api_client.get(f"/organizations/{id}")
+    response = await api_client.get(
+        f"/organizations/{id}", headers={"Authorization": f"Bearer {gcp_jwt_token}"}
+    )
 
     assert response.status_code == 404
     assert response.json()["detail"] == f"Organization with ID {id} wasn't found"
 
 
-async def test_get_invalid_id_format(api_client: AsyncClient):
-    response = await api_client.get("/organizations/this-is-not-a-valid-uuid")
+async def test_get_invalid_id_format(api_client: AsyncClient, gcp_jwt_token: str):
+    response = await api_client.get(
+        "/organizations/this-is-not-a-valid-uuid",
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+    )
 
     assert response.status_code == 422
 

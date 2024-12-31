@@ -1,4 +1,3 @@
-import os
 import secrets
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from datetime import UTC, datetime, timedelta
@@ -11,9 +10,9 @@ from faker import Faker
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from pytest_asyncio import is_async_test
-from pytest_mock import MockerFixture
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app import settings
 from app.db import db_engine
 from app.db.models import Actor, Base, Entitlement, Organization, System
 from app.enums import ActorType
@@ -118,15 +117,13 @@ def organization_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory
     return _organization
 
 
-@pytest.fixture
-def mock_settings(mocker: MockerFixture) -> None:
-    mocker.patch.dict(
-        os.environ,
-        {
-            "FFC_OPERATIONS_API_MODIFIER_BASE_URL": "https://api-modifier.ffc.com",
-            "FFC_OPERATIONS_API_MODIFIER_JWT_SECRET": "test_jwt_secret",
-        },
-    )
+@pytest.fixture(scope="session", autouse=True)
+def mock_settings() -> None:
+    settings.opt_cluster_secret = "test_cluster_secret"
+    settings.opt_api_base_url = "https://opt-api.ffc.com"
+    settings.opt_auth_base_url = "https://opt-auth.ffc.com"
+    settings.api_modifier_base_url = "https://api-modifier.ffc.com"
+    settings.api_modifier_jwt_secret = "test_jwt_secret"
 
 
 @pytest.fixture
@@ -201,6 +198,16 @@ async def gcp_extension(system_factory: ModelFactory[System]) -> System:
 @pytest.fixture
 def gcp_jwt_token(system_jwt_token_factory: Callable[[System], str], gcp_extension: System) -> str:
     return system_jwt_token_factory(gcp_extension)
+
+
+@pytest.fixture
+async def ffc_extension(system_factory: ModelFactory[System]) -> System:
+    return await system_factory(external_id="FFC")
+
+
+@pytest.fixture
+def ffc_jwt_token(system_jwt_token_factory: Callable[[System], str], ffc_extension: System) -> str:
+    return system_jwt_token_factory(ffc_extension)
 
 
 @pytest.fixture

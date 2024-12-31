@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     api_modifier_jwt_secret: str
     secrets_encryption_key: str
 
+    opt_auth_base_url: str
+    opt_api_base_url: str
+    opt_cluster_secret: str
+
     debug: bool = False
 
     @computed_field

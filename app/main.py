@@ -6,7 +6,7 @@ from fastapi import FastAPI
 
 from app import settings
 from app.db import verify_db_connection
-from app.routers import entitlements, organizations
+from app.routers import entitlements, organizations, users
 
 logger = logging.getLogger(__name__)
 
@@ -27,12 +27,8 @@ async def lifespan(app: FastAPI):  # pragma: no cover
 
 tags_metadata = [
     {
-        "name": "Entitlements",
-        "description": "Operations with entitlements",
-    },
-    {
-        "name": "Organizations",
-        "description": "Operations with organizations",
+        "name": "Operations",
+        "description": "Endpoint for managing FinOps for Cloud",
     },
 ]
 
@@ -51,5 +47,6 @@ fastapi_pagination.add_pagination(app)
 
 # TODO: Add healthcheck
 
-app.include_router(entitlements.router, prefix="/entitlements", tags=["Entitlements"])
-app.include_router(organizations.router, prefix="/organizations", tags=["Organizations"])
+app.include_router(entitlements.router, prefix="/entitlements", tags=["Operations"])
+app.include_router(organizations.router, prefix="/organizations", tags=["Operations"])
+app.include_router(users.router, prefix="/users", tags=["Operations"])
