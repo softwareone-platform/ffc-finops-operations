@@ -99,3 +99,16 @@ class OrganizationUpdate(OrganizationBase):
     name: str | None = None  # type: ignore
     external_id: str | None = None  # type: ignore
     organization_id: str | None = None
+
+
+class UserBase(BaseSchema):
+    email: Annotated[str, Field(max_length=255)]
+    display_name: Annotated[str, Field(max_length=255)]
+
+
+class UserCreate(UserBase):
+    pass
+
+
+class UserRead(UserBase):
+    id: uuid.UUID

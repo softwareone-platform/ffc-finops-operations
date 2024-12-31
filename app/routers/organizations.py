@@ -1,13 +1,13 @@
 from uuid import UUID
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 from fastapi_pagination.limit_offset import LimitOffsetPage
 
 from app import settings
-from app.auth import get_current_system
+from app.auth import CurrentSystem
 from app.db.handlers import ConstraintViolationError, NotFoundError
-from app.db.models import Organization, System
+from app.db.models import Organization
 from app.pagination import paginate
 from app.repositories import OrganizationRepository
 from app.schemas import OrganizationCreate, OrganizationRead, from_orm, to_orm
@@ -18,16 +18,23 @@ router = APIRouter()
 
 @router.get("/", response_model=LimitOffsetPage[OrganizationRead])
 async def get_organizations(
-    organization_repo: OrganizationRepository, system: System = Depends(get_current_system)
+    organization_repo: OrganizationRepository, current_system: CurrentSystem
 ):
     return await paginate(organization_repo, OrganizationRead)
 
 
 @router.post("/", response_model=OrganizationRead, status_code=status.HTTP_201_CREATED)
-async def create_organization(data: OrganizationCreate, organization_repo: OrganizationRepository):
+async def create_organization(
+    data: OrganizationCreate,
+    organization_repo: OrganizationRepository,
+    current_system: CurrentSystem,
+):
     db_organization: Organization | None = None
     try:
-        db_organization = await organization_repo.create(to_orm(data, Organization))
+        organization = to_orm(data, Organization)
+        organization.created_by = current_system
+        organization.updated_by = current_system
+        db_organization = await organization_repo.create(organization)
     except ConstraintViolationError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -65,7 +72,9 @@ async def create_organization(data: OrganizationCreate, organization_repo: Organ
 
 
 @router.get("/{id}", response_model=OrganizationRead)
-async def get_organization_by_id(id: UUID, organization_repo: OrganizationRepository):
+async def get_organization_by_id(
+    id: UUID, organization_repo: OrganizationRepository, current_system: CurrentSystem
+):
     try:
         db_organization = await organization_repo.get(id=id)
         return from_orm(OrganizationRead, db_organization)
