@@ -30,7 +30,7 @@ DBSession = Annotated[AsyncSession, Depends(get_db_session)]
 
 async def verify_db_connection():  # pragma: no cover
     async with asynccontextmanager(get_db_session)() as session:
-        result = await session.exec(text("SELECT 1"))
+        result = await session.execute(text("SELECT 1"))
 
         if result.one()[0] != 1:
             raise RuntimeError("Could not verify database connection")
