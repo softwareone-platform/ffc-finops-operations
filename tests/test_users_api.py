@@ -11,7 +11,9 @@ async def test_can_create_users(
     api_client: AsyncClient,
     ffc_jwt_token: str,
 ):
-    mocker.patch("app.routers.users.get_api_modifier_jwt_token", return_value="test_token")
+    mocker.patch(
+        "app.api_clients.api_modifier.get_api_modifier_jwt_token", return_value="test_token"
+    )
     mocked_token_urlsafe = mocker.patch(
         "app.routers.users.secrets.token_urlsafe", return_value="random_password"
     )
@@ -69,7 +71,9 @@ async def test_create_user_already_exists(
     api_client: AsyncClient,
     ffc_jwt_token: str,
 ):
-    mocker.patch("app.routers.users.get_api_modifier_jwt_token", return_value="test_token")
+    mocker.patch(
+        "app.api_clients.api_modifier.get_api_modifier_jwt_token", return_value="test_token"
+    )
 
     httpx_mock.add_response(
         method="GET",
@@ -105,7 +109,9 @@ async def test_create_user_check_existence_error(
     api_client: AsyncClient,
     ffc_jwt_token: str,
 ):
-    mocker.patch("app.routers.users.get_api_modifier_jwt_token", return_value="test_token")
+    mocker.patch(
+        "app.api_clients.api_modifier.get_api_modifier_jwt_token", return_value="test_token"
+    )
 
     httpx_mock.add_response(
         method="GET",
@@ -122,9 +128,7 @@ async def test_create_user_check_existence_error(
     )
     assert response.status_code == 502
     assert response.json() == {
-        "detail": [
-            "Error checking user existence in FinOps for Cloud: 500 - Internal Server Error.",
-        ],
+        "detail": "Error checking user existence in FinOps for Cloud: 500 - Internal Server Error.",
     }
 
 
@@ -134,7 +138,9 @@ async def test_create_user_error_creating_user(
     api_client: AsyncClient,
     ffc_jwt_token: str,
 ):
-    mocker.patch("app.routers.users.get_api_modifier_jwt_token", return_value="test_token")
+    mocker.patch(
+        "app.api_clients.api_modifier.get_api_modifier_jwt_token", return_value="test_token"
+    )
 
     httpx_mock.add_response(
         method="GET",
@@ -156,7 +162,5 @@ async def test_create_user_error_creating_user(
     )
     assert response.status_code == 502
     assert response.json() == {
-        "detail": [
-            "Error creating user in FinOps for Cloud: 500 - Internal Server Error.",
-        ],
+        "detail": "Error creating user in FinOps for Cloud: 500 - Internal Server Error.",
     }

@@ -114,7 +114,9 @@ async def test_can_create_organizations(
     db_session: AsyncSession,
     gcp_jwt_token: str,
 ):
-    mocker.patch("app.routers.organizations.get_api_modifier_jwt_token", return_value="test_token")
+    mocker.patch(
+        "app.api_clients.api_modifier.get_api_modifier_jwt_token", return_value="test_token"
+    )
 
     httpx_mock.add_response(
         method="POST",
@@ -203,7 +205,9 @@ async def test_create_organization_api_modifier_error(
     api_client: AsyncClient,
     gcp_jwt_token: str,
 ):
-    mocker.patch("app.routers.organizations.get_api_modifier_jwt_token", return_value="test_token")
+    mocker.patch(
+        "app.api_clients.api_modifier.get_api_modifier_jwt_token", return_value="test_token"
+    )
 
     httpx_mock.add_response(
         method="POST",
@@ -225,7 +229,7 @@ async def test_create_organization_api_modifier_error(
 
     assert response.status_code == 502
 
-    [detail] = response.json()["detail"]
+    detail = response.json()["detail"]
     assert detail == "Error creating organization in FinOps for Cloud: 500 - Internal Server Error."
 
 

@@ -1,17 +1,16 @@
 from uuid import UUID
 
-import httpx
 from fastapi import APIRouter, HTTPException, status
 from fastapi_pagination.limit_offset import LimitOffsetPage
 
-from app import settings
+from app.api_clients.api_modifier import APIModifier
 from app.auth import CurrentSystem
 from app.db.handlers import ConstraintViolationError, NotFoundError
 from app.db.models import Organization
 from app.pagination import paginate
 from app.repositories import OrganizationRepository
 from app.schemas import OrganizationCreate, OrganizationRead, from_orm, to_orm
-from app.utils import get_api_modifier_jwt_token
+from app.utils import wrap_http_error_in_502
 
 router = APIRouter()
 
@@ -28,6 +27,7 @@ async def create_organization(
     data: OrganizationCreate,
     organization_repo: OrganizationRepository,
     current_system: CurrentSystem,
+    api_modifier_client: APIModifier,
 ):
     db_organization: Organization | None = None
     try:
@@ -41,34 +41,19 @@ async def create_organization(
             detail=f"Organization with this external ID already exists: {data.external_id}.",
         )
 
-    try:
-        async with httpx.AsyncClient(base_url=settings.api_modifier_base_url) as client:
-            response = await client.post(
-                "/admin/organizations",
-                headers={"Authorization": f"Bearer {get_api_modifier_jwt_token()}"},
-                json={
-                    "org_name": data.name,
-                    "user_id": data.user_id,
-                    "currency": data.currency,
-                },
-            )
-            response.raise_for_status()
-            ffc_organization = response.json()
-            db_organization = await organization_repo.update(
-                db_organization.id,
-                {
-                    "organization_id": ffc_organization["id"],
-                },
-            )
-            return from_orm(OrganizationRead, db_organization)
-    except httpx.HTTPStatusError as e:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=(
-                "Error creating organization in FinOps for Cloud: "
-                f"{e.response.status_code} - {e.response.text}.",
-            ),
-        ) from e
+    async with wrap_http_error_in_502("Error creating organization in FinOps for Cloud"):
+        response = await api_modifier_client.create_organization(
+            org_name=data.name, user_id=data.user_id, currency=data.currency
+        )
+
+        ffc_organization = response.json()
+        db_organization = await organization_repo.update(
+            db_organization.id,
+            {
+                "organization_id": ffc_organization["id"],
+            },
+        )
+        return from_orm(OrganizationRead, db_organization)
 
 
 @router.get("/{id}", response_model=OrganizationRead)

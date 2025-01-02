@@ -1,0 +1,56 @@
+from collections.abc import AsyncGenerator
+from typing import Annotated
+
+import httpx
+from fastapi import Depends
+
+from app import settings
+from app.api_clients.base import APIClientError, BaseAPIClient, HeaderAuth
+from app.utils import get_api_modifier_jwt_token
+
+
+class APIModifierClientError(APIClientError):
+    client_name = "APIModifier"
+
+
+class APIModifierClient(BaseAPIClient):
+    base_url = settings.api_modifier_base_url
+    auth = HeaderAuth("Authorization", lambda: f"Bearer {get_api_modifier_jwt_token()}")
+
+    async def create_user(self, email: str, display_name: str, password: str) -> httpx.Response:
+        response = await self.httpx_client.post(
+            "/admin/users",
+            json={
+                "email": email,
+                "display_name": display_name,
+                "password": password,
+            },
+        )
+
+        response.raise_for_status()
+        return response
+
+    async def create_organization(
+        self,
+        org_name: str,
+        user_id: str,
+        currency: str,
+    ) -> httpx.Response:
+        response = await self.httpx_client.post(
+            "/admin/organizations",
+            json={
+                "org_name": org_name,
+                "user_id": user_id,
+                "currency": currency,
+            },
+        )
+        response.raise_for_status()
+        return response
+
+
+async def get_api_modifier_client() -> AsyncGenerator[APIModifierClient]:
+    async with APIModifierClient() as client:
+        yield client
+
+
+APIModifier = Annotated[APIModifierClient, Depends(get_api_modifier_client)]
