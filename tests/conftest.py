@@ -3,9 +3,9 @@ from collections.abc import AsyncGenerator, Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from typing import TypeVar
 
-import fastapi_pagination
 import jwt
 import pytest
+from asgi_lifespan import LifespanManager
 from faker import Faker
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
@@ -38,11 +38,11 @@ def mock_settings() -> None:
 
 
 @pytest.fixture(scope="session", autouse=True)
-def fastapi_app(mock_settings) -> FastAPI:
+async def fastapi_app(mock_settings) -> FastAPI:
     from app.main import app
 
-    fastapi_pagination.add_pagination(app)
-    return app
+    async with LifespanManager(app) as lifespan_manager:
+        yield lifespan_manager.app
 
 
 @pytest.fixture(autouse=True)

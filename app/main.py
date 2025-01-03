@@ -12,15 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):  # pragma: no cover
-    # NOTE: the lifespan is not executed when running the tests (thus the pragma: no cover)
-    #       There is a way to change that with florimondmanca/asgi-lifespan but it's not
-    #       needed for now as the lifespan is only used to verify the DB connection.
-    #
-    # refs:
-    #     * https://fastapi.tiangolo.com/advanced/async-tests/#run-it
-    #     * https://github.com/florimondmanca/asgi-lifespan#usage
-
+async def lifespan(app: FastAPI):
     await verify_db_connection()
     yield
 

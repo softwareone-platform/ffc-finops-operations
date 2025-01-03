@@ -41,6 +41,7 @@ dev = [
     "pytest-mock>=3.14.0",
     "freezegun>=1.5.1,<2.0",
     "ipdb>=0.13.13",
+    "asgi-lifespan>=2.1.0",
 ]
 
 
