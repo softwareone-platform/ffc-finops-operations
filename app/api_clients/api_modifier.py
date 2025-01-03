@@ -5,7 +5,7 @@ import httpx
 from fastapi import Depends
 
 from app import settings
-from app.api_clients.base import APIClientError, BaseAPIClient, HeaderAuth
+from app.api_clients.base import APIClientError, BaseAPIClient, BearerAuth
 from app.utils import get_api_modifier_jwt_token
 
 
@@ -15,7 +15,9 @@ class APIModifierClientError(APIClientError):
 
 class APIModifierClient(BaseAPIClient):
     base_url = settings.api_modifier_base_url
-    auth = HeaderAuth("Authorization", lambda: f"Bearer {get_api_modifier_jwt_token()}")
+
+    def get_auth(self) -> BearerAuth:
+        return BearerAuth(get_api_modifier_jwt_token())
 
     async def create_user(self, email: str, display_name: str, password: str) -> httpx.Response:
         response = await self.httpx_client.post(

@@ -1,7 +1,7 @@
 import abc
 import json
 import logging
-from collections.abc import Callable, Generator
+from collections.abc import Generator
 from types import TracebackType
 from typing import ClassVar, Self
 
@@ -11,15 +11,20 @@ logger = logging.getLogger(__name__)
 
 
 class HeaderAuth(httpx.Auth):
-    def __init__(self, header_name: str, header_value: str | Callable[[], str]):
+    def __init__(self, header_name: str, header_value: str):
         self.header_name = header_name
-        self.get_header_value = header_value if callable(header_value) else lambda: header_value
+        self.header_value = header_value
 
     def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response, None]:
         if self.header_name not in request.headers:
-            request.headers[self.header_name] = self.get_header_value()
+            request.headers[self.header_name] = self.header_value
 
         yield request
+
+
+class BearerAuth(HeaderAuth):
+    def __init__(self, token: str):
+        super().__init__("Authorization", f"Bearer {token}")
 
 
 class APIClientError(Exception):
@@ -45,8 +50,8 @@ class BaseAPIClient(abc.ABC):
 
     def __init__(self):
         self.httpx_client = httpx.AsyncClient(
-            base_url=self.base_url,
-            auth=self.auth,
+            base_url=self.get_base_url(),
+            auth=self.get_auth(),
             event_hooks={"request": [self._log_request], "response": [self._log_response]},
         )
 
@@ -61,6 +66,10 @@ class BaseAPIClient(abc.ABC):
         exc_tb: TracebackType | None = None,
     ) -> None:
         return await self.httpx_client.__aexit__(exc_type, exc_val, exc_tb)
+
+    # ===============
+    # Logging Methods
+    # ===============
 
     def _get_headers_to_log(self, headers: httpx.Headers) -> dict[str, str]:
         return {
@@ -119,3 +128,13 @@ class BaseAPIClient(abc.ABC):
             response.status_code,
             extra=structured_log_data,
         )
+
+    # ===========================================
+    # Methods for dynamic class fields evaliation
+    # ===========================================
+
+    def get_auth(self) -> httpx.Auth | None:
+        return self.auth
+
+    def get_base_url(self) -> str:
+        return self.base_url
