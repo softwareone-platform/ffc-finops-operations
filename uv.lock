@@ -717,14 +717,14 @@ requires-dist = [
     { name = "python-dotenv", specifier = "==1.0.*" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = "==2.0.*" },
     { name = "sqlalchemy-utils", specifier = "==0.41.*" },
-    { name = "svcs", specifier = ">=24.1.0" },
+    { name = "svcs", specifier = "==24.1.*" },
     { name = "uvicorn-worker", specifier = "==0.3.*" },
     { name = "uvloop", specifier = "==0.21.*" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "asgi-lifespan", specifier = ">=2.1.0" },
+    { name = "asgi-lifespan", specifier = ">=2.1.0,<3.0" },
     { name = "bandit", specifier = ">=1.8.0,<2.0" },
     { name = "faker", specifier = ">=33.1.0,<34.0" },
     { name = "freezegun", specifier = ">=1.5.1,<2.0" },
