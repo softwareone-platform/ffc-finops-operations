@@ -24,6 +24,7 @@ dependencies = [
     "gunicorn==23.0.*",
     "uvloop==0.21.*",
     "uvicorn-worker==0.3.*",
+    "svcs>=24.1.0",
 ]
 
 [dependency-groups]

@@ -1,9 +1,10 @@
 from uuid import UUID
 
+import svcs
 from fastapi import APIRouter, HTTPException, status
 from fastapi_pagination.limit_offset import LimitOffsetPage
 
-from app.api_clients.api_modifier import APIModifier
+from app.api_clients import APIModifierClient
 from app.auth import CurrentSystem
 from app.db.handlers import ConstraintViolationError, NotFoundError
 from app.db.models import Organization
@@ -27,8 +28,10 @@ async def create_organization(
     data: OrganizationCreate,
     organization_repo: OrganizationRepository,
     current_system: CurrentSystem,
-    api_modifier_client: APIModifier,
+    services: svcs.fastapi.DepContainer,
 ):
+    api_modifier_client = await services.aget(APIModifierClient)
+
     db_organization: Organization | None = None
     try:
         organization = to_orm(data, Organization)

@@ -1,8 +1,4 @@
-from collections.abc import AsyncGenerator
-from typing import Annotated
-
 import httpx
-from fastapi import Depends
 
 from app import settings
 from app.api_clients.base import APIClientError, BaseAPIClient, BearerAuth
@@ -10,7 +6,7 @@ from app.utils import get_api_modifier_jwt_token
 
 
 class APIModifierClientError(APIClientError):
-    client_name = "APIModifier"
+    pass
 
 
 class APIModifierClient(BaseAPIClient):
@@ -48,11 +44,3 @@ class APIModifierClient(BaseAPIClient):
         )
         response.raise_for_status()
         return response
-
-
-async def get_api_modifier_client() -> AsyncGenerator[APIModifierClient]:
-    async with APIModifierClient() as client:
-        yield client
-
-
-APIModifier = Annotated[APIModifierClient, Depends(get_api_modifier_client)]

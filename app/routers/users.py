@@ -1,10 +1,9 @@
 import secrets
 
+import svcs
 from fastapi import APIRouter, status
 
-from app.api_clients.api_modifier import APIModifier
-from app.api_clients.optscale import Optscale
-from app.api_clients.optscale_auth import OptscaleAuth, UserDoesNotExist
+from app.api_clients import APIModifierClient, OptscaleAuthClient, OptscaleClient, UserDoesNotExist
 from app.auth import CurrentSystem
 from app.schemas import UserCreate, UserRead
 from app.utils import wrap_http_error_in_502
@@ -16,10 +15,9 @@ router = APIRouter()
 async def create_user(
     data: UserCreate,
     system: CurrentSystem,
-    optscale_auth_client: OptscaleAuth,
-    api_modifier_client: APIModifier,
-    optscale_client: Optscale,
+    services: svcs.fastapi.DepContainer,
 ):
+    optscale_auth_client = await services.aget(OptscaleAuthClient)
     async with wrap_http_error_in_502("Error checking user existence in FinOps for Cloud"):
         try:
             response = await optscale_auth_client.get_existing_user_info(data.email)
@@ -28,6 +26,7 @@ async def create_user(
         else:
             return UserRead(**response.json()["user_info"])
 
+    api_modifier_client = await services.aget(APIModifierClient)
     async with wrap_http_error_in_502("Error creating user in FinOps for Cloud"):
         create_user_response = await api_modifier_client.create_user(
             email=data.email,
@@ -35,6 +34,8 @@ async def create_user(
             password=secrets.token_urlsafe(128),
         )
 
+    optscale_client = await services.aget(OptscaleClient)
+    async with wrap_http_error_in_502("Error resetting the password for user in FinOps for Cloud"):
         await optscale_client.reset_password(data.email)
 
         return UserRead(**create_user_response.json())

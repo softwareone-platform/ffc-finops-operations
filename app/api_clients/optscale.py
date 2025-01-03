@@ -1,15 +1,11 @@
-from collections.abc import AsyncGenerator
-from typing import Annotated
-
 import httpx
-from fastapi import Depends
 
 from app import settings
 from app.api_clients.base import APIClientError, BaseAPIClient
 
 
 class OptscaleClientError(APIClientError):
-    client_name = "Optscale"
+    pass
 
 
 class OptscaleClient(BaseAPIClient):
@@ -23,11 +19,3 @@ class OptscaleClient(BaseAPIClient):
 
         response.raise_for_status()
         return response
-
-
-async def get_optscale_client() -> AsyncGenerator[OptscaleClient]:
-    async with OptscaleClient() as client:
-        yield client
-
-
-Optscale = Annotated[OptscaleClient, Depends(get_optscale_client)]

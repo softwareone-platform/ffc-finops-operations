@@ -1,15 +1,11 @@
-from collections.abc import AsyncGenerator
-from typing import Annotated
-
 import httpx
-from fastapi import Depends
 
 from app import settings
 from app.api_clients.base import APIClientError, BaseAPIClient, HeaderAuth
 
 
 class OptscaleAuthClientError(APIClientError):
-    client_name = "OptscaleAuth"
+    pass
 
 
 class UserDoesNotExist(OptscaleAuthClientError):
@@ -37,11 +33,3 @@ class OptscaleAuthClient(BaseAPIClient):
             raise UserDoesNotExist(email)
 
         return response
-
-
-async def get_optscale_auth_client() -> AsyncGenerator[OptscaleAuthClient]:
-    async with OptscaleAuthClient() as client:
-        yield client
-
-
-OptscaleAuth = Annotated[OptscaleAuthClient, Depends(get_optscale_auth_client)]

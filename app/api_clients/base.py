@@ -1,4 +1,5 @@
 import abc
+import inspect
 import json
 import logging
 from collections.abc import Generator
@@ -16,7 +17,7 @@ class HeaderAuth(httpx.Auth):
         self.header_value = header_value
 
     def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response, None]:
-        if self.header_name not in request.headers:
+        if self.header_name not in request.headers:  # pragma: no cover
             request.headers[self.header_name] = self.header_value
 
         yield request
@@ -29,14 +30,10 @@ class BearerAuth(HeaderAuth):
 
 class APIClientError(Exception):
     client_name: ClassVar[str]
-    _clients_by_name: ClassVar[dict[str, type["APIClientError"]]] = {}
 
     def __init_subclass__(cls):
-        cls._clients_by_name[cls.client_name] = cls
-
-    @classmethod
-    def for_client(cls, client_name: str) -> type["APIClientError"]:
-        return cls._clients_by_name.get(client_name, cls)
+        super().__init_subclass__()
+        cls.client_name = cls.__module__.split(".")[-1]
 
     def __init__(self, message: str):
         self.message = message
@@ -47,6 +44,21 @@ class APIClientError(Exception):
 class BaseAPIClient(abc.ABC):
     base_url: ClassVar[str]
     auth: ClassVar[httpx.Auth | None] = None
+
+    _clients_by_name: ClassVar[dict[str, type[Self]]] = {}
+
+    def __init_subclass__(cls):
+        super().__init_subclass__()
+
+        if inspect.isabstract(cls):  # pragma: no cover
+            return
+
+        client_name = cls.__module__.split(".")[-1]
+        cls._clients_by_name[client_name] = cls
+
+    @classmethod
+    def get_clients_by_name(cls) -> dict[str, type[Self]]:
+        return cls._clients_by_name
 
     def __init__(self):
         self.httpx_client = httpx.AsyncClient(
