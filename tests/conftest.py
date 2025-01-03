@@ -3,9 +3,9 @@ from collections.abc import AsyncGenerator, Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from typing import TypeVar
 
-import fastapi_pagination
 import jwt
 import pytest
+from asgi_lifespan import LifespanManager
 from faker import Faker
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
@@ -16,7 +16,6 @@ from app import settings
 from app.db import db_engine
 from app.db.models import Actor, Base, Entitlement, Organization, System
 from app.enums import ActorType
-from app.main import app
 
 ModelT = TypeVar("ModelT", bound=Base)
 ModelFactory = Callable[..., Awaitable[ModelT]]
@@ -29,10 +28,21 @@ def pytest_collection_modifyitems(items):
         async_test.add_marker(session_scope_marker, append=False)
 
 
+@pytest.fixture(scope="session")
+def mock_settings() -> None:
+    settings.opt_cluster_secret = "test_cluster_secret"
+    settings.opt_api_base_url = "https://opt-api.ffc.com"
+    settings.opt_auth_base_url = "https://opt-auth.ffc.com"
+    settings.api_modifier_base_url = "https://api-modifier.ffc.com"
+    settings.api_modifier_jwt_secret = "test_jwt_secret"
+
+
 @pytest.fixture(scope="session", autouse=True)
-def fastapi_app() -> FastAPI:
-    fastapi_pagination.add_pagination(app)
-    return app
+async def fastapi_app(mock_settings) -> FastAPI:
+    from app.main import app
+
+    async with LifespanManager(app) as lifespan_manager:
+        yield lifespan_manager.app
 
 
 @pytest.fixture(autouse=True)
@@ -115,15 +125,6 @@ def organization_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory
         return organization
 
     return _organization
-
-
-@pytest.fixture(scope="session", autouse=True)
-def mock_settings() -> None:
-    settings.opt_cluster_secret = "test_cluster_secret"
-    settings.opt_api_base_url = "https://opt-api.ffc.com"
-    settings.opt_auth_base_url = "https://opt-auth.ffc.com"
-    settings.api_modifier_base_url = "https://api-modifier.ffc.com"
-    settings.api_modifier_jwt_secret = "test_jwt_secret"
 
 
 @pytest.fixture
