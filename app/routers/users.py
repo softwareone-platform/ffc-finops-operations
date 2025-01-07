@@ -3,7 +3,7 @@ import secrets
 import svcs
 from fastapi import APIRouter, status
 
-from app.api_clients import APIModifierClient, OptscaleAuthClient, OptscaleClient, UserDoesNotExist
+from app.api_clients import APIModifierClient, OptscaleClient
 from app.auth import CurrentSystem
 from app.schemas import UserCreate, UserRead
 from app.utils import wrap_http_error_in_502
@@ -17,15 +17,6 @@ async def create_user(
     system: CurrentSystem,
     services: svcs.fastapi.DepContainer,
 ):
-    optscale_auth_client = await services.aget(OptscaleAuthClient)
-    async with wrap_http_error_in_502("Error checking user existence in FinOps for Cloud"):
-        try:
-            response = await optscale_auth_client.get_existing_user_info(data.email)
-        except UserDoesNotExist:
-            pass
-        else:
-            return UserRead(**response.json()["user_info"])
-
     api_modifier_client = await services.aget(APIModifierClient)
     async with wrap_http_error_in_502("Error creating user in FinOps for Cloud"):
         create_user_response = await api_modifier_client.create_user(
