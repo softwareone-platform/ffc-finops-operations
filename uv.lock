@@ -100,7 +100,7 @@ name = "bandit"
 version = "1.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "platform_system == 'Windows'" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
     { name = "pyyaml" },
     { name = "rich" },
     { name = "stevedore" },
@@ -166,7 +166,7 @@ name = "click"
 version = "8.1.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "platform_system == 'Windows'" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/96/d3/f04c7bfcf5c1862a2a5b845c6b2b360488cf47af55dfa79c98f6a6bf98b5/click-8.1.7.tar.gz", hash = "sha256:ca9853ad459e787e2192211578cc907e7594e294c7ccc834310722b41b9ca6de", size = 336121 }
 wheels = [
@@ -728,7 +728,7 @@ dev = [
     { name = "bandit", specifier = ">=1.8.0,<2.0" },
     { name = "faker", specifier = ">=33.1.0,<34.0" },
     { name = "freezegun", specifier = ">=1.5.1,<2.0" },
-    { name = "ipdb", specifier = ">=0.13.13" },
+    { name = "ipdb", specifier = ">=0.13.13,<1.0" },
     { name = "ipython", specifier = ">=8.30.0,<9.0" },
     { name = "mypy", specifier = ">=1.14.0,<2.0" },
     { name = "pre-commit", specifier = ">=4.0.1,<5.0" },
@@ -736,7 +736,7 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=0.24.0,<1.0" },
     { name = "pytest-cov", specifier = ">=6.0.0,<7.0" },
     { name = "pytest-httpx", specifier = ">=0.34.0,<1.0" },
-    { name = "pytest-mock", specifier = ">=3.14.0" },
+    { name = "pytest-mock", specifier = ">=3.14.0,<4.0" },
     { name = "ruff", specifier = ">=0.8.0,<1.0" },
 ]
 
