@@ -2,6 +2,8 @@ from httpx import AsyncClient
 from pytest_httpx import HTTPXMock
 from pytest_mock import MockerFixture
 
+from app import settings
+
 
 async def test_can_create_users(
     mocker: MockerFixture,
@@ -81,4 +83,80 @@ async def test_create_user_error_creating_user(
     assert response.status_code == 502
     assert response.json() == {
         "detail": "Error creating user in FinOps for Cloud: 500 - Internal Server Error.",
+    }
+
+
+async def test_get_user_by_email(
+    httpx_mock: HTTPXMock, api_client: AsyncClient, ffc_jwt_token: str
+):
+    httpx_mock.add_response(
+        method="GET",
+        url="https://opt-auth.ffc.com/user_existence?email=test@example.com&user_info=true",
+        json={
+            "exists": True,
+            "user_info": {
+                "id": "1bf6f063-d90b-4d45-8e7f-62fefa9f5471",
+                "email": "test@example.com",
+                "display_name": "Test User",
+                "created_at": 13234,
+            },
+        },
+        match_headers={"Secret": settings.opt_cluster_secret},
+    )
+
+    response = await api_client.get(
+        "/users/test@example.com",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "id": "1bf6f063-d90b-4d45-8e7f-62fefa9f5471",
+        "email": "test@example.com",
+        "display_name": "Test User",
+    }
+
+
+async def test_get_user_by_email_not_found(
+    httpx_mock: HTTPXMock, api_client: AsyncClient, ffc_jwt_token: str
+):
+    httpx_mock.add_response(
+        method="GET",
+        url="https://opt-auth.ffc.com/user_existence?email=test@example.com&user_info=true",
+        json={
+            "exists": False,
+        },
+        match_headers={"Secret": settings.opt_cluster_secret},
+    )
+
+    response = await api_client.get(
+        "/users/test@example.com",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "detail": "A user with the email `test@example.com` wasn't found.",
+    }
+
+
+async def test_get_user_by_email_lookup_error(
+    httpx_mock: HTTPXMock, api_client: AsyncClient, ffc_jwt_token: str
+):
+    httpx_mock.add_response(
+        method="GET",
+        url="https://opt-auth.ffc.com/user_existence?email=test@example.com&user_info=true",
+        status_code=500,
+        text="Internal Server Error",
+        match_headers={"Secret": settings.opt_cluster_secret},
+    )
+
+    response = await api_client.get(
+        "/users/test@example.com",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+    )
+
+    assert response.status_code == 502
+    assert response.json() == {
+        "detail": "Error checking user existence in FinOps for Cloud: 500 - Internal Server Error.",
     }
