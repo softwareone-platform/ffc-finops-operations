@@ -290,6 +290,58 @@ async def test_count_organizations(
     assert count == 3
 
 
+async def test_organization_get_or_create(
+    db_session: AsyncSession,
+    test_actor: Actor,
+):
+    organizations_handler = OrganizationHandler(db_session)
+    db_org, created = await organizations_handler.get_or_create(
+        external_id="ORG-1234",
+        defaults={
+            "name": "Test Org",
+            "external_id": "ORG-1234",
+            "created_by": test_actor,
+            "updated_by": test_actor,
+        },
+    )
+
+    assert created is True
+    assert db_org.id is not None
+    assert db_org.name == "Test Org"
+    assert db_org.external_id == "ORG-1234"
+    assert db_org.created_by == test_actor
+    assert db_org.updated_by == test_actor
+
+
+async def test_organization_get_or_create_exists(
+    db_session: AsyncSession,
+    test_actor: Actor,
+):
+    existing_org = Organization(
+        name="Test Org",
+        external_id="ORG-1234",
+        created_by=test_actor,
+        updated_by=test_actor,
+    )
+    db_session.add(existing_org)
+    await db_session.commit()
+    await db_session.refresh(existing_org)
+
+    organizations_handler = OrganizationHandler(db_session)
+    db_org, created = await organizations_handler.get_or_create(
+        external_id="ORG-1234",
+        defaults={
+            "name": "Test Org",
+            "external_id": "ORG-1234",
+            "created_by": test_actor,
+            "updated_by": test_actor,
+        },
+    )
+
+    assert created is False
+    assert db_org.id == existing_org.id
+
+
 # =========================================================
 # System Handler Tests
 # =========================================================

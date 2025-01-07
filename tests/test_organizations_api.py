@@ -175,17 +175,67 @@ async def test_create_organization_with_incomplete_data(
     assert detail["loc"] == ["body", missing_field]
 
 
-async def test_create_organization_with_existing_external_id(
-    api_client: AsyncClient, organization_factory: ModelFactory[Organization], gcp_jwt_token: str
+async def test_create_organization_with_existing_db_organization(
+    mocker: MockerFixture,
+    httpx_mock: HTTPXMock,
+    api_client: AsyncClient,
+    organization_factory: ModelFactory[Organization],
+    gcp_jwt_token: str,
 ):
+    mocker.patch(
+        "app.api_clients.api_modifier.get_api_modifier_jwt_token", return_value="test_token"
+    )
+
+    existing_org = await organization_factory(external_id="ACC-1234-5678")
     payload = {
-        "name": "My Organization",
+        "name": existing_org.name,
         "external_id": "ACC-1234-5678",
         "user_id": "UUID-xxxx-xxxx-xxxx-xxxx",
         "currency": "USD",
     }
 
-    await organization_factory(external_id="ACC-1234-5678")
+    httpx_mock.add_response(
+        method="POST",
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+        url="https://api-modifier.ffc.com/admin/organizations",
+        json={"id": "UUID-yyyy-yyyy-yyyy-yyyy"},
+        match_headers={"Authorization": "Bearer test_token"},
+    )
+
+    response = await api_client.post(
+        "/organizations/",
+        json=payload,
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+
+    assert data["id"] == str(existing_org.id)
+    assert data["name"] == existing_org.name
+    assert data["external_id"] == "ACC-1234-5678"
+    assert data["organization_id"] == "UUID-yyyy-yyyy-yyyy-yyyy"
+    assert data["created_at"] is not None
+
+
+async def test_create_organization_with_existing_db_organization_name_mismatch(
+    mocker: MockerFixture,
+    httpx_mock: HTTPXMock,
+    api_client: AsyncClient,
+    organization_factory: ModelFactory[Organization],
+    gcp_jwt_token: str,
+):
+    mocker.patch(
+        "app.api_clients.api_modifier.get_api_modifier_jwt_token", return_value="test_token"
+    )
+
+    existing_org = await organization_factory(external_id="ACC-1234-5678")
+    payload = {
+        "name": f"{existing_org.name} Existing",
+        "external_id": "ACC-1234-5678",
+        "user_id": "UUID-xxxx-xxxx-xxxx-xxxx",
+        "currency": "USD",
+    }
 
     response = await api_client.post(
         "/organizations/",
@@ -195,7 +245,37 @@ async def test_create_organization_with_existing_external_id(
 
     assert response.status_code == 400
     detail = response.json()["detail"]
-    assert detail == "Organization with this external ID already exists: ACC-1234-5678."
+    assert detail == (
+        f"The name of a partially created Organization with "
+        f"external ID {existing_org.external_id}  doesn't match the "
+        f"current request: {existing_org.name}."
+    )
+
+
+async def test_create_organization_already_created(
+    api_client: AsyncClient, organization_factory: ModelFactory[Organization], gcp_jwt_token: str
+):
+    payload = {
+        "name": "My Organization",
+        "external_id": "ACC-1234-5678",
+        "user_id": "UUID-xxxx-xxxx-xxxx-xxxx",
+        "currency": "USD",
+    }
+
+    await organization_factory(
+        external_id="ACC-1234-5678",
+        organization_id="957c9a0a-2d18-4015-b7b0-e1b4259b3167",
+    )
+
+    response = await api_client.post(
+        "/organizations/",
+        json=payload,
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+    )
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert detail == "An Organization with external ID `ACC-1234-5678` already exists."
 
 
 async def test_create_organization_api_modifier_error(
