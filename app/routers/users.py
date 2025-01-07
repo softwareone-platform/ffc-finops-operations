@@ -1,9 +1,9 @@
 import secrets
 
 import svcs
-from fastapi import APIRouter, status
+from fastapi import APIRouter, HTTPException, status
 
-from app.api_clients import APIModifierClient, OptscaleClient
+from app.api_clients import APIModifierClient, OptscaleAuthClient, OptscaleClient, UserDoesNotExist
 from app.auth import CurrentSystem
 from app.schemas import UserCreate, UserRead
 from app.utils import wrap_http_error_in_502
@@ -30,3 +30,21 @@ async def create_user(
         await optscale_client.reset_password(data.email)
 
         return UserRead(**create_user_response.json())
+
+
+@router.get("/{email}", response_model=UserRead)
+async def get_user_by_email(
+    email: str,
+    system: CurrentSystem,
+    services: svcs.fastapi.DepContainer,
+):
+    optscale_auth_client = await services.aget(OptscaleAuthClient)
+    async with wrap_http_error_in_502("Error checking user existence in FinOps for Cloud"):
+        try:
+            response = await optscale_auth_client.get_existing_user_info(email)
+        except UserDoesNotExist:
+            raise HTTPException(
+                status_code=404, detail=f"A user with the email `{email}` wasn't found."
+            )
+        else:
+            return UserRead(**response.json()["user_info"])

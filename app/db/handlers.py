@@ -42,11 +42,11 @@ class ModelHandler[M: Base]:
         try:
             result = await self.session.get(self.model_cls, id)
             if result is None:
-                raise NotFoundError(f"{self.model_cls.__name__} with ID {str(id)} wasn't found")
+                raise NotFoundError(f"{self.model_cls.__name__} with ID `{str(id)}` wasn't found")
             return result
         except DBAPIError as e:
             raise DatabaseError(
-                f"Failed to get {self.model_cls.__name__} with ID {str(id)}: {e}"
+                f"Failed to get {self.model_cls.__name__} with ID `{str(id)}`: {e}"
             ) from e
 
     async def update(self, id: str | UUID, data: dict[str, Any]) -> M:
