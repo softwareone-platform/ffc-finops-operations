@@ -1,5 +1,4 @@
 import uuid
-from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
 from httpx import AsyncClient
@@ -8,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Entitlement, System
 from app.schemas import EntitlementRead, from_orm
-from tests.conftest import ModelFactory
+from tests.conftest import JWTTokenFactory, ModelFactory
 from tests.utils import assert_json_contains_model
 
 # ====================
@@ -35,7 +34,7 @@ async def test_get_entitlements_with_invalid_token(api_client: AsyncClient):
 
 async def test_get_entitlements_with_expired_token(
     api_client: AsyncClient,
-    jwt_token_factory: Callable[[str, str, datetime | None, datetime | None, datetime | None], str],
+    jwt_token_factory: JWTTokenFactory,
     gcp_extension: System,
 ):
     expired_time = datetime.now(UTC) - timedelta(hours=1)
@@ -62,6 +61,7 @@ async def test_get_entitlements_with_expired_token(
 async def test_can_create_entitlements(
     api_client: AsyncClient,
     gcp_jwt_token: str,
+    gcp_extension: System,
     db_session: AsyncSession,
 ):
     response = await api_client.post(
@@ -85,10 +85,13 @@ async def test_can_create_entitlements(
     assert data["status"] == "new"
     assert data["activated_at"] is None
     assert data["created_at"] is not None
-    assert data["created_by"] is not None
-    assert data["created_by"]["type"] == "system"
-    assert data["updated_by"] is not None
-    assert data["updated_by"]["type"] == "system"
+    assert data["created_by"]["id"] == str(gcp_extension.id)
+    assert data["created_by"]["type"] == gcp_extension.type
+    assert data["created_by"]["name"] == gcp_extension.name
+    assert data["updated_at"] is not None
+    assert data["updated_by"]["id"] == str(gcp_extension.id)
+    assert data["updated_by"]["type"] == gcp_extension.type
+    assert data["updated_by"]["name"] == gcp_extension.name
 
     result = await db_session.execute(select(Entitlement).where(Entitlement.id == data["id"]))
     assert result.one_or_none() is not None
@@ -206,7 +209,12 @@ async def test_get_all_entitlements_multiple_pages(
 # =====================
 
 
-async def test_get_entitlement_by_id(entitlement_aws, api_client: AsyncClient, gcp_jwt_token: str):
+async def test_get_entitlement_by_id(
+    entitlement_aws: Entitlement,
+    api_client: AsyncClient,
+    gcp_jwt_token: str,
+    gcp_extension: System,
+):
     response = await api_client.get(
         f"/entitlements/{entitlement_aws.id}",
         headers={"Authorization": f"Bearer {gcp_jwt_token}"},
@@ -222,6 +230,13 @@ async def test_get_entitlement_by_id(entitlement_aws, api_client: AsyncClient, g
     assert data["status"] == "new"
     assert data["activated_at"] is None
     assert data["created_at"] is not None
+    assert data["created_by"]["id"] == str(gcp_extension.id)
+    assert data["created_by"]["type"] == gcp_extension.type
+    assert data["created_by"]["name"] == gcp_extension.name
+    assert data["updated_at"] is not None
+    assert data["updated_by"]["id"] == str(gcp_extension.id)
+    assert data["updated_by"]["type"] == gcp_extension.type
+    assert data["updated_by"]["name"] == gcp_extension.name
 
 
 async def test_get_non_existant_entitlement(api_client: AsyncClient, gcp_jwt_token: str):

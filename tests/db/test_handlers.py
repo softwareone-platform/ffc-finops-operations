@@ -13,7 +13,7 @@ from app.db.handlers import (
     OrganizationHandler,
     SystemHandler,
 )
-from app.db.models import Actor, Entitlement, Organization, System
+from app.db.models import Entitlement, Organization, System
 from app.enums import ActorType, EntitlementStatus
 
 # =========================================================
@@ -23,14 +23,14 @@ from app.enums import ActorType, EntitlementStatus
 
 async def test_create_entitlement(
     db_session: AsyncSession,
-    test_actor: Actor,
+    gcp_extension: System,
 ):
     entitlement = Entitlement(
         sponsor_name="AWS",
         sponsor_external_id="ACC-123",
         sponsor_container_id="container-123",
-        created_by=test_actor,
-        updated_by=test_actor,
+        created_by=gcp_extension,
+        updated_by=gcp_extension,
     )
 
     entitlements_handler = EntitlementHandler(db_session)
@@ -45,21 +45,21 @@ async def test_create_entitlement(
     assert db_entitlement.status == EntitlementStatus.NEW
     assert db_entitlement.created_at is not None
     assert db_entitlement.updated_at is not None
-    assert db_entitlement.created_by_id == test_actor.id
-    assert db_entitlement.updated_by_id == test_actor.id
+    assert db_entitlement.created_by_id == gcp_extension.id
+    assert db_entitlement.updated_by_id == gcp_extension.id
 
 
 async def test_get_entitlement(
     db_session: AsyncSession,
-    test_actor: Actor,
+    gcp_extension: System,
 ):
     # Create directly in DB
     entitlement = Entitlement(
         sponsor_name="AWS",
         sponsor_external_id="ACC-123",
         sponsor_container_id="container-123",
-        created_by=test_actor,
-        updated_by=test_actor,
+        created_by=gcp_extension,
+        updated_by=gcp_extension,
     )
     db_session.add(entitlement)
     await db_session.commit()
@@ -71,8 +71,8 @@ async def test_get_entitlement(
 
     assert fetched.id == entitlement.id
     assert fetched.sponsor_name == "AWS"
-    assert fetched.created_by_id == test_actor.id
-    assert fetched.updated_by_id == test_actor.id
+    assert fetched.created_by_id == gcp_extension.id
+    assert fetched.updated_by_id == gcp_extension.id
 
 
 async def test_get_entitlement_not_found(db_session: AsyncSession):
@@ -84,15 +84,15 @@ async def test_get_entitlement_not_found(db_session: AsyncSession):
 
 async def test_update_entitlement(
     db_session: AsyncSession,
-    test_actor: Actor,
+    gcp_extension: System,
 ):
     # Create directly in DB
     entitlement = Entitlement(
         sponsor_name="AWS",
         sponsor_external_id="ACC-123",
         sponsor_container_id="container-123",
-        created_by=test_actor,
-        updated_by=test_actor,
+        created_by=gcp_extension,
+        updated_by=gcp_extension,
     )
     db_session.add(entitlement)
     await db_session.commit()
@@ -105,7 +105,7 @@ async def test_update_entitlement(
             "sponsor_name": "Updated AWS",
             "status": EntitlementStatus.ACTIVE.value,
             "activated_at": datetime.now(UTC),
-            "updated_by_id": test_actor.id,
+            "updated_by_id": gcp_extension.id,
         },
     )
 
@@ -116,8 +116,8 @@ async def test_update_entitlement(
     assert db_entitlement.sponsor_name == "Updated AWS"
     assert db_entitlement.status == EntitlementStatus.ACTIVE.value
     assert db_entitlement.activated_at is not None
-    assert db_entitlement.created_by_id == test_actor.id
-    assert db_entitlement.updated_by_id == test_actor.id
+    assert db_entitlement.created_by_id == gcp_extension.id
+    assert db_entitlement.updated_by_id == gcp_extension.id
 
 
 async def test_update_entitlement_not_found(db_session: AsyncSession):
@@ -129,7 +129,7 @@ async def test_update_entitlement_not_found(db_session: AsyncSession):
 
 async def test_fetch_page_entitlements(
     db_session: AsyncSession,
-    test_actor: Actor,
+    gcp_extension: System,
 ):
     # Create 5 entitlements directly in DB
     for i in range(5):
@@ -137,8 +137,8 @@ async def test_fetch_page_entitlements(
             sponsor_name=f"AWS-{i}",
             sponsor_external_id=f"ACC-{i}",
             sponsor_container_id=f"container-{i}",
-            created_by=test_actor,
-            updated_by=test_actor,
+            created_by=gcp_extension,
+            updated_by=gcp_extension,
         )
         db_session.add(entitlement)
     await db_session.commit()
@@ -149,8 +149,8 @@ async def test_fetch_page_entitlements(
     items = await entitlements_handler.fetch_page(limit=3, offset=0)
     assert len(items) == 3
     for item in items:
-        assert item.created_by_id == test_actor.id
-        assert item.updated_by_id == test_actor.id
+        assert item.created_by_id == gcp_extension.id
+        assert item.updated_by_id == gcp_extension.id
 
     # Test second page
     items = await entitlements_handler.fetch_page(limit=3, offset=3)
@@ -159,7 +159,7 @@ async def test_fetch_page_entitlements(
 
 async def test_count_entitlements(
     db_session: AsyncSession,
-    test_actor: Actor,
+    gcp_extension: System,
 ):
     # Create 5 entitlements directly in DB
     for i in range(5):
@@ -167,8 +167,8 @@ async def test_count_entitlements(
             sponsor_name=f"AWS-{i}",
             sponsor_external_id=f"ACC-{i}",
             sponsor_container_id=f"container-{i}",
-            created_by=test_actor,
-            updated_by=test_actor,
+            created_by=gcp_extension,
+            updated_by=gcp_extension,
         )
         db_session.add(entitlement)
     await db_session.commit()
@@ -186,13 +186,13 @@ async def test_count_entitlements(
 
 async def test_create_organization(
     db_session: AsyncSession,
-    test_actor: Actor,
+    ffc_extension: System,
 ):
     org = Organization(
         name="Test Org",
         external_id="ORG-123",
-        created_by=test_actor,
-        updated_by=test_actor,
+        created_by=ffc_extension,
+        updated_by=ffc_extension,
     )
 
     organizations_handler = OrganizationHandler(db_session)
@@ -204,20 +204,20 @@ async def test_create_organization(
 
     assert db_org.name == "Test Org"
     assert db_org.external_id == "ORG-123"
-    assert db_org.created_by_id == test_actor.id
-    assert db_org.updated_by_id == test_actor.id
+    assert db_org.created_by_id == ffc_extension.id
+    assert db_org.updated_by_id == ffc_extension.id
 
 
 async def test_create_organization_duplicate_external_id(
     db_session: AsyncSession,
-    test_actor: Actor,
+    ffc_extension: System,
 ):
     # Create first organization directly in DB
     org1 = Organization(
         name="Test Org 1",
         external_id="ORG-123",
-        created_by=test_actor,
-        updated_by=test_actor,
+        created_by=ffc_extension,
+        updated_by=ffc_extension,
     )
     db_session.add(org1)
     await db_session.commit()
@@ -227,8 +227,8 @@ async def test_create_organization_duplicate_external_id(
     org2 = Organization(
         name="Test Org 2",
         external_id="ORG-123",
-        created_by=test_actor,
-        updated_by=test_actor,
+        created_by=ffc_extension,
+        updated_by=ffc_extension,
     )
     organizations_handler = OrganizationHandler(db_session)
     with pytest.raises(ConstraintViolationError):
@@ -237,15 +237,15 @@ async def test_create_organization_duplicate_external_id(
 
 async def test_fetch_page_organizations(
     db_session: AsyncSession,
-    test_actor: Actor,
+    ffc_extension: System,
 ):
     # Create 5 organizations directly in DB
     for i in range(5):
         org = Organization(
             name=f"Test Org {i}",
             external_id=f"ORG-{i}",
-            created_by=test_actor,
-            updated_by=test_actor,
+            created_by=ffc_extension,
+            updated_by=ffc_extension,
         )
         db_session.add(org)
     await db_session.commit()
@@ -257,8 +257,8 @@ async def test_fetch_page_organizations(
     items = await organizations_handler.fetch_page(limit=2, offset=0)
     assert len(items) == 2
     for item in items:
-        assert item.created_by_id == test_actor.id
-        assert item.updated_by_id == test_actor.id
+        assert item.created_by_id == ffc_extension.id
+        assert item.updated_by_id == ffc_extension.id
 
     # Test second page
     items = await organizations_handler.fetch_page(limit=2, offset=2)
@@ -271,15 +271,15 @@ async def test_fetch_page_organizations(
 
 async def test_count_organizations(
     db_session: AsyncSession,
-    test_actor: Actor,
+    ffc_extension: System,
 ):
     # Create 3 organizations directly in DB
     for i in range(3):
         org = Organization(
             name=f"Test Org {i}",
             external_id=f"ORG-{i}",
-            created_by=test_actor,
-            updated_by=test_actor,
+            created_by=ffc_extension,
+            updated_by=ffc_extension,
         )
         db_session.add(org)
     await db_session.commit()
@@ -292,7 +292,7 @@ async def test_count_organizations(
 
 async def test_organization_get_or_create(
     db_session: AsyncSession,
-    test_actor: Actor,
+    ffc_extension: System,
 ):
     organizations_handler = OrganizationHandler(db_session)
     db_org, created = await organizations_handler.get_or_create(
@@ -300,8 +300,8 @@ async def test_organization_get_or_create(
         defaults={
             "name": "Test Org",
             "external_id": "ORG-1234",
-            "created_by": test_actor,
-            "updated_by": test_actor,
+            "created_by": ffc_extension,
+            "updated_by": ffc_extension,
         },
     )
 
@@ -309,19 +309,19 @@ async def test_organization_get_or_create(
     assert db_org.id is not None
     assert db_org.name == "Test Org"
     assert db_org.external_id == "ORG-1234"
-    assert db_org.created_by == test_actor
-    assert db_org.updated_by == test_actor
+    assert db_org.created_by == ffc_extension
+    assert db_org.updated_by == ffc_extension
 
 
 async def test_organization_get_or_create_exists(
     db_session: AsyncSession,
-    test_actor: Actor,
+    ffc_extension: System,
 ):
     existing_org = Organization(
         name="Test Org",
         external_id="ORG-1234",
-        created_by=test_actor,
-        updated_by=test_actor,
+        created_by=ffc_extension,
+        updated_by=ffc_extension,
     )
     db_session.add(existing_org)
     await db_session.commit()
@@ -333,8 +333,8 @@ async def test_organization_get_or_create_exists(
         defaults={
             "name": "Test Org",
             "external_id": "ORG-1234",
-            "created_by": test_actor,
-            "updated_by": test_actor,
+            "created_by": ffc_extension,
+            "updated_by": ffc_extension,
         },
     )
 

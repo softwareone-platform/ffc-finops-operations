@@ -7,7 +7,7 @@ from pytest_mock import MockerFixture
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Organization
+from app.db.models import Organization, System
 from app.schemas import OrganizationRead, from_orm
 from tests.conftest import ModelFactory
 from tests.utils import assert_json_contains_model
@@ -17,9 +17,9 @@ from tests.utils import assert_json_contains_model
 # =================
 
 
-async def test_get_all_organizations_empty_db(api_client: AsyncClient, gcp_jwt_token: str):
+async def test_get_all_organizations_empty_db(api_client: AsyncClient, ffc_jwt_token: str):
     response = await api_client.get(
-        "/organizations/", headers={"Authorization": f"Bearer {gcp_jwt_token}"}
+        "/organizations/", headers={"Authorization": f"Bearer {ffc_jwt_token}"}
     )
 
     assert response.status_code == 200
@@ -28,14 +28,14 @@ async def test_get_all_organizations_empty_db(api_client: AsyncClient, gcp_jwt_t
 
 
 async def test_get_all_organizations_single_page(
-    organization_factory: ModelFactory[Organization], api_client: AsyncClient, gcp_jwt_token: str
+    organization_factory: ModelFactory[Organization], api_client: AsyncClient, ffc_jwt_token: str
 ):
     organization_1 = await organization_factory(external_id="EXTERNAL_ID_1")
     organization_2 = await organization_factory(external_id="EXTERNAL_ID_2")
 
     response = await api_client.get(
         "/organizations/",
-        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
     )
 
     assert response.status_code == 200
@@ -49,7 +49,7 @@ async def test_get_all_organizations_single_page(
 
 
 async def test_get_all_organizations_multiple_pages(
-    organization_factory: ModelFactory[Organization], api_client: AsyncClient, gcp_jwt_token: str
+    organization_factory: ModelFactory[Organization], api_client: AsyncClient, ffc_jwt_token: str
 ):
     for index in range(10):
         await organization_factory(
@@ -59,7 +59,7 @@ async def test_get_all_organizations_multiple_pages(
 
     first_page_response = await api_client.get(
         "/organizations/",
-        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
         params={"limit": 5},
     )
     first_page_data = first_page_response.json()
@@ -72,7 +72,7 @@ async def test_get_all_organizations_multiple_pages(
 
     second_page_response = await api_client.get(
         "/organizations/",
-        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
         params={"limit": 3, "offset": 5},
     )
     second_page_data = second_page_response.json()
@@ -85,7 +85,7 @@ async def test_get_all_organizations_multiple_pages(
 
     third_page_response = await api_client.get(
         "/organizations/",
-        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
         params={"offset": 8},
     )
     third_page_data = third_page_response.json()
@@ -112,7 +112,8 @@ async def test_can_create_organizations(
     httpx_mock: HTTPXMock,
     api_client: AsyncClient,
     db_session: AsyncSession,
-    gcp_jwt_token: str,
+    ffc_jwt_token: str,
+    ffc_extension: System,
 ):
     mocker.patch(
         "app.api_clients.api_modifier.get_api_modifier_jwt_token", return_value="test_token"
@@ -120,7 +121,7 @@ async def test_can_create_organizations(
 
     httpx_mock.add_response(
         method="POST",
-        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
         url="https://api-modifier.ffc.com/admin/organizations",
         json={"id": "UUID-yyyy-yyyy-yyyy-yyyy"},
         match_headers={"Authorization": "Bearer test_token"},
@@ -128,7 +129,7 @@ async def test_can_create_organizations(
 
     response = await api_client.post(
         "/organizations/",
-        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
         json={
             "name": "My Organization",
             "external_id": "ACC-1234-5678",
@@ -145,6 +146,13 @@ async def test_can_create_organizations(
     assert data["external_id"] == "ACC-1234-5678"
     assert data["organization_id"] == "UUID-yyyy-yyyy-yyyy-yyyy"
     assert data["created_at"] is not None
+    assert data["created_by"]["id"] == str(ffc_extension.id)
+    assert data["created_by"]["type"] == ffc_extension.type
+    assert data["created_by"]["name"] == ffc_extension.name
+    assert data["updated_at"] is not None
+    assert data["updated_by"]["id"] == str(ffc_extension.id)
+    assert data["updated_by"]["type"] == ffc_extension.type
+    assert data["updated_by"]["name"] == ffc_extension.name
 
     result = await db_session.execute(select(Organization).where(Organization.id == data["id"]))
     assert result.one_or_none() is not None
@@ -152,7 +160,7 @@ async def test_can_create_organizations(
 
 @pytest.mark.parametrize("missing_field", ["name", "external_id", "user_id", "currency"])
 async def test_create_organization_with_incomplete_data(
-    api_client: AsyncClient, missing_field: str, gcp_jwt_token: str
+    api_client: AsyncClient, missing_field: str, ffc_jwt_token: str
 ):
     payload = {
         "name": "My Organization",
@@ -165,7 +173,7 @@ async def test_create_organization_with_incomplete_data(
     response = await api_client.post(
         "/organizations/",
         json=payload,
-        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
     )
 
     assert response.status_code == 422
@@ -223,7 +231,7 @@ async def test_create_organization_with_existing_db_organization_name_mismatch(
     httpx_mock: HTTPXMock,
     api_client: AsyncClient,
     organization_factory: ModelFactory[Organization],
-    gcp_jwt_token: str,
+    ffc_jwt_token: str,
 ):
     mocker.patch(
         "app.api_clients.api_modifier.get_api_modifier_jwt_token", return_value="test_token"
@@ -240,7 +248,7 @@ async def test_create_organization_with_existing_db_organization_name_mismatch(
     response = await api_client.post(
         "/organizations/",
         json=payload,
-        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
     )
 
     assert response.status_code == 400
@@ -283,7 +291,7 @@ async def test_create_organization_api_modifier_error(
     httpx_mock: HTTPXMock,
     mock_settings: None,
     api_client: AsyncClient,
-    gcp_jwt_token: str,
+    ffc_jwt_token: str,
 ):
     mocker.patch(
         "app.api_clients.api_modifier.get_api_modifier_jwt_token", return_value="test_token"
@@ -304,7 +312,7 @@ async def test_create_organization_api_modifier_error(
             "user_id": "UUID-xxxx-xxxx-xxxx-xxxx",
             "currency": "USD",
         },
-        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
     )
 
     assert response.status_code == 502
@@ -319,11 +327,17 @@ async def test_create_organization_api_modifier_error(
 
 
 async def test_get_organization_by_id(
-    organization_factory: ModelFactory[Organization], api_client: AsyncClient, gcp_jwt_token: str
+    organization_factory: ModelFactory[Organization],
+    api_client: AsyncClient,
+    ffc_jwt_token: str,
+    ffc_extension: System,
 ):
-    org = await organization_factory()
+    org = await organization_factory(
+        created_by=ffc_extension,
+        updated_by=ffc_extension,
+    )
     response = await api_client.get(
-        f"/organizations/{org.id}", headers={"Authorization": f"Bearer {gcp_jwt_token}"}
+        f"/organizations/{org.id}", headers={"Authorization": f"Bearer {ffc_jwt_token}"}
     )
 
     assert response.status_code == 200
@@ -333,22 +347,29 @@ async def test_get_organization_by_id(
     assert data["name"] == org.name
     assert data["external_id"] == org.external_id
     assert data["created_at"] is not None
+    assert data["created_by"]["id"] == str(ffc_extension.id)
+    assert data["created_by"]["type"] == ffc_extension.type
+    assert data["created_by"]["name"] == ffc_extension.name
+    assert data["updated_at"] is not None
+    assert data["updated_by"]["id"] == str(ffc_extension.id)
+    assert data["updated_by"]["type"] == ffc_extension.type
+    assert data["updated_by"]["name"] == ffc_extension.name
 
 
-async def test_get_non_existant_organization(api_client: AsyncClient, gcp_jwt_token: str):
+async def test_get_non_existant_organization(api_client: AsyncClient, ffc_jwt_token: str):
     id = str(uuid.uuid4())
     response = await api_client.get(
-        f"/organizations/{id}", headers={"Authorization": f"Bearer {gcp_jwt_token}"}
+        f"/organizations/{id}", headers={"Authorization": f"Bearer {ffc_jwt_token}"}
     )
 
     assert response.status_code == 404
     assert response.json()["detail"] == f"Organization with ID `{id}` wasn't found"
 
 
-async def test_get_invalid_id_format(api_client: AsyncClient, gcp_jwt_token: str):
+async def test_get_invalid_id_format(api_client: AsyncClient, ffc_jwt_token: str):
     response = await api_client.get(
         "/organizations/this-is-not-a-valid-uuid",
-        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
     )
 
     assert response.status_code == 422
