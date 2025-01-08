@@ -65,12 +65,12 @@ async def test_uuid_mixin(db_session: AsyncSession):
     assert isinstance(org.id, uuid.UUID)
 
 
-async def test_auditable_mixin(db_session: AsyncSession, test_actor: Actor):
+async def test_auditable_mixin(db_session: AsyncSession, ffc_extension: System):
     org = Organization(
         name="Test Org",
         external_id="test-org",
-        created_by=test_actor,
-        updated_by=test_actor,
+        created_by=ffc_extension,
+        updated_by=ffc_extension,
     )
     db_session.add(org)
     await db_session.commit()
@@ -80,10 +80,10 @@ async def test_auditable_mixin(db_session: AsyncSession, test_actor: Actor):
     result = await db_session.execute(select(Organization).where(Organization.id == org.id))
     org_from_db = result.scalar_one()
 
-    assert org_from_db.created_by_id == test_actor.id
-    assert org_from_db.updated_by_id == test_actor.id
-    assert org_from_db.created_by.type == ActorType.USER
-    assert org_from_db.updated_by.type == ActorType.USER
+    assert org_from_db.created_by_id == ffc_extension.id
+    assert org_from_db.updated_by_id == ffc_extension.id
+    assert org_from_db.created_by.type == ActorType.SYSTEM
+    assert org_from_db.updated_by.type == ActorType.SYSTEM
 
 
 async def test_entitlement_status_default(db_session: AsyncSession):

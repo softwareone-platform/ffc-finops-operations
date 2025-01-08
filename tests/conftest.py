@@ -1,7 +1,7 @@
 import secrets
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from datetime import UTC, datetime, timedelta
-from typing import TypeVar
+from typing import Any, Protocol, TypeVar
 
 import jwt
 import pytest
@@ -15,10 +15,20 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app import settings
 from app.db import db_engine
 from app.db.models import Actor, Base, Entitlement, Organization, System
-from app.enums import ActorType
 
 ModelT = TypeVar("ModelT", bound=Base)
 ModelFactory = Callable[..., Awaitable[ModelT]]
+
+
+class JWTTokenFactory(Protocol):
+    def __call__(
+        self,
+        user_id: str,
+        secret: str,
+        exp: datetime | None = None,
+        iat: datetime | None = None,
+        nbf: datetime | None = None,
+    ) -> str: ...
 
 
 def pytest_collection_modifyitems(items):
@@ -38,7 +48,7 @@ def mock_settings() -> None:
 
 
 @pytest.fixture(scope="session", autouse=True)
-async def fastapi_app(mock_settings) -> FastAPI:
+async def fastapi_app(mock_settings) -> AsyncGenerator[Any, None]:
     from app.main import app
 
     async with LifespanManager(app) as lifespan_manager:
@@ -113,11 +123,15 @@ def organization_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory
         name: str | None = None,
         external_id: str | None = None,
         organization_id: str | None = None,
+        created_by: Actor | None = None,
+        updated_by: Actor | None = None,
     ) -> Organization:
         organization = Organization(
             name=name or faker.company(),
             external_id=external_id or "ACC-1234-5678",
             organization_id=organization_id,
+            created_by=created_by,
+            updated_by=updated_by,
         )
         db_session.add(organization)
         await db_session.commit()
@@ -209,15 +223,6 @@ async def ffc_extension(system_factory: ModelFactory[System]) -> System:
 @pytest.fixture
 def ffc_jwt_token(system_jwt_token_factory: Callable[[System], str], ffc_extension: System) -> str:
     return system_jwt_token_factory(ffc_extension)
-
-
-@pytest.fixture
-async def test_actor(db_session: AsyncSession) -> Actor:
-    actor = Actor(type=ActorType.USER)
-    db_session.add(actor)
-    await db_session.commit()
-    await db_session.refresh(actor)
-    return actor
 
 
 @pytest.fixture

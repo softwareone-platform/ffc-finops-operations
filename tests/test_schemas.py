@@ -31,6 +31,7 @@ def test_actor_read_from_orm():
 
 def test_system_create_to_orm():
     data = {
+        "id": str(uuid.uuid4()),
         "name": "Test System",
         "external_id": "test-system",
         "jwt_secret": "secret",
@@ -48,7 +49,7 @@ def test_system_create_to_orm():
     assert system.type == ActorType.SYSTEM
 
 
-def test_system_read_from_orm(test_actor: Actor):
+def test_system_read_from_orm(gcp_extension: System):
     system = System(
         id=uuid.uuid4(),
         name="Test System",
@@ -59,8 +60,8 @@ def test_system_read_from_orm(test_actor: Actor):
     )
     system.created_at = datetime.now(UTC)
     system.updated_at = datetime.now(UTC)
-    system.created_by = test_actor
-    system.updated_by = test_actor
+    system.created_by = gcp_extension
+    system.updated_by = gcp_extension
 
     system_read = from_orm(SystemRead, system)
 
@@ -70,8 +71,8 @@ def test_system_read_from_orm(test_actor: Actor):
     assert system_read.description == system.description
     assert system_read.created_at == system.created_at
     assert system_read.updated_at == system.updated_at
-    assert system_read.created_by.id == test_actor.id
-    assert system_read.updated_by.id == test_actor.id
+    assert system_read.created_by.id == gcp_extension.id
+    assert system_read.updated_by.id == gcp_extension.id
 
 
 def test_entitlement_create_to_orm():
@@ -90,7 +91,7 @@ def test_entitlement_create_to_orm():
     assert entitlement.sponsor_container_id == data["sponsor_container_id"]
 
 
-def test_entitlement_read_from_orm(test_actor: Actor):
+def test_entitlement_read_from_orm(gcp_extension: System):
     entitlement = Entitlement(
         id=uuid.uuid4(),
         sponsor_name="AWS",
@@ -102,8 +103,8 @@ def test_entitlement_read_from_orm(test_actor: Actor):
     entitlement.created_at = datetime.now(UTC)
     entitlement.updated_at = datetime.now(UTC)
     entitlement.activated_at = datetime.now(UTC)
-    entitlement.created_by = test_actor
-    entitlement.updated_by = test_actor
+    entitlement.created_by = gcp_extension
+    entitlement.updated_by = gcp_extension
 
     entitlement_read = from_orm(EntitlementRead, entitlement)
 
@@ -115,8 +116,12 @@ def test_entitlement_read_from_orm(test_actor: Actor):
     assert entitlement_read.activated_at == entitlement.activated_at
     assert entitlement_read.created_at == entitlement.created_at
     assert entitlement_read.updated_at == entitlement.updated_at
-    assert entitlement_read.created_by.id == test_actor.id
-    assert entitlement_read.updated_by.id == test_actor.id
+    assert entitlement_read.created_by.id == gcp_extension.id
+    assert entitlement_read.created_by.type == gcp_extension.type
+    assert entitlement_read.created_by.name == gcp_extension.name
+    assert entitlement_read.updated_by.id == gcp_extension.id
+    assert entitlement_read.updated_by.type == gcp_extension.type
+    assert entitlement_read.updated_by.name == gcp_extension.name
 
 
 def test_entitlement_update_partial():
@@ -150,7 +155,7 @@ def test_organization_create_to_orm():
     assert not hasattr(organization, "currency")
 
 
-def test_organization_read_from_orm(test_actor: Actor):
+def test_organization_read_from_orm(ffc_extension: System):
     organization = Organization(
         id=uuid.uuid4(),
         name="Test Org",
@@ -160,8 +165,8 @@ def test_organization_read_from_orm(test_actor: Actor):
     # Set timestamps and audit fields after creation
     organization.created_at = datetime.now(UTC)
     organization.updated_at = datetime.now(UTC)
-    organization.created_by = test_actor
-    organization.updated_by = test_actor
+    organization.created_by = ffc_extension
+    organization.updated_by = ffc_extension
 
     org_read = from_orm(OrganizationRead, organization)
 
@@ -171,8 +176,12 @@ def test_organization_read_from_orm(test_actor: Actor):
     assert org_read.organization_id == organization.organization_id
     assert org_read.created_at == organization.created_at
     assert org_read.updated_at == organization.updated_at
-    assert org_read.created_by.id == test_actor.id
-    assert org_read.updated_by.id == test_actor.id
+    assert org_read.created_by.id == ffc_extension.id
+    assert org_read.created_by.type == ffc_extension.type
+    assert org_read.created_by.name == ffc_extension.name
+    assert org_read.updated_by.id == ffc_extension.id
+    assert org_read.updated_by.type == ffc_extension.type
+    assert org_read.updated_by.name == ffc_extension.name
 
 
 def test_organization_update_partial():

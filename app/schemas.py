@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 import uuid
 from typing import Annotated
@@ -24,11 +26,15 @@ class BaseSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class BaseReadSchema(BaseSchema):
+    id: uuid.UUID
+
+
 class ActorBase(BaseSchema):
     type: ActorType
 
 
-class ActorRead(ActorBase, BaseSchema):
+class ActorRead(ActorBase, BaseReadSchema):
     id: uuid.UUID
 
 
@@ -42,12 +48,16 @@ class SystemCreate(SystemBase):
     jwt_secret: Annotated[str, Field(max_length=255)]
 
 
-class SystemRead(SystemBase):
-    id: uuid.UUID
+class ActorReference(BaseReadSchema):
+    type: ActorType
+    name: str
+
+
+class SystemRead(SystemBase, BaseReadSchema):
     created_at: datetime.datetime
     updated_at: datetime.datetime
-    created_by: ActorRead | None
-    updated_by: ActorRead | None
+    created_by: ActorReference | None = None
+    updated_by: ActorReference | None = None
 
 
 class EntitlementBase(BaseSchema):
@@ -66,14 +76,13 @@ class EntitlementUpdate(EntitlementBase):
     sponsor_container_id: str | None = None  # type: ignore
 
 
-class EntitlementRead(EntitlementBase):
-    id: uuid.UUID
+class EntitlementRead(BaseReadSchema, EntitlementBase):
     created_at: datetime.datetime
     updated_at: datetime.datetime
     activated_at: datetime.datetime | None
     status: EntitlementStatus
-    created_by: ActorRead | None
-    updated_by: ActorRead | None
+    created_by: ActorReference | None = None
+    updated_by: ActorReference | None = None
 
 
 class OrganizationBase(BaseSchema):
@@ -86,13 +95,12 @@ class OrganizationCreate(OrganizationBase):
     currency: str
 
 
-class OrganizationRead(OrganizationBase):
-    id: uuid.UUID
+class OrganizationRead(OrganizationBase, BaseReadSchema):
     created_at: datetime.datetime
     updated_at: datetime.datetime
     organization_id: str | None
-    created_by: ActorRead | None
-    updated_by: ActorRead | None
+    created_by: ActorReference | None = None
+    updated_by: ActorReference | None = None
 
 
 class OrganizationUpdate(OrganizationBase):
