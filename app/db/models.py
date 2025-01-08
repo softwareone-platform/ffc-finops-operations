@@ -110,6 +110,9 @@ class Entitlement(AuditableMixin, Base):
         server_default=EntitlementStatus.NEW.value,
     )
     activated_at: Mapped[datetime.datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    terminated_at: Mapped[datetime.datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    terminated_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("actors.id"))
+    terminated_by: Mapped[Actor | None] = relationship(foreign_keys=[terminated_by_id])
 
 
 class Organization(AuditableMixin, Base):

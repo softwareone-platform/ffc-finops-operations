@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Entitlement, System
+from app.enums import EntitlementStatus
 from app.schemas import EntitlementRead, from_orm
 from tests.conftest import JWTTokenFactory, ModelFactory
 from tests.utils import assert_json_contains_model
@@ -261,3 +262,106 @@ async def test_get_invalid_id_format(api_client: AsyncClient, gcp_jwt_token: str
     [detail] = response.json()["detail"]
     assert detail["loc"] == ["path", "id"]
     assert detail["type"] == "uuid_parsing"
+
+
+# =====================
+# Terminate Entitlement
+# =====================
+
+
+async def test_terminate_entitlement_success(
+    entitlement_aws: Entitlement,
+    api_client: AsyncClient,
+    gcp_jwt_token: str,
+    gcp_extension: System,
+    db_session: AsyncSession,
+):
+    assert entitlement_aws.terminated_at is None
+    assert entitlement_aws.terminated_by is None
+    assert entitlement_aws.status == EntitlementStatus.NEW
+
+    entitlement_aws.status = EntitlementStatus.ACTIVE
+
+    db_session.add(entitlement_aws)
+    await db_session.commit()
+    await db_session.refresh(entitlement_aws)
+
+    request_start_dt = datetime.now(UTC)
+    response = await api_client.post(
+        f"/entitlements/{entitlement_aws.id}/terminate",
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+    )
+    request_end_dt = datetime.now(UTC)
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["id"] == str(entitlement_aws.id)
+    assert data["status"] == "terminated"
+
+    await db_session.refresh(entitlement_aws)
+
+    assert entitlement_aws.status == EntitlementStatus.TERMINATED
+    assert entitlement_aws.terminated_at is not None
+    assert request_start_dt < entitlement_aws.terminated_at < request_end_dt
+    assert entitlement_aws.terminated_by_id == gcp_extension.id
+
+
+async def test_terminate_new_entitlement(
+    entitlement_aws: Entitlement,
+    api_client: AsyncClient,
+    gcp_jwt_token: str,
+    gcp_extension: System,
+):
+    assert entitlement_aws.status == EntitlementStatus.NEW
+
+    response = await api_client.post(
+        f"/entitlements/{entitlement_aws.id}/terminate",
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+    )
+
+    assert response.status_code == 400
+    error_msg = response.json()["detail"]
+
+    assert error_msg == "Only active entitlements can be terminated, current status is new"
+
+
+async def test_terminate_already_terminated_entitlement(
+    entitlement_aws: Entitlement,
+    api_client: AsyncClient,
+    gcp_jwt_token: str,
+    gcp_extension: System,
+    db_session: AsyncSession,
+):
+    entitlement_aws.status = EntitlementStatus.TERMINATED
+
+    db_session.add(entitlement_aws)
+    await db_session.commit()
+
+    response = await api_client.post(
+        f"/entitlements/{entitlement_aws.id}/terminate",
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+    )
+
+    assert response.status_code == 400
+    error_msg = response.json()["detail"]
+
+    assert error_msg == "Entitlement is already terminated"
+
+
+async def test_terminate_non_existant_entitlement(
+    api_client: AsyncClient,
+    gcp_jwt_token: str,
+    gcp_extension: System,
+    db_session: AsyncSession,
+):
+    entitlement_id = str(uuid.uuid4())
+    response = await api_client.post(
+        f"/entitlements/{entitlement_id}/terminate",
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+    )
+
+    assert response.status_code == 404
+    error_msg = response.json()["detail"]
+
+    assert error_msg == f"Entitlement with ID `{entitlement_id}` wasn't found"
