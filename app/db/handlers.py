@@ -49,6 +49,27 @@ class ModelHandler[M: Base]:
                 f"Failed to get {self.model_cls.__name__} with ID `{str(id)}`: {e}"
             ) from e
 
+    async def get_or_create(
+        self, *, defaults: dict[str, Any] | None = None, **filters: Any
+    ) -> tuple[M, bool]:
+        defaults = defaults or {}
+        stmt = select(self.model_cls).where(
+            *(getattr(self.model_cls, key) == value for key, value in filters.items())
+        )
+        result = await self.session.execute(stmt)
+        obj = result.scalars().first()
+
+        if obj:
+            return obj, False
+
+        params = filters
+        params.update(defaults)
+        obj = self.model_cls(**params)  # type: ignore[arg-type]
+        self.session.add(obj)
+        await self.session.commit()
+        await self.session.refresh(obj)
+        return obj, True
+
     async def update(self, id: str | UUID, data: dict[str, Any]) -> M:
         # First fetch the object to ensure polymorphic loading
         obj = await self.get(id)
