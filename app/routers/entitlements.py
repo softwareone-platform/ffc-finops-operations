@@ -1,12 +1,9 @@
-from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi_pagination.limit_offset import LimitOffsetPage
 
-from app.auth import CurrentSystem
-from app.db.db import DBSession
 from app.db.handlers import NotFoundError
 from app.db.models import Entitlement
 from app.enums import EntitlementStatus
@@ -26,12 +23,8 @@ async def get_entitlements(entitlement_repo: EntitlementRepository):
 async def create_entitlement(
     data: EntitlementCreate,
     entitlement_repo: EntitlementRepository,
-    system: CurrentSystem,
 ):
     entitlement = to_orm(data, Entitlement)
-    entitlement.created_by = system
-    entitlement.updated_by = system
-
     db_entitlement = await entitlement_repo.create(entitlement)
     return from_orm(EntitlementRead, db_entitlement)
 
@@ -58,8 +51,7 @@ async def get_entitlement_by_id(
 @router.post("/{id}/terminate", response_model=EntitlementRead)
 async def terminate_entitlement(
     entitlement: Annotated[Entitlement, Depends(fetch_entitlement_or_404)],
-    session: DBSession,
-    system: CurrentSystem,
+    entitlement_repo: EntitlementRepository,
 ):
     if entitlement.status == EntitlementStatus.TERMINATED:
         raise HTTPException(
@@ -75,12 +67,6 @@ async def terminate_entitlement(
             ),
         )
 
-    entitlement.status = EntitlementStatus.TERMINATED
-    entitlement.terminated_by = system
-    entitlement.updated_by = system
-    entitlement.terminated_at = datetime.now(UTC)
-
-    await session.commit()
-    await session.refresh(entitlement)
+    entitlement = await entitlement_repo.terminate(entitlement)
 
     return from_orm(EntitlementRead, entitlement)
