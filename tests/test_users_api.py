@@ -339,3 +339,130 @@ async def test_get_users_for_organization_with_optscale_error(
 
     assert response.status_code == 502
     assert f"Error fetching users for organization {org.name}" in response.json()["detail"]
+
+
+# ===============
+# Make user admin
+# ===============
+
+
+async def test_make_user_admin(
+    organization_factory: ModelFactory[Organization],
+    authenticated_client: AsyncClient,
+    httpx_mock: HTTPXMock,
+):
+    user_id = str(uuid.uuid4())
+    org = await organization_factory(
+        organization_id=str(uuid.uuid4()),
+    )
+    auth_user_id = str(uuid.uuid4())
+
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{settings.opt_api_base_url}/employees/{user_id}?roles=true",
+        match_headers={"Secret": settings.opt_cluster_secret},
+        status_code=200,
+        json={
+            "deleted_at": 0,
+            "id": "2c2e9705-8023-437c-b09d-8cbd49f0a682",
+            "created_at": 1729156673,
+            "name": "Ciccio",
+            "organization_id": org.organization_id,
+            "auth_user_id": auth_user_id,
+            "default_ssh_key_id": None,
+        },
+    )
+
+    httpx_mock.add_response(
+        method="POST",
+        url=f"{settings.opt_auth_base_url}/users/{auth_user_id}/assignment_register",
+        match_headers={"Secret": settings.opt_cluster_secret},
+        status_code=200,
+        json={
+            "created_at": 1736352461,
+            "deleted_at": 0,
+            "id": "7884c0c0-be5c-4cc7-8413-dd8033b1e4a2",
+            "type_id": 2,
+            "role_id": 3,
+            "user_id": auth_user_id,
+            "resource_id": org.organization_id,
+        },
+        match_json={
+            "role_id": 3,  # Admin
+            "type_id": 2,  # Organization
+            "resource_id": org.organization_id,
+        },
+    )
+    response = await authenticated_client.post(
+        f"/organizations/{org.id}/users/{user_id}/make-admin",
+    )
+    assert response.status_code == 204
+
+
+async def test_make_user_admin_not_found(
+    organization_factory: ModelFactory[Organization],
+    authenticated_client: AsyncClient,
+    httpx_mock: HTTPXMock,
+):
+    user_id = str(uuid.uuid4())
+    org = await organization_factory(
+        organization_id=str(uuid.uuid4()),
+    )
+
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{settings.opt_api_base_url}/employees/{user_id}?roles=true",
+        match_headers={"Secret": settings.opt_cluster_secret},
+        status_code=404,
+    )
+
+    response = await authenticated_client.post(
+        f"/organizations/{org.id}/users/{user_id}/make-admin",
+    )
+    assert response.status_code == 502
+    assert "Error making user admin in FinOps for Cloud: 404" in response.json()["detail"]
+
+
+async def test_make_user_admin_error_assigning_role(
+    organization_factory: ModelFactory[Organization],
+    authenticated_client: AsyncClient,
+    httpx_mock: HTTPXMock,
+):
+    user_id = str(uuid.uuid4())
+    org = await organization_factory(
+        organization_id=str(uuid.uuid4()),
+    )
+    auth_user_id = str(uuid.uuid4())
+
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{settings.opt_api_base_url}/employees/{user_id}?roles=true",
+        match_headers={"Secret": settings.opt_cluster_secret},
+        status_code=200,
+        json={
+            "deleted_at": 0,
+            "id": "2c2e9705-8023-437c-b09d-8cbd49f0a682",
+            "created_at": 1729156673,
+            "name": "Ciccio",
+            "organization_id": org.organization_id,
+            "auth_user_id": auth_user_id,
+            "default_ssh_key_id": None,
+        },
+    )
+
+    httpx_mock.add_response(
+        method="POST",
+        url=f"{settings.opt_auth_base_url}/users/{auth_user_id}/assignment_register",
+        match_headers={"Secret": settings.opt_cluster_secret},
+        status_code=400,
+        match_json={
+            "role_id": 3,  # Admin
+            "type_id": 2,  # Organization
+            "resource_id": org.organization_id,
+        },
+    )
+    response = await authenticated_client.post(
+        f"/organizations/{org.id}/users/{user_id}/make-admin",
+    )
+    assert response.status_code == 502
+    assert "Error making user admin in FinOps for Cloud: 400" in response.json()["detail"]
