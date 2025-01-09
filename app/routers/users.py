@@ -4,7 +4,6 @@ import svcs
 from fastapi import APIRouter, HTTPException, status
 
 from app.api_clients import APIModifierClient, OptscaleAuthClient, OptscaleClient, UserDoesNotExist
-from app.auth import CurrentSystem
 from app.schemas import UserCreate, UserRead
 from app.utils import wrap_http_error_in_502
 
@@ -14,7 +13,6 @@ router = APIRouter()
 @router.post("/", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 async def create_user(
     data: UserCreate,
-    system: CurrentSystem,
     services: svcs.fastapi.DepContainer,
 ):
     api_modifier_client = await services.aget(APIModifierClient)
@@ -35,7 +33,6 @@ async def create_user(
 @router.get("/{email}", response_model=UserRead)
 async def get_user_by_email(
     email: str,
-    system: CurrentSystem,
     services: svcs.fastapi.DepContainer,
 ):
     optscale_auth_client = await services.aget(OptscaleAuthClient)

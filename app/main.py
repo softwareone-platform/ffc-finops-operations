@@ -2,10 +2,11 @@ import logging
 
 import fastapi_pagination
 import svcs
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 
 from app import settings
 from app.api_clients import BaseAPIClient
+from app.auth import get_current_system
 from app.db import verify_db_connection
 from app.routers import entitlements, organizations, users
 
@@ -40,10 +41,11 @@ app = FastAPI(
     root_path="/v1",
     debug=settings.debug,
     lifespan=lifespan,
+    dependencies=[Depends(get_current_system)],
 )
 
-fastapi_pagination.add_pagination(app)
 
+fastapi_pagination.add_pagination(app)
 
 # TODO: Add healthcheck
 

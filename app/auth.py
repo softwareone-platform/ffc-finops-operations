@@ -1,12 +1,14 @@
+from contextvars import ContextVar
 from typing import Annotated, Any
 
 import jwt
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app.db.handlers import DatabaseError
+from app.db.db import DBSession
 from app.db.models import System
-from app.repositories import SystemRepository
+
+current_system = ContextVar[System]("current_system")
 
 JWT_ALGORITHM = "HS256"
 
@@ -43,20 +45,29 @@ class JWTBearer(HTTPBearer):
 
 
 async def get_current_system(
-    system_repo: SystemRepository, credentials: Annotated[JWTCredentials, Depends(JWTBearer())]
+    db_session: DBSession, credentials: Annotated[JWTCredentials, Depends(JWTBearer())]
 ):
+    from app.db.handlers import DatabaseError, SystemHandler
+
+    system_handler = SystemHandler(db_session)
     try:
         system_id = credentials.claim["sub"]
-        system = await system_repo.get(system_id)
+        system = await system_handler.get(system_id)
         jwt.decode(
             credentials.credentials,
             system.jwt_secret,
             options={"require": ["exp", "nbf", "iat", "sub"]},
             algorithms=[JWT_ALGORITHM],
         )
-        return system
     except (jwt.InvalidTokenError, DatabaseError) as e:
         raise UNAUTHORIZED_EXCEPTION from e
+
+    reset_token = current_system.set(system)
+
+    try:
+        yield system
+    finally:
+        current_system.reset(reset_token)
 
 
 CurrentSystem = Annotated[System, Depends(get_current_system)]

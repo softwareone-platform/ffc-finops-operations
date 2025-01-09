@@ -17,9 +17,7 @@ router = APIRouter()
 
 
 @router.get("/", response_model=LimitOffsetPage[OrganizationRead])
-async def get_organizations(
-    organization_repo: OrganizationRepository, current_system: CurrentSystem
-):
+async def get_organizations(organization_repo: OrganizationRepository):
     return await paginate(organization_repo, OrganizationRead)
 
 
@@ -73,9 +71,7 @@ async def create_organization(
 
 
 @router.get("/{id}", response_model=OrganizationRead)
-async def get_organization_by_id(
-    id: UUID, organization_repo: OrganizationRepository, current_system: CurrentSystem
-):
+async def get_organization_by_id(id: UUID, organization_repo: OrganizationRepository):
     try:
         db_organization = await organization_repo.get(id=id)
         return from_orm(OrganizationRead, db_organization)

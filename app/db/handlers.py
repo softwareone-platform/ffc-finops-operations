@@ -1,4 +1,6 @@
 from collections.abc import Sequence
+from contextlib import suppress
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -6,7 +8,10 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Base, Entitlement, Organization, System
+from app.auth import current_system
+from app.db.models import AuditableMixin, Entitlement, Organization, System
+from app.db.models import Base as BaseModel
+from app.enums import EntitlementStatus
 
 
 class DatabaseError(Exception):
@@ -21,12 +26,32 @@ class ConstraintViolationError(DatabaseError):
     pass
 
 
-class ModelHandler[M: Base]:
-    def __init__(self, session: AsyncSession, model_cls: type[M]) -> None:
+class ModelHandler[M: BaseModel]:
+    def __init__(self, session: AsyncSession) -> None:
         self.session = session
-        self.model_cls = model_cls
+
+    @classmethod
+    def _get_generic_cls_args(cls):
+        return next(
+            base_cls.__args__
+            for base_cls in cls.__orig_bases__
+            if base_cls.__origin__ is ModelHandler
+        )
+
+    @property
+    def model_cls(self) -> type[M]:
+        return self._get_generic_cls_args()[0]
 
     async def create(self, obj: M) -> M:
+        if isinstance(obj, AuditableMixin):
+            if obj.created_by is None:
+                with suppress(LookupError):
+                    obj.created_by = current_system.get()
+
+            if obj.updated_by is None:
+                with suppress(LookupError):
+                    obj.updated_by = current_system.get()
+
         try:
             self.session.add(obj)
             await self.session.commit()
@@ -64,10 +89,8 @@ class ModelHandler[M: Base]:
 
         params = filters
         params.update(defaults)
-        obj = self.model_cls(**params)  # type: ignore[arg-type]
-        self.session.add(obj)
-        await self.session.commit()
-        await self.session.refresh(obj)
+
+        obj = await self.create(self.model_cls(**params))
         return obj, True
 
     async def update(self, id: str | UUID, data: dict[str, Any]) -> M:
@@ -76,6 +99,11 @@ class ModelHandler[M: Base]:
         # Update attributes
         for key, value in data.items():
             setattr(obj, key, value)
+
+        if isinstance(obj, AuditableMixin) and "updated_by" not in data:
+            with suppress(LookupError):
+                obj.updated_by = current_system.get()
+
         await self.session.commit()
         await self.session.refresh(obj)
         return obj
@@ -90,15 +118,21 @@ class ModelHandler[M: Base]:
 
 
 class EntitlementHandler(ModelHandler[Entitlement]):
-    def __init__(self, session: AsyncSession) -> None:
-        super().__init__(session, Entitlement)
+    async def terminate(self, entitlement: Entitlement) -> Entitlement:
+        entitlement.status = EntitlementStatus.TERMINATED
+        entitlement.terminated_by = current_system.get()
+        entitlement.updated_by = current_system.get()
+        entitlement.terminated_at = datetime.now(UTC)
+
+        await self.session.commit()
+        await self.session.refresh(entitlement)
+
+        return entitlement
 
 
 class OrganizationHandler(ModelHandler[Organization]):
-    def __init__(self, session: AsyncSession) -> None:
-        super().__init__(session, Organization)
+    pass
 
 
 class SystemHandler(ModelHandler[System]):
-    def __init__(self, session: AsyncSession) -> None:
-        super().__init__(session, System)
+    pass
