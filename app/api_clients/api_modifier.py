@@ -1,3 +1,5 @@
+from uuid import UUID
+
 import httpx
 
 from app import settings
@@ -40,6 +42,28 @@ class APIModifierClient(BaseAPIClient):
                 "org_name": org_name,
                 "user_id": user_id,
                 "currency": currency,
+            },
+        )
+        response.raise_for_status()
+        return response
+
+    async def fetch_cloud_accounts_for_organization(
+        self, organization_id: UUID | str
+    ) -> httpx.Response:
+        response = await self.httpx_client.get(
+            f"/restapi/v2/organizations/{organization_id}/cloud_accounts",
+            params={
+                "details": "true",
+            },
+        )
+        response.raise_for_status()
+        return response
+
+    async def fetch_cloud_account_by_id(self, id: UUID | str) -> httpx.Response:
+        response = await self.httpx_client.get(
+            f"/restapi/v2/cloud_accounts/{id}",
+            params={
+                "details": "true",
             },
         )
         response.raise_for_status()

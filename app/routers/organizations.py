@@ -8,9 +8,10 @@ from app.api_clients import APIModifierClient
 from app.auth import CurrentSystem
 from app.db.handlers import NotFoundError
 from app.db.models import Organization
+from app.enums import DataSourceType
 from app.pagination import paginate
 from app.repositories import OrganizationRepository
-from app.schemas import OrganizationCreate, OrganizationRead, from_orm
+from app.schemas import DataSourceRead, OrganizationCreate, OrganizationRead, from_orm
 from app.utils import wrap_http_error_in_502
 
 router = APIRouter()
@@ -80,3 +81,93 @@ async def get_organization_by_id(id: UUID, organization_repo: OrganizationReposi
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e),
         ) from e
+
+
+@router.get("/{id}/data-sources", response_model=list[DataSourceRead])
+async def get_datasources_by_organization_id(
+    id: UUID,
+    organization_repo: OrganizationRepository,
+    services: svcs.fastapi.DepContainer,
+):
+    try:
+        db_organization = await organization_repo.get(id=id)
+    except NotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
+
+    if db_organization.organization_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Organization {db_organization.name} has no associated "
+                "FinOps for Cloud organization"
+            ),
+        )
+
+    api_modifier_client = await services.aget(APIModifierClient)
+
+    async with wrap_http_error_in_502(
+        f"Error fetching cloud accounts for organization {db_organization.name}"
+    ):
+        response = await api_modifier_client.fetch_cloud_accounts_for_organization(
+            organization_id=db_organization.organization_id
+        )
+
+    cloud_accounts = response.json()["cloud_account"]
+
+    return [
+        DataSourceRead(
+            id=acc["id"],
+            organization_id=db_organization.id,
+            type=DataSourceType(acc["type"]),
+            resources_changed_this_month=acc["details"]["tracked"],
+            expenses_so_far_this_month=acc["details"]["cost"],
+            expenses_forecast_this_month=acc["details"]["forecast"],
+        )
+        for acc in cloud_accounts
+    ]
+
+
+@router.get("/{organization_id}/data-sources/{data_source_id}", response_model=DataSourceRead)
+async def get_datasource_by_id(
+    organization_id: UUID,
+    data_source_id: UUID,
+    organization_repo: OrganizationRepository,
+    services: svcs.fastapi.DepContainer,
+):
+    try:
+        db_organization = await organization_repo.get(id=organization_id)
+    except NotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
+
+    if db_organization.organization_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Organization {db_organization.name} has no associated "
+                "FinOps for Cloud organization"
+            ),
+        )
+
+    api_modifier_client = await services.aget(APIModifierClient)
+
+    async with wrap_http_error_in_502(f"Error fetching cloud account with ID {data_source_id}"):
+        response = await api_modifier_client.fetch_cloud_accounts_for_organization(
+            organization_id=db_organization.organization_id
+        )
+
+    cloud_account = response.json()
+
+    return DataSourceRead(
+        id=cloud_account["id"],
+        organization_id=db_organization.id,
+        type=DataSourceType(cloud_account["type"]),
+        resources_changed_this_month=cloud_account["details"]["tracked"],
+        expenses_so_far_this_month=cloud_account["details"]["cost"],
+        expenses_forecast_this_month=cloud_account["details"]["forecast"],
+    )
