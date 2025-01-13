@@ -664,7 +664,7 @@ wheels = [
 [[package]]
 name = "mpt-finops-operations"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "alembic" },
     { name = "asyncpg" },
@@ -677,9 +677,11 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "pyjwt" },
     { name = "python-dotenv" },
+    { name = "pyyaml" },
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "sqlalchemy-utils" },
     { name = "svcs" },
+    { name = "typer" },
     { name = "uvicorn-worker" },
     { name = "uvloop" },
 ]
@@ -700,6 +702,7 @@ dev = [
     { name = "pytest-httpx" },
     { name = "pytest-mock" },
     { name = "ruff" },
+    { name = "types-pyyaml" },
 ]
 
 [package.metadata]
@@ -715,9 +718,11 @@ requires-dist = [
     { name = "pydantic-settings", specifier = "==2.6.*" },
     { name = "pyjwt", specifier = "==2.10.*" },
     { name = "python-dotenv", specifier = "==1.0.*" },
+    { name = "pyyaml", specifier = "==6.0.*" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = "==2.0.*" },
     { name = "sqlalchemy-utils", specifier = "==0.41.*" },
     { name = "svcs", specifier = "==24.1.*" },
+    { name = "typer", specifier = "==0.13.*" },
     { name = "uvicorn-worker", specifier = "==0.3.*" },
     { name = "uvloop", specifier = "==0.21.*" },
 ]
@@ -738,6 +743,7 @@ dev = [
     { name = "pytest-httpx", specifier = ">=0.34.0,<1.0" },
     { name = "pytest-mock", specifier = ">=3.14.0,<4.0" },
     { name = "ruff", specifier = ">=0.8.0,<1.0" },
+    { name = "types-pyyaml", specifier = ">=6.0.12.20241230,<7.0" },
 ]
 
 [[package]]
@@ -1290,6 +1296,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/76/41/49ead3ad3310545e767bcb917c759b026ca9eada5d5c150c2fb6fc555568/typer-0.13.1.tar.gz", hash = "sha256:9d444cb96cc268ce6f8b94e13b4335084cef4c079998a9f4851a90229a3bd25c", size = 98631 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/22/69/e90a0b4d0c16e095901679216c8ecdc728110c7c54e7b5f43a623bc4c789/typer-0.13.1-py3-none-any.whl", hash = "sha256:5b59580fd925e89463a29d363e0a43245ec02765bde9fb77d39e5d0f29dd7157", size = 44723 },
+]
+
+[[package]]
+name = "types-pyyaml"
+version = "6.0.12.20241230"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/9a/f9/4d566925bcf9396136c0a2e5dc7e230ff08d86fa011a69888dd184469d80/types_pyyaml-6.0.12.20241230.tar.gz", hash = "sha256:7f07622dbd34bb9c8b264fe860a17e0efcad00d50b5f27e93984909d9363498c", size = 17078 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e8/c1/48474fbead512b70ccdb4f81ba5eb4a58f69d100ba19f17c92c0c4f50ae6/types_PyYAML-6.0.12.20241230-py3-none-any.whl", hash = "sha256:fa4d32565219b68e6dee5f67534c722e53c00d1cfc09c435ef04d7353e1e96e6", size = 20029 },
 ]
 
 [[package]]

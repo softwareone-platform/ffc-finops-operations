@@ -14,7 +14,7 @@ from app.utils import get_api_modifier_jwt_token
 
 
 @freeze_time("2024-01-01T00:00:00Z")
-def test_get_api_modifier_jwt_token(mock_settings: None):
+def test_get_api_modifier_jwt_token():
     token = get_api_modifier_jwt_token()
     decoded_token = jwt.decode(
         token,
