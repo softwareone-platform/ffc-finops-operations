@@ -1,0 +1,61 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      accept:
+      - '*/*'
+      accept-encoding:
+      - gzip, deflate
+      authorization:
+      - DUMMY
+      connection:
+      - keep-alive
+      host:
+      - cloudspend.velasuci.com
+      user-agent:
+      - python-httpx/0.27.2
+    method: GET
+    uri: https://cloudspend.velasuci.com/restapi/v2/organizations/9044af7f-2f62-40cd-976f-1cbbbf1a0411/cloud_accounts?details=true
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA9xWyW4cNxD9lcGcEsAUyObSZG6B/QE55BYEDS5FiXBPs0GyBcuC/j1ka0YjW7IW
+        j6VDbt3FYi2vFr7rrR3j4gZtbVymkrd/bP653joYoUCVlvqPP2y2wdWPrXCcO8UwMpppxEBiJJmi
+        iPeGeue5pZRsq7ZNoO+uk75TQlLFSD2Z9A6apY9//bn57RNcwhjnHUxloye3+Rty+b3dL1fzqqW/
+        LgkGO6XVaJx8OK/i6xpyqHeG26BsjYh7ZhDmnCGmiUBKY4WU0J2n2FgMfjUKk55aQFvirDKUKuS1
+        M4jRDpAUziPWUUulxt4a2W7kz2Geaxp5MdmmMJcQp7wG8ET4LbmG6GaP6MbHtCkXId8J9FjhcVcb
+        +BJy2d40R/cc7LNSRBKliUW2dxQxIxUyVnlElZfceM+EEC1G+DLDlGEIuzmmMmR7AbcIL1mfw2o9
+        pnM9ha/6vnXMmPa9R50XHWLYOqR64RGxxhhPNGZkLaReStybrtdKWqD1wq2rGVKIzVqr66hzOcSw
+        r3rtBU4Ew9+d7qILPtzvrT0ur0x8TtFCzkMCG3e1Bk4fyrMP89uQCuzm50I7aEFKMVXFaRnHg8o5
+        lBKm82EHJQWb7yyJvpeCyMfVHvh9mfZ3/u0IeroP2KzTsf2ZJFiyjqCaVWv/ziJt+zoNRGDWC2d7
+        hRteDooO42372pgPtmp3gtXrL+kkP2NdG5Wk7Wdwe5U11F2cysWwv9gprM4IFpJ3hPE6drw5CNnG
+        S0hXQ5h8fHqRdJzonrdFophqi8TWlcId6nCNXXU95aJ7epF8s7WG162nBDkuycJw2DNhykVPFtph
+        NBnSZT0L6xzdFk3JY9GOed6rqpL0bgzW8h0zPsqOJa2ryIwrwK1Z65D+ECnnGYG23fqujiujNSfF
+        OUHAcMeV9BwovCNSl3FcdifhxNmb4FQh6uvesEjVlY8YNzUjzhwywlHhiHdS+3fEKU96zhexnISU
+        eBOkCNMMiDLISNzXN6/2luQ9IOG6+gYowiTD74iUWeqqOQ2n/k1wsmBEz6xBQFmdPEkx0sr1yAKl
+        ve0UYOreEacwD9q5Ks4nYSU//DRW/948BddL36HH4JKqPSAHbth41EMWuKdvzcL/lAj+Uq7m9Zhf
+        TNZey9FeitvPc7STqRl+/PQHXn4BEdvrPE+z8FkTPEexmvQho7q+ualj+B8AAAD//wMAeAWazbQN
+        AAA=
+    headers:
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json; charset="utf-8"
+      Date:
+      - Mon, 13 Jan 2025 14:51:58 GMT
+      Etag:
+      - W/"48352e11a55bca02bae5c090322662fd8f2c1afd"
+      Server:
+      - nginx/1.19.1
+      Strict-Transport-Security:
+      - max-age=15724800; includeSubDomains
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Accept-Encoding
+    status:
+      code: 200
+      message: OK
+version: 1

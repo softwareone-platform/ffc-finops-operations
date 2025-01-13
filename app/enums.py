@@ -16,8 +16,12 @@ class EntitlementStatus(str, enum.Enum):
 
 @enum.unique
 class DataSourceType(str, enum.Enum):
-    AWS_ROOT = "aws_root"
-    AWS_LINKED = "aws_linked"
+    AWS_CNR = "aws_cnr"
+    AZURE_CNR = "azure_cnr"
     AZURE_TENANT = "azure_tenant"
-    AZURE_SUBSCRIPTION = "azure_subscription"
-    GCP = "gcp"
+    GCP_CNR = "gcp_cnr"
+    UNKNOWN = "unknown"
+
+    @classmethod
+    def _missing_(cls, value):
+        return cls.UNKNOWN
