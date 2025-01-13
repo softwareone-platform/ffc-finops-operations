@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
-from app.db.models import Actor, Entitlement, Organization, System
-from app.enums import ActorType, EntitlementStatus
+from app.db.models import Account, Actor, Entitlement, Organization, System
+from app.enums import AccountType, ActorType, EntitlementStatus, OrganizationStatus, SystemStatus
 from app.schemas import (
     ActorRead,
     EntitlementCreate,
@@ -35,6 +35,7 @@ def test_system_create_to_orm():
         "external_id": "test-system",
         "jwt_secret": "secret",
         "description": "Test Description",
+        "owner": {"id": "FACC-1234-5678"},
     }
 
     system_create = SystemCreate(**data)
@@ -56,6 +57,8 @@ def test_system_read_from_orm(gcp_extension: System):
         jwt_secret="secret",
         description="Test Description",
         type=ActorType.SYSTEM,
+        status=SystemStatus.ACTIVE,
+        owner=Account(id="FACC-1234-5678", name="test", type=AccountType.AFFILIATE),
     )
     system.created_at = datetime.now(UTC)
     system.updated_at = datetime.now(UTC)
@@ -72,47 +75,46 @@ def test_system_read_from_orm(gcp_extension: System):
     assert system_read.updated_at == system.updated_at
     assert system_read.created_by.id == gcp_extension.id
     assert system_read.updated_by.id == gcp_extension.id
+    assert system_read.owner.id == system.owner.id
 
 
 def test_entitlement_create_to_orm():
     data = {
-        "sponsor_name": "AWS",
-        "sponsor_external_id": "ACC-123",
-        "sponsor_container_id": "container-123",
+        "name": "AWS",
+        "affiliate_external_id": "ACC-123",
+        "datasource_id": "container-123",
     }
 
     entitlement_create = EntitlementCreate(**data)
     entitlement = to_orm(entitlement_create, Entitlement)
 
     assert isinstance(entitlement, Entitlement)
-    assert entitlement.sponsor_name == data["sponsor_name"]
-    assert entitlement.sponsor_external_id == data["sponsor_external_id"]
-    assert entitlement.sponsor_container_id == data["sponsor_container_id"]
+    assert entitlement.name == data["name"]
+    assert entitlement.affiliate_external_id == data["affiliate_external_id"]
+    assert entitlement.datasource_id == data["datasource_id"]
 
 
 def test_entitlement_read_from_orm(gcp_extension: System):
     entitlement = Entitlement(
         id="FENT-1234-5678-9012",
-        sponsor_name="AWS",
-        sponsor_external_id="ACC-123",
-        sponsor_container_id="container-123",
+        name="AWS",
+        affiliate_external_id="ACC-123",
+        datasource_id="container-123",
         status=EntitlementStatus.ACTIVE,
     )
     # Set timestamps and audit fields after creation
     entitlement.created_at = datetime.now(UTC)
     entitlement.updated_at = datetime.now(UTC)
-    entitlement.activated_at = datetime.now(UTC)
     entitlement.created_by = gcp_extension
     entitlement.updated_by = gcp_extension
 
     entitlement_read = from_orm(EntitlementRead, entitlement)
 
     assert entitlement_read.id == entitlement.id
-    assert entitlement_read.sponsor_name == entitlement.sponsor_name
-    assert entitlement_read.sponsor_external_id == entitlement.sponsor_external_id
-    assert entitlement_read.sponsor_container_id == entitlement.sponsor_container_id
+    assert entitlement_read.name == entitlement.name
+    assert entitlement_read.affiliate_external_id == entitlement.affiliate_external_id
+    assert entitlement_read.datasource_id == entitlement.datasource_id
     assert entitlement_read.status == entitlement.status
-    assert entitlement_read.activated_at == entitlement.activated_at
     assert entitlement_read.created_at == entitlement.created_at
     assert entitlement_read.updated_at == entitlement.updated_at
     assert entitlement_read.created_by.id == gcp_extension.id
@@ -125,20 +127,20 @@ def test_entitlement_read_from_orm(gcp_extension: System):
 
 def test_entitlement_update_partial():
     update_data = {
-        "sponsor_name": "Updated AWS",
+        "name": "Updated AWS",
     }
 
     entitlement_update = EntitlementUpdate(**update_data)
     data = entitlement_update.model_dump(exclude_unset=True)
 
     assert len(data) == 1
-    assert data["sponsor_name"] == update_data["sponsor_name"]
+    assert data["name"] == update_data["name"]
 
 
 def test_organization_create_to_orm():
     data = {
         "name": "Test Org",
-        "external_id": "ORG-123",
+        "affiliate_external_id": "ORG-123",
         "user_id": "user-123",
         "currency": "USD",
     }
@@ -148,18 +150,19 @@ def test_organization_create_to_orm():
 
     assert isinstance(organization, Organization)
     assert organization.name == data["name"]
-    assert organization.external_id == data["external_id"]
+    assert organization.affiliate_external_id == data["affiliate_external_id"]
     # These fields should not be in the ORM model
     assert not hasattr(organization, "user_id")
-    assert not hasattr(organization, "currency")
 
 
 def test_organization_read_from_orm(ffc_extension: System):
     organization = Organization(
         id="FORG-1234-5678-9012",
         name="Test Org",
-        external_id="ORG-123",
-        organization_id="FFC-123",
+        currency="EUR",
+        affiliate_external_id="ORG-123",
+        operations_external_id="FFC-123",
+        status=OrganizationStatus.ACTIVE,
     )
     # Set timestamps and audit fields after creation
     organization.created_at = datetime.now(UTC)
@@ -171,8 +174,10 @@ def test_organization_read_from_orm(ffc_extension: System):
 
     assert org_read.id == organization.id
     assert org_read.name == organization.name
-    assert org_read.external_id == organization.external_id
-    assert org_read.organization_id == organization.organization_id
+    assert org_read.currency == organization.currency
+    assert org_read.affiliate_external_id == organization.affiliate_external_id
+    assert org_read.operations_external_id == organization.operations_external_id
+    assert org_read.status == organization.status
     assert org_read.created_at == organization.created_at
     assert org_read.updated_at == organization.updated_at
     assert org_read.created_by.id == ffc_extension.id
@@ -186,7 +191,7 @@ def test_organization_read_from_orm(ffc_extension: System):
 def test_organization_update_partial():
     update_data = {
         "name": "Updated Org",
-        "organization_id": "FFC-456",
+        "affiliate_external_id": "FFC-456",
     }
 
     org_update = OrganizationUpdate(**update_data)
@@ -194,4 +199,4 @@ def test_organization_update_partial():
 
     assert len(data) == 2
     assert data["name"] == update_data["name"]
-    assert data["organization_id"] == update_data["organization_id"]
+    assert data["affiliate_external_id"] == update_data["affiliate_external_id"]

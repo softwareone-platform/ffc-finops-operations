@@ -8,17 +8,17 @@ from app.db.models import Entitlement
 from app.dependencies import EntitlementId, EntitlementRepository
 from app.enums import EntitlementStatus
 from app.pagination import paginate
-from app.schemas import EntitlementCreate, EntitlementRead, from_orm, to_orm
+from app.schemas import EntitlementCreate, EntitlementRead, EntitlementRedeem, from_orm, to_orm
 
 router = APIRouter()
 
 
-@router.get("/", response_model=LimitOffsetPage[EntitlementRead])
+@router.get("", response_model=LimitOffsetPage[EntitlementRead])
 async def get_entitlements(entitlement_repo: EntitlementRepository):
     return await paginate(entitlement_repo, EntitlementRead)
 
 
-@router.post("/", response_model=EntitlementRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=EntitlementRead, status_code=status.HTTP_201_CREATED)
 async def create_entitlement(
     data: EntitlementCreate,
     entitlement_repo: EntitlementRepository,
@@ -69,3 +69,18 @@ async def terminate_entitlement(
     entitlement = await entitlement_repo.terminate(entitlement)
 
     return from_orm(EntitlementRead, entitlement)
+
+
+@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_entitlement_by_id(
+    entitlement: Annotated[Entitlement, Depends(fetch_entitlement_or_404)],
+):
+    pass
+
+
+@router.post("/{id}/redeem", response_model=EntitlementRead)
+async def redeem_entitlement(
+    entitlement: Annotated[Entitlement, Depends(fetch_entitlement_or_404)],
+    redeem_info: EntitlementRedeem,
+):
+    pass

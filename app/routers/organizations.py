@@ -12,18 +12,18 @@ from app.db.models import Organization
 from app.dependencies import OrganizationId, OrganizationRepository
 from app.enums import DatasourceType
 from app.pagination import paginate
-from app.schemas import DatasourceRead, OrganizationCreate, OrganizationRead, UserRead, from_orm
+from app.schemas import DatasourceRead, EmployeeRead, OrganizationCreate, OrganizationRead, from_orm
 from app.utils import wrap_http_error_in_502
 
 router = APIRouter()
 
 
-@router.get("/", response_model=LimitOffsetPage[OrganizationRead])
+@router.get("", response_model=LimitOffsetPage[OrganizationRead])
 async def get_organizations(organization_repo: OrganizationRepository):
     return await paginate(organization_repo, OrganizationRead)
 
 
-@router.post("/", response_model=OrganizationRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=OrganizationRead, status_code=status.HTTP_201_CREATED)
 async def create_organization(
     data: OrganizationCreate,
     organization_repo: OrganizationRepository,
@@ -33,26 +33,29 @@ async def create_organization(
     api_modifier_client = await services.aget(APIModifierClient)
 
     db_organization: Organization | None = None
-    defaults = data.model_dump(exclude_unset=True, exclude={"user_id", "currency"})
+    defaults = data.model_dump(exclude_unset=True, exclude={"user_id"})
     defaults["created_by"] = current_system
     defaults["updated_by"] = current_system
     db_organization, created = await organization_repo.get_or_create(
         defaults=defaults,
-        external_id=data.external_id,
+        affiliate_external_id=data.affiliate_external_id,
     )
 
     if not created:
-        if db_organization.organization_id:
+        if db_organization.operations_external_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"An Organization with external ID `{data.external_id}` already exists.",
+                detail=(
+                    "An Organization with external ID "
+                    f"`{data.affiliate_external_id}` already exists."
+                ),
             )
         if db_organization.name != data.name:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=(
                     f"The name of a partially created Organization with "
-                    f"external ID {data.external_id}  doesn't match the "
+                    f"external ID {data.affiliate_external_id}  doesn't match the "
                     f"current request: {db_organization.name}."
                 ),
             )
@@ -66,7 +69,7 @@ async def create_organization(
         db_organization = await organization_repo.update(
             db_organization.id,
             {
-                "organization_id": ffc_organization["id"],
+                "operations_external_id": ffc_organization["id"],
             },
         )
         return from_orm(OrganizationRead, db_organization)
@@ -96,7 +99,7 @@ async def get_datasources_by_organization_id(
     organization: Annotated[Organization, Depends(fetch_organization_or_404)],
     services: svcs.fastapi.DepContainer,
 ):
-    if organization.organization_id is None:
+    if organization.operations_external_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
@@ -111,7 +114,7 @@ async def get_datasources_by_organization_id(
         f"Error fetching datasources for organization {organization.name}"
     ):
         response = await optscale_client.fetch_datasources_for_organization(
-            organization_id=organization.organization_id
+            organization_id=organization.operations_external_id
         )
 
     datasources = response.json()["cloud_accounts"]
@@ -135,7 +138,7 @@ async def get_datasource_by_id(
     datasource_id: UUID,
     services: svcs.fastapi.DepContainer,
 ):
-    if organization.organization_id is None:
+    if organization.operations_external_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
@@ -161,12 +164,12 @@ async def get_datasource_by_id(
     )
 
 
-@router.get("/{organization_id}/users", response_model=list[UserRead])
-async def get_users_by_organization_id(
+@router.get("/{organization_id}/employees", response_model=list[EmployeeRead])
+async def get_employees_by_organization_id(
     organization: Annotated[Organization, Depends(fetch_organization_or_404)],
     services: svcs.fastapi.DepContainer,
 ):
-    if organization.organization_id is None:
+    if organization.operations_external_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
@@ -177,15 +180,17 @@ async def get_users_by_organization_id(
 
     optscale_client = await services.aget(OptscaleClient)
 
-    async with wrap_http_error_in_502(f"Error fetching users for organization {organization.name}"):
+    async with wrap_http_error_in_502(
+        f"Error fetching employees for organization {organization.name}"
+    ):
         response = await optscale_client.fetch_users_for_organization(
-            organization_id=organization.organization_id
+            organization_id=organization.operations_external_id
         )
 
     users = response.json()["employees"]
 
     return [
-        UserRead(
+        EmployeeRead(
             id=user["id"],
             email=user["user_email"],
             display_name=user["user_display_name"],
@@ -198,7 +203,7 @@ async def get_users_by_organization_id(
 
 
 @router.post(
-    "/{organization_id}/users/{user_id}/make-admin",
+    "/{organization_id}/employees/{user_id}/make-admin",
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def make_organization_user_admin(
@@ -209,12 +214,17 @@ async def make_organization_user_admin(
     optscale_auth_client = await services.aget(OptscaleAuthClient)
     optscale_client = await services.aget(OptscaleClient)
 
-    async with wrap_http_error_in_502("Error making user admin in FinOps for Cloud"):
+    async with wrap_http_error_in_502("Error making employee admin in FinOps for Cloud"):
         # check user exists in optscale
         response = await optscale_client.fetch_user_by_id(str(user_id))
         user = response.json()
         # assign admin role of current organization to the user
         await optscale_auth_client.make_user_admin(
-            str(organization.organization_id),
+            str(organization.operations_external_id),
             user["auth_user_id"],
         )
+
+
+@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_organization_by_id(id: str):
+    pass

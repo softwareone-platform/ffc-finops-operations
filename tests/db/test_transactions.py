@@ -5,25 +5,33 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_tx_db_session
-from app.db.handlers import EntitlementHandler, SystemHandler
-from app.db.models import Entitlement, System
+from app.db.handlers import AccountHandler, EntitlementHandler, SystemHandler
+from app.db.models import Account, Entitlement, System
 from app.enums import DatasourceType
 from tests.utils import SQLAlchemyCapturer
 
 
-def random_entitlement() -> Entitlement:
-    return Entitlement(
-        sponsor_name=random.choice(list(DatasourceType)),
-        sponsor_external_id=str(uuid.uuid4()),
-        sponsor_container_id=str(uuid.uuid4()),
+def random_account() -> Account:
+    return Account(
+        name=str(uuid.uuid4()),
     )
 
 
-def random_system() -> System:
+def random_entitlement(account_id) -> Entitlement:
+    return Entitlement(
+        name=random.choice(list(DatasourceType)),
+        affiliate_external_id=str(uuid.uuid4()),
+        datasource_id=str(uuid.uuid4()),
+        owner_id=account_id,
+    )
+
+
+def random_system(account_id) -> System:
     return System(
         name=str(uuid.uuid4()),
         external_id=str(uuid.uuid4()),
         jwt_secret=secrets.token_hex(32),
+        owner_id=account_id,
     )
 
 
@@ -39,16 +47,15 @@ def get_sql_query_types(statements: list[str]) -> list[str]:
 
 
 async def test_handler_simple_insert(db_session: AsyncSession, capsql: SQLAlchemyCapturer):
-    entitlements_handler = EntitlementHandler(db_session)
+    account_handler = AccountHandler(db_session)
 
-    entitlement = random_entitlement()
-
-    assert entitlement.id is None
+    account = random_account()
+    assert account.id is None
 
     with capsql:
-        await entitlements_handler.create(entitlement)
+        await account_handler.create(account)
 
-    assert entitlement.id is not None
+    assert account.id is not None
 
     assert get_sql_query_types(capsql.statements) == [
         "BEGIN",
@@ -60,61 +67,52 @@ async def test_handler_simple_insert(db_session: AsyncSession, capsql: SQLAlchem
     ]
 
 
-async def test_handler_simple_insert_two_objects(
-    db_session: AsyncSession, capsql: SQLAlchemyCapturer
-):
-    entitlements_handler = EntitlementHandler(db_session)
-
-    with capsql:
-        await entitlements_handler.create(random_entitlement())
-        await entitlements_handler.create(random_entitlement())
-
-    assert get_sql_query_types(capsql.statements) == [
-        "BEGIN",
-        "SELECT",  # check PK
-        "INSERT",
-        "COMMIT",
-        "BEGIN",
-        "SELECT",
-        "SELECT",
-        "INSERT",
-        "COMMIT",
-        "BEGIN",
-        "SELECT",
-    ]
-
-
-async def test_handler_insert_two_models(db_session: AsyncSession, capsql: SQLAlchemyCapturer):
+async def test_handler_insert_three_models(db_session: AsyncSession, capsql: SQLAlchemyCapturer):
+    account_handler = AccountHandler(db_session)
     entitlements_handler = EntitlementHandler(db_session)
     systems_handler = SystemHandler(db_session)
+    account = random_account()
 
     with capsql:
-        await entitlements_handler.create(random_entitlement())
-        await systems_handler.create(random_system())
+        account = await account_handler.create(account)
+        await entitlements_handler.create(random_entitlement(account.id))
+        await systems_handler.create(random_system(account.id))
 
-    assert get_sql_query_types(capsql.statements) == [
+    statements = get_sql_query_types(capsql.statements)
+    assert statements == [
         "BEGIN",
-        "SELECT",  # check PK
-        "INSERT",
+        "SELECT",  # check account PK
+        "INSERT",  # insert account
         "COMMIT",
         "BEGIN",
-        "SELECT",  # check PK
-        "SELECT",  # check PK
+        "SELECT",  # refresh account
+        "SELECT",  # check entitlement PK
+        "INSERT",  # insert entitlement
+        "COMMIT",
+        "BEGIN",
+        "SELECT",  # refresh entitlement
+        "SELECT",  # check system PK
         "INSERT",  # insert actor
         "INSERT",  # insert system
         "COMMIT",
         "BEGIN",
-        "SELECT",
+        "SELECT",  # refresh system
     ]
 
 
-async def test_handler_insert_two_models_with_session_begin(capsql: SQLAlchemyCapturer):
+async def test_handler_insert_two_models_with_session_begin(
+    db_session: AsyncSession, capsql: SQLAlchemyCapturer
+):
+    account_handler = AccountHandler(db_session)
+    account = random_account()
+    account = await account_handler.create(account)
+    db_session.expunge_all()
     with capsql:
         async with get_tx_db_session() as tx_session:
             entitlements_handler = EntitlementHandler(tx_session)
             systems_handler = SystemHandler(tx_session)
-            await entitlements_handler.create(random_entitlement())
-            await systems_handler.create(random_system())
+            await entitlements_handler.create(random_entitlement(account.id))
+            await systems_handler.create(random_system(account.id))
 
     assert get_sql_query_types(capsql.statements) == [
         "BEGIN",
@@ -129,14 +127,20 @@ async def test_handler_insert_two_models_with_session_begin(capsql: SQLAlchemyCa
     ]
 
 
-async def test_handler_insert_two_models_with_session_begin_rollback(capsql: SQLAlchemyCapturer):
+async def test_handler_insert_two_models_with_session_begin_rollback(
+    db_session: AsyncSession,
+    capsql: SQLAlchemyCapturer,
+):
+    account_handler = AccountHandler(db_session)
+    account = random_account()
+    account = await account_handler.create(account)
     with capsql:
         try:
             async with get_tx_db_session() as tx_session:
                 entitlements_handler = EntitlementHandler(tx_session)
                 systems_handler = SystemHandler(tx_session)
-                await entitlements_handler.create(random_entitlement())
-                await systems_handler.create(random_system())
+                await entitlements_handler.create(random_entitlement(account.id))
+                await systems_handler.create(random_system(account.id))
                 raise Exception("rollback!")
         except Exception:
             pass
@@ -155,15 +159,20 @@ async def test_handler_insert_two_models_with_session_begin_rollback(capsql: SQL
 
 
 async def test_handler_insert_two_models_with_session_begin_multiple_transactions(
+    db_session: AsyncSession,
     capsql: SQLAlchemyCapturer,
 ):
+    account_handler = AccountHandler(db_session)
+    account = random_account()
+    account = await account_handler.create(account)
+    db_session.expunge_all()
     statements = []
     with capsql:
         async with get_tx_db_session() as tx_session:
             entitlements_handler = EntitlementHandler(tx_session)
             systems_handler = SystemHandler(tx_session)
-            await entitlements_handler.create(random_entitlement())
-            await systems_handler.create(random_system())
+            await entitlements_handler.create(random_entitlement(account.id))
+            await systems_handler.create(random_system(account.id))
 
     statements.extend(capsql.statements)
 
@@ -171,8 +180,8 @@ async def test_handler_insert_two_models_with_session_begin_multiple_transaction
         async with get_tx_db_session() as tx_session:
             entitlements_handler = EntitlementHandler(tx_session)
             systems_handler = SystemHandler(tx_session)
-            await entitlements_handler.create(random_entitlement())
-            await systems_handler.create(random_system())
+            await entitlements_handler.create(random_entitlement(account.id))
+            await systems_handler.create(random_system(account.id))
 
     statements.extend(capsql.statements)
 

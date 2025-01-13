@@ -8,7 +8,7 @@ from app import settings
 from app.api_clients import BaseAPIClient
 from app.auth import get_current_system
 from app.db import verify_db_connection
-from app.routers import entitlements, organizations, users
+from app.routers import accounts, auth, employees, entitlements, organizations, systems, users
 
 logger = logging.getLogger(__name__)
 
@@ -28,16 +28,33 @@ async def lifespan(app: FastAPI, registry: svcs.Registry):
 
 tags_metadata = [
     {
-        "name": "Operations",
-        "description": "Endpoint for managing FinOps for Cloud",
+        "name": "Auth",
+        "description": "Operations Portal Authentication",
+    },
+    {
+        "name": "Portal Administration",
+        "description": "Operations Portal administration edpoints.",
+    },
+    {
+        "name": "Portal Settings",
+        "description": "Operations Portal settings edpoints.",
+    },
+    {
+        "name": "FinOps for Cloud Provisioning",
+        "description": "Endpoints for account provisioning in FinOps for Cloud",
+    },
+    {
+        "name": "Billing",
+        "description": "FinOps for Cloud Billing management endpoints.",
     },
 ]
 
 
 app = FastAPI(
     title="FinOps for Cloud Operations API",
-    description="API to be used by Operators to manage FinOps for Cloud tool",
+    description="API to be used to manage FinOps for Cloud tool",
     openapi_tags=tags_metadata,
+    version="4.0.0",
     root_path="/ops/v1",
     debug=settings.debug,
     lifespan=lifespan,
@@ -49,6 +66,14 @@ fastapi_pagination.add_pagination(app)
 
 # TODO: Add healthcheck
 
-app.include_router(entitlements.router, prefix="/entitlements", tags=["Operations"])
-app.include_router(organizations.router, prefix="/organizations", tags=["Operations"])
-app.include_router(users.router, prefix="/users", tags=["Operations"])
+app.include_router(entitlements.router, prefix="/entitlements", tags=["Billing"])
+app.include_router(
+    organizations.router, prefix="/organizations", tags=["FinOps for Cloud Provisioning"]
+)
+app.include_router(employees.router, prefix="/employees", tags=["FinOps for Cloud Provisioning"])
+app.include_router(accounts.router, prefix="/accounts", tags=["Portal Administration"])
+
+
+app.include_router(users.router, prefix="/users", tags=["Portal Settings"])
+app.include_router(systems.router, prefix="/systems", tags=["Portal Settings"])
+app.include_router(auth.router, prefix="/auth", tags=["Auth"])
