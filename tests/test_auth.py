@@ -1,5 +1,4 @@
 import uuid
-from collections.abc import Callable
 from contextlib import asynccontextmanager
 
 import pytest
@@ -9,9 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import JWTBearer, JWTCredentials, current_system, get_current_system
 from app.db.models import System
+from tests.conftest import JWTTokenFactory
 
 
-async def test_jwt_bearer(mocker, jwt_token_factory):
+async def test_jwt_bearer(mocker: MockerFixture, jwt_token_factory: JWTTokenFactory):
     bearer = JWTBearer()
     request = mocker.Mock()
     request.headers = {"Authorization": f"Bearer {jwt_token_factory('test', 'secret')}"}
@@ -21,7 +21,7 @@ async def test_jwt_bearer(mocker, jwt_token_factory):
     assert credentials.claim["sub"] == "test"
 
 
-async def test_jwt_bearer_invalid_token(mocker):
+async def test_jwt_bearer_invalid_token(mocker: MockerFixture):
     bearer = JWTBearer()
     request = mocker.Mock()
     request.headers = {"Authorization": "Bearer 1234567890"}
@@ -31,7 +31,7 @@ async def test_jwt_bearer_invalid_token(mocker):
     assert exc_info.value.detail == "Unauthorized"
 
 
-async def test_jwt_bearer_no_token(mocker):
+async def test_jwt_bearer_no_token(mocker: MockerFixture):
     bearer = JWTBearer()
     request = mocker.Mock()
     request.headers = {}
@@ -61,7 +61,7 @@ async def test_get_current_system(
 
 
 async def test_get_current_system_system_not_found(
-    mocker: MockerFixture, jwt_token_factory: Callable[[str, str], str], db_session: AsyncSession
+    mocker: MockerFixture, jwt_token_factory: JWTTokenFactory, db_session: AsyncSession
 ):
     bearer = JWTBearer()
     request = mocker.Mock()
@@ -80,7 +80,7 @@ async def test_get_current_system_system_not_found(
 
 
 async def test_get_current_system_invalid_subject(
-    mocker: MockerFixture, jwt_token_factory: Callable[[str, str], str], db_session: AsyncSession
+    mocker: MockerFixture, jwt_token_factory: JWTTokenFactory, db_session: AsyncSession
 ):
     bearer = JWTBearer()
     request = mocker.Mock()

@@ -25,6 +25,8 @@ dependencies = [
     "uvloop==0.21.*",
     "uvicorn-worker==0.3.*",
     "svcs==24.1.*",
+    "pyyaml==6.0.*",
+    "typer==0.13.*",
 ]
 
 [dependency-groups]
@@ -43,8 +45,17 @@ dev = [
     "freezegun>=1.5.1,<2.0",
     "ipdb>=0.13.13,<1.0",
     "asgi-lifespan>=2.1.0,<3.0",
+    "types-pyyaml>=6.0.12.20241230,<7.0",
 ]
 
+[project.scripts]
+ffcops = "app.cli:app"
+
+[tool.uv]
+package = true
+
+[tool.setuptools]
+py-modules = ["app"]
 
 [tool.ruff]
 line-length = 100

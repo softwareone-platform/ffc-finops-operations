@@ -90,7 +90,7 @@ jobs:
           retention-days: 10
 
       - name: Generate openapi.json
-        run: uv run python -m scripts.generate_openapi_json openapi.json
+        run: uv run ffcops openapi -f json -o openapi.json
 
       - name: Save openapi.json the artefacts
         uses: actions/upload-artifact@v4

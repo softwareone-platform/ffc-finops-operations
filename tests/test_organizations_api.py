@@ -289,7 +289,6 @@ async def test_create_organization_already_created(
 async def test_create_organization_api_modifier_error(
     mocker: MockerFixture,
     httpx_mock: HTTPXMock,
-    mock_settings: None,
     api_client: AsyncClient,
     ffc_jwt_token: str,
 ):
