@@ -15,7 +15,7 @@ class EntitlementStatus(str, enum.Enum):
 
 
 @enum.unique
-class DataSourceType(str, enum.Enum):
+class CloudAccountType(str, enum.Enum):
     AWS_CNR = "aws_cnr"
     AZURE_CNR = "azure_cnr"
     AZURE_TENANT = "azure_tenant"

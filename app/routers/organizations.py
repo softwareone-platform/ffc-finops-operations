@@ -8,10 +8,10 @@ from app.api_clients import APIModifierClient
 from app.auth import CurrentSystem
 from app.db.handlers import NotFoundError
 from app.db.models import Organization
-from app.enums import DataSourceType
+from app.enums import CloudAccountType
 from app.pagination import paginate
 from app.repositories import OrganizationRepository
-from app.schemas import DataSourceRead, OrganizationCreate, OrganizationRead, from_orm
+from app.schemas import CloudAccountRead, OrganizationCreate, OrganizationRead, from_orm
 from app.utils import wrap_http_error_in_502
 
 router = APIRouter()
@@ -83,8 +83,8 @@ async def get_organization_by_id(id: UUID, organization_repo: OrganizationReposi
         ) from e
 
 
-@router.get("/{id}/data-sources", response_model=list[DataSourceRead])
-async def get_datasources_by_organization_id(
+@router.get("/{id}/cloud-accounts", response_model=list[CloudAccountRead])
+async def get_cloud_accounts_by_organization_id(
     id: UUID,
     organization_repo: OrganizationRepository,
     services: svcs.fastapi.DepContainer,
@@ -118,10 +118,10 @@ async def get_datasources_by_organization_id(
     cloud_accounts = response.json()["cloud_accounts"]
 
     return [
-        DataSourceRead(
+        CloudAccountRead(
             id=acc["id"],
             organization_id=db_organization.id,
-            type=DataSourceType(acc["type"]),
+            type=CloudAccountType(acc["type"]),
             resources_changed_this_month=acc["details"]["tracked"],
             expenses_so_far_this_month=acc["details"]["cost"],
             expenses_forecast_this_month=acc["details"]["forecast"],
@@ -130,10 +130,10 @@ async def get_datasources_by_organization_id(
     ]
 
 
-@router.get("/{organization_id}/data-sources/{data_source_id}", response_model=DataSourceRead)
-async def get_datasource_by_id(
+@router.get("/{organization_id}/cloud-account/{cloud_account_id}", response_model=CloudAccountRead)
+async def get_cloud_account_by_id(
     organization_id: UUID,
-    data_source_id: UUID,
+    cloud_account_id: UUID,
     organization_repo: OrganizationRepository,
     services: svcs.fastapi.DepContainer,
 ):
@@ -156,17 +156,17 @@ async def get_datasource_by_id(
 
     api_modifier_client = await services.aget(APIModifierClient)
 
-    async with wrap_http_error_in_502(f"Error fetching cloud account with ID {data_source_id}"):
+    async with wrap_http_error_in_502(f"Error fetching cloud account with ID {cloud_account_id}"):
         response = await api_modifier_client.fetch_cloud_accounts_for_organization(
             organization_id=db_organization.organization_id
         )
 
     cloud_account = response.json()
 
-    return DataSourceRead(
+    return CloudAccountRead(
         id=cloud_account["id"],
         organization_id=db_organization.id,
-        type=DataSourceType(cloud_account["type"]),
+        type=CloudAccountType(cloud_account["type"]),
         resources_changed_this_month=cloud_account["details"]["tracked"],
         expenses_so_far_this_month=cloud_account["details"]["cost"],
         expenses_forecast_this_month=cloud_account["details"]["forecast"],

@@ -3,7 +3,7 @@ from httpx import AsyncClient
 from pytest_mock import MockerFixture
 
 from app.db.models import Organization, System
-from app.enums import DataSourceType
+from app.enums import CloudAccountType
 from tests.conftest import ModelFactory
 
 
@@ -25,7 +25,7 @@ def optscale_organization_id():
 
 
 @pytest.mark.vcr()
-async def test_get_datasources_for_organization_success(
+async def test_get_cloud_accounts_for_organization_success(
     mock_api_modifier_client,
     optscale_organization_id: str,
     organization_factory: ModelFactory[Organization],
@@ -37,7 +37,7 @@ async def test_get_datasources_for_organization_success(
         organization_id=optscale_organization_id,
     )
 
-    response = await authenticated_client.get(f"/organizations/{org.id}/data-sources")
+    response = await authenticated_client.get(f"/organizations/{org.id}/cloud-accounts")
 
     assert response.status_code == 200
     data = response.json()
@@ -48,13 +48,13 @@ async def test_get_datasources_for_organization_success(
     azure_tenant = next(item for item in data if item["type"] == "azure_tenant")
 
     assert azure_cnr["organization_id"] == str(org.id)
-    assert azure_cnr["type"] == DataSourceType.AZURE_CNR.value
+    assert azure_cnr["type"] == CloudAccountType.AZURE_CNR.value
     assert azure_cnr["resources_changed_this_month"] == 0
     assert azure_cnr["expenses_so_far_this_month"] == 0.0
     assert azure_cnr["expenses_forecast_this_month"] == 1285.42
 
     assert azure_tenant["organization_id"] == str(org.id)
-    assert azure_tenant["type"] == DataSourceType.AZURE_TENANT.value
+    assert azure_tenant["type"] == CloudAccountType.AZURE_TENANT.value
     assert azure_tenant["resources_changed_this_month"] == 0
     assert azure_tenant["expenses_so_far_this_month"] == 0.0
     assert azure_tenant["expenses_forecast_this_month"] == 0.0
