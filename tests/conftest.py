@@ -229,14 +229,3 @@ def ffc_jwt_token(system_jwt_token_factory: Callable[[System], str], ffc_extensi
 def authenticated_client(api_client: AsyncClient, gcp_jwt_token: str) -> AsyncClient:
     api_client.headers["Authorization"] = f"Bearer {gcp_jwt_token}"
     return api_client
-
-
-@pytest.fixture(scope="session")
-async def vcr_config(api_client: AsyncClient):
-    return {
-        "filter_headers": [
-            ("authorization", "DUMMY"),
-            ("secret", "DUMMY"),
-        ],
-        "ignore_hosts": [api_client.base_url.host],
-    }

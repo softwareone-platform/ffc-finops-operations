@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, status
 from fastapi_pagination.limit_offset import LimitOffsetPage
 
 from app.api_clients import APIModifierClient
+from app.api_clients.optscale import OptscaleClient
 from app.auth import CurrentSystem
 from app.db.handlers import NotFoundError
 from app.db.models import Organization
@@ -106,12 +107,12 @@ async def get_cloud_accounts_by_organization_id(
             ),
         )
 
-    api_modifier_client = await services.aget(APIModifierClient)
+    optscale_client = await services.aget(OptscaleClient)
 
     async with wrap_http_error_in_502(
         f"Error fetching cloud accounts for organization {db_organization.name}"
     ):
-        response = await api_modifier_client.fetch_cloud_accounts_for_organization(
+        response = await optscale_client.fetch_cloud_accounts_for_organization(
             organization_id=db_organization.organization_id
         )
 
@@ -154,10 +155,10 @@ async def get_cloud_account_by_id(
             ),
         )
 
-    api_modifier_client = await services.aget(APIModifierClient)
+    optscale_client = await services.aget(OptscaleClient)
 
     async with wrap_http_error_in_502(f"Error fetching cloud account with ID {cloud_account_id}"):
-        response = await api_modifier_client.fetch_cloud_accounts_for_organization(
+        response = await optscale_client.fetch_cloud_accounts_for_organization(
             organization_id=db_organization.organization_id
         )
 
