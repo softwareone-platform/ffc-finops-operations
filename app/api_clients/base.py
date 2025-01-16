@@ -27,7 +27,7 @@ class APIClientError(Exception):
         super().__init__(f"{self.client_name} API client error: {message}")
 
 
-class JWTTokenAuth(httpx.Auth):
+class APIModifierJWTTokenAuth(httpx.Auth):
     def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response, None]:
         # NOTE: Needs to be re-generated for each request as it exipres after a certain time
         jwt_token = get_api_modifier_jwt_token()
@@ -37,7 +37,7 @@ class JWTTokenAuth(httpx.Auth):
         yield request
 
 
-class ClusterSecretAuth(httpx.Auth):
+class OptscaleClusterSecretAuth(httpx.Auth):
     def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response, None]:
         request.headers["Secret"] = settings.opt_cluster_secret
 

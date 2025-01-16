@@ -1,7 +1,7 @@
 import httpx
 
 from app import settings
-from app.api_clients.base import APIClientError, BaseAPIClient, ClusterSecretAuth
+from app.api_clients.base import APIClientError, BaseAPIClient, OptscaleClusterSecretAuth
 
 
 class OptscaleAuthClientError(APIClientError):
@@ -16,7 +16,7 @@ class UserDoesNotExist(OptscaleAuthClientError):
 
 class OptscaleAuthClient(BaseAPIClient):
     base_url = settings.opt_auth_base_url
-    default_auth = ClusterSecretAuth()
+    default_auth = OptscaleClusterSecretAuth()
 
     async def get_existing_user_info(self, email: str) -> httpx.Response:
         response = await self.httpx_client.get(

@@ -3,7 +3,7 @@ from uuid import UUID
 import httpx
 
 from app import settings
-from app.api_clients.base import APIClientError, BaseAPIClient, ClusterSecretAuth
+from app.api_clients.base import APIClientError, BaseAPIClient, OptscaleClusterSecretAuth
 
 
 class OptscaleClientError(APIClientError):
@@ -12,7 +12,7 @@ class OptscaleClientError(APIClientError):
 
 class OptscaleClient(BaseAPIClient):
     base_url = settings.opt_api_base_url
-    default_auth = ClusterSecretAuth()
+    default_auth = OptscaleClusterSecretAuth()
 
     async def reset_password(self, email: str) -> httpx.Response:
         response = await self.httpx_client.post(
