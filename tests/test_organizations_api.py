@@ -367,5 +367,5 @@ async def test_get_invalid_id_format(api_client: AsyncClient, ffc_jwt_token: str
     assert response.status_code == 422
 
     [detail] = response.json()["detail"]
-    assert detail["loc"] == ["path", "id"]
+    assert detail["loc"] == ["path", "organization_id"]
     assert detail["type"] == "uuid_parsing"
