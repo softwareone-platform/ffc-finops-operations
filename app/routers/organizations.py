@@ -1,16 +1,19 @@
+from typing import Annotated
 from uuid import UUID
 
 import svcs
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi_pagination.limit_offset import LimitOffsetPage
 
 from app.api_clients import APIModifierClient
+from app.api_clients.optscale import OptscaleClient
 from app.auth import CurrentSystem
 from app.db.handlers import NotFoundError
 from app.db.models import Organization
+from app.enums import CloudAccountType
 from app.pagination import paginate
 from app.repositories import OrganizationRepository
-from app.schemas import OrganizationCreate, OrganizationRead, from_orm
+from app.schemas import CloudAccountRead, OrganizationCreate, OrganizationRead, from_orm
 from app.utils import wrap_http_error_in_502
 
 router = APIRouter()
@@ -70,13 +73,90 @@ async def create_organization(
         return from_orm(OrganizationRead, db_organization)
 
 
-@router.get("/{id}", response_model=OrganizationRead)
-async def get_organization_by_id(id: UUID, organization_repo: OrganizationRepository):
+async def fetch_organization_or_404(
+    organization_id: UUID, organization_repo: OrganizationRepository
+) -> Organization:
     try:
-        db_organization = await organization_repo.get(id=id)
-        return from_orm(OrganizationRead, db_organization)
+        return await organization_repo.get(id=organization_id)
     except NotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e),
         ) from e
+
+
+@router.get("/{organization_id}", response_model=OrganizationRead)
+async def get_organization_by_id(
+    organization: Annotated[Organization, Depends(fetch_organization_or_404)],
+):
+    return from_orm(OrganizationRead, organization)
+
+
+@router.get("/{organization_id}/cloud-accounts", response_model=list[CloudAccountRead])
+async def get_cloud_accounts_by_organization_id(
+    organization: Annotated[Organization, Depends(fetch_organization_or_404)],
+    services: svcs.fastapi.DepContainer,
+):
+    if organization.organization_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Organization {organization.name} has no associated "
+                "FinOps for Cloud organization"
+            ),
+        )
+
+    optscale_client = await services.aget(OptscaleClient)
+
+    async with wrap_http_error_in_502(
+        f"Error fetching cloud accounts for organization {organization.name}"
+    ):
+        response = await optscale_client.fetch_cloud_accounts_for_organization(
+            organization_id=organization.organization_id
+        )
+
+    cloud_accounts = response.json()["cloud_accounts"]
+
+    return [
+        CloudAccountRead(
+            id=acc["id"],
+            organization_id=organization.id,
+            type=CloudAccountType(acc["type"]),
+            resources_changed_this_month=acc["details"]["tracked"],
+            expenses_so_far_this_month=acc["details"]["cost"],
+            expenses_forecast_this_month=acc["details"]["forecast"],
+        )
+        for acc in cloud_accounts
+    ]
+
+
+@router.get("/{organization_id}/cloud-accounts/{cloud_account_id}", response_model=CloudAccountRead)
+async def get_cloud_account_by_id(
+    organization: Annotated[Organization, Depends(fetch_organization_or_404)],
+    cloud_account_id: UUID,
+    services: svcs.fastapi.DepContainer,
+):
+    if organization.organization_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Organization {organization.name} has no associated "
+                "FinOps for Cloud organization"
+            ),
+        )
+
+    optscale_client = await services.aget(OptscaleClient)
+
+    async with wrap_http_error_in_502(f"Error fetching cloud account with ID {cloud_account_id}"):
+        response = await optscale_client.fetch_cloud_account_by_id(cloud_account_id)
+
+    cloud_account = response.json()
+
+    return CloudAccountRead(
+        id=cloud_account["id"],
+        organization_id=organization.id,
+        type=CloudAccountType(cloud_account["type"]),
+        resources_changed_this_month=cloud_account["details"]["tracked"],
+        expenses_so_far_this_month=cloud_account["details"]["cost"],
+        expenses_forecast_this_month=cloud_account["details"]["forecast"],
+    )

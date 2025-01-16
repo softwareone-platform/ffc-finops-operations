@@ -7,7 +7,7 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.db.models import Base
-from app.enums import ActorType, EntitlementStatus
+from app.enums import ActorType, CloudAccountType, EntitlementStatus
 
 
 def from_orm[M: Base, S: BaseModel](cls: type[S], db_model: M) -> S:
@@ -120,3 +120,12 @@ class UserCreate(UserBase):
 
 class UserRead(UserBase):
     id: uuid.UUID
+
+
+class CloudAccountRead(BaseSchema):
+    id: uuid.UUID
+    organization_id: uuid.UUID
+    type: CloudAccountType
+    resources_changed_this_month: int
+    expenses_so_far_this_month: float
+    expenses_forecast_this_month: float

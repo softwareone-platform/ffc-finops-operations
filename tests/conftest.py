@@ -71,7 +71,7 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
     await db_engine.dispose()
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 async def api_client(fastapi_app: FastAPI):
     async with AsyncClient(
         transport=ASGITransport(app=fastapi_app), base_url="http://v1/"

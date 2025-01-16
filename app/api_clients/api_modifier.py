@@ -1,8 +1,11 @@
 import httpx
 
 from app import settings
-from app.api_clients.base import APIClientError, BaseAPIClient, BearerAuth
-from app.utils import get_api_modifier_jwt_token
+from app.api_clients.base import (
+    APIClientError,
+    APIModifierJWTTokenAuth,
+    BaseAPIClient,
+)
 
 
 class APIModifierClientError(APIClientError):
@@ -11,9 +14,7 @@ class APIModifierClientError(APIClientError):
 
 class APIModifierClient(BaseAPIClient):
     base_url = settings.api_modifier_base_url
-
-    def get_auth(self) -> BearerAuth:
-        return BearerAuth(get_api_modifier_jwt_token())
+    default_auth = APIModifierJWTTokenAuth()
 
     async def create_user(self, email: str, display_name: str, password: str) -> httpx.Response:
         response = await self.httpx_client.post(

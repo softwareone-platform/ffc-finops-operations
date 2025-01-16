@@ -8,24 +8,10 @@ from typing import ClassVar, Self
 
 import httpx
 
+from app import settings
+from app.utils import get_api_modifier_jwt_token
+
 logger = logging.getLogger(__name__)
-
-
-class HeaderAuth(httpx.Auth):
-    def __init__(self, header_name: str, header_value: str):
-        self.header_name = header_name
-        self.header_value = header_value
-
-    def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response, None]:
-        if self.header_name not in request.headers:  # pragma: no cover
-            request.headers[self.header_name] = self.header_value
-
-        yield request
-
-
-class BearerAuth(HeaderAuth):
-    def __init__(self, token: str):
-        super().__init__("Authorization", f"Bearer {token}")
 
 
 class APIClientError(Exception):
@@ -41,9 +27,29 @@ class APIClientError(Exception):
         super().__init__(f"{self.client_name} API client error: {message}")
 
 
+class APIModifierJWTTokenAuth(httpx.Auth):
+    def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response, None]:
+        # NOTE: Needs to be re-generated for each request as it exipres after a certain time
+        jwt_token = get_api_modifier_jwt_token()
+
+        request.headers["Authorization"] = f"Bearer {jwt_token}"
+
+        yield request
+
+
+class OptscaleClusterSecretAuth(httpx.Auth):
+    def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response, None]:
+        request.headers["Secret"] = settings.opt_cluster_secret
+
+        yield request
+
+
+HEADERS_TO_REDACT_IN_LOGS = {"authorization", "secret"}
+
+
 class BaseAPIClient(abc.ABC):
     base_url: ClassVar[str]
-    auth: ClassVar[httpx.Auth | None] = None
+    default_auth: ClassVar[httpx.Auth | None] = None
 
     _clients_by_name: ClassVar[dict[str, type[Self]]] = {}
 
@@ -62,8 +68,8 @@ class BaseAPIClient(abc.ABC):
 
     def __init__(self):
         self.httpx_client = httpx.AsyncClient(
-            base_url=self.get_base_url(),
-            auth=self.get_auth(),
+            base_url=self.base_url,
+            auth=self.default_auth,
             event_hooks={"request": [self._log_request], "response": [self._log_response]},
         )
 
@@ -85,11 +91,8 @@ class BaseAPIClient(abc.ABC):
 
     def _get_headers_to_log(self, headers: httpx.Headers) -> dict[str, str]:
         return {
-            key: value
+            key: (value if key.lower() not in HEADERS_TO_REDACT_IN_LOGS else "REDACTED")
             for key, value in headers.items()
-            if not (
-                isinstance(self.auth, HeaderAuth) and key.lower() == self.auth.header_name.lower()
-            )
         }
 
     async def _log_request(self, request: httpx.Request) -> None:
@@ -140,13 +143,3 @@ class BaseAPIClient(abc.ABC):
             response.status_code,
             extra=structured_log_data,
         )
-
-    # ===========================================
-    # Methods for dynamic class fields evaliation
-    # ===========================================
-
-    def get_auth(self) -> httpx.Auth | None:
-        return self.auth
-
-    def get_base_url(self) -> str:
-        return self.base_url
