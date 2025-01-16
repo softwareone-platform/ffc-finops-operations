@@ -1,4 +1,5 @@
 import uuid
+from typing import Any
 
 from httpx import AsyncClient
 from pytest_httpx import HTTPXMock
@@ -8,6 +9,92 @@ from app import settings
 from app.db.models import Organization
 from app.enums import CloudAccountType
 from tests.conftest import ModelFactory
+
+# ===========================
+# Optscale API Mock responses
+# ===========================
+
+
+def optscale_azure_cnr_cloud_account_response_data(
+    organization_id: uuid.UUID | str,
+) -> dict[str, Any]:
+    return {
+        "deleted_at": 0,
+        "id": "6d55d940-ba4a-4e80-8493-57b3fdf5c331",
+        "created_at": 1729683941,
+        "name": "CPA (Development and Test)",
+        "type": "azure_cnr",
+        "config": {
+            "client_id": "cd945f4b-0554-4a16-9a09-96a2f30bc0ef",
+            "tenant": "1dc9b339-fadb-432e-86df-423c38a0fcb8",
+            "skipped_subscriptions": {
+                "CPA (Development and Test)": "Cloud account for this account already exist"
+            },
+            "subscription_id": "91819a1c-c7d3-4b89-bc9f-39f85bff4666",
+            "expense_import_scheme": "usage",
+        },
+        "organization_id": str(organization_id),
+        "auto_import": True,
+        "import_period": 1,
+        "last_import_at": 1733151640,
+        "last_import_modified_at": 0,
+        "account_id": "91819a1c-c7d3-4b89-bc9f-39f85bff4666",
+        "process_recommendations": True,
+        "cleaned_at": 0,
+        "parent_id": "48108421-7334-4a2c-ac7b-0160476dc790",
+        "details": {
+            "cost": 0,
+            "forecast": 1099.0,
+            "tracked": 0,
+            "last_month_cost": 2909.1068521455545,
+            "discovery_infos": [],
+        },
+    }
+
+
+def optscale_azure_tenant_cloud_account_response_data(
+    organization_id: uuid.UUID | str,
+) -> dict[str, Any]:
+    return {
+        "deleted_at": 0,
+        "id": "48108421-7334-4a2c-ac7b-0160476dc790",
+        "created_at": 1729683895,
+        "name": "Test",
+        "type": "azure_tenant",
+        "config": {
+            "client_id": "cd945f4b-0554-4a16-9a09-96a2f30bc0ef",
+            "tenant": "1dc9b339-fadb-432e-86df-423c38a0fcb8",
+            "skipped_subscriptions": {
+                "CPA (Development and Test)": "Cloud account for this account already exist"
+            },
+        },
+        "organization_id": str(organization_id),
+        "auto_import": False,
+        "import_period": 1,
+        "last_import_at": 0,
+        "last_import_modified_at": 0,
+        "account_id": "1dc9b339-fadb-432e-86df-423c38a0fcb8",
+        "process_recommendations": True,
+        "last_import_attempt_at": 0,
+        "last_import_attempt_error": None,
+        "last_getting_metrics_at": 0,
+        "last_getting_metric_attempt_at": 0,
+        "last_getting_metric_attempt_error": None,
+        "cleaned_at": 0,
+        "parent_id": None,
+        "details": {
+            "cost": 0,
+            "forecast": 0.0,
+            "tracked": 0,
+            "last_month_cost": 0,
+            "discovery_infos": [],
+        },
+    }
+
+
+# =============================================
+# Get all cloud accounts within an organization
+# =============================================
 
 
 async def test_get_cloud_accounts_for_organization_success(
@@ -20,83 +107,16 @@ async def test_get_cloud_accounts_for_organization_success(
         organization_id=str(uuid.uuid4()),
     )
 
-    optscale_response = {
-        "cloud_accounts": [
-            {
-                "deleted_at": 0,
-                "id": "6d55d940-ba4a-4e80-8493-57b3fdf5c331",
-                "created_at": 1729683941,
-                "name": "CPA (Development and Test)",
-                "type": "azure_cnr",
-                "config": {
-                    "client_id": "cd945f4b-0554-4a16-9a09-96a2f30bc0ef",
-                    "tenant": "1dc9b339-fadb-432e-86df-423c38a0fcb8",
-                    "skipped_subscriptions": {
-                        "CPA (Development and Test)": "Cloud account for this account already exist"
-                    },
-                    "subscription_id": "91819a1c-c7d3-4b89-bc9f-39f85bff4666",
-                    "expense_import_scheme": "usage",
-                },
-                "organization_id": "9044af7f-2f62-40cd-976f-1cbbbf1a0411",
-                "auto_import": True,
-                "import_period": 1,
-                "last_import_at": 1733151640,
-                "last_import_modified_at": 0,
-                "account_id": "91819a1c-c7d3-4b89-bc9f-39f85bff4666",
-                "process_recommendations": True,
-                "cleaned_at": 0,
-                "parent_id": "48108421-7334-4a2c-ac7b-0160476dc790",
-                "details": {
-                    "cost": 0,
-                    "forecast": 1099.0,
-                    "tracked": 0,
-                    "last_month_cost": 2909.1068521455545,
-                    "discovery_infos": [],
-                },
-            },
-            {
-                "deleted_at": 0,
-                "id": "48108421-7334-4a2c-ac7b-0160476dc790",
-                "created_at": 1729683895,
-                "name": "Test",
-                "type": "azure_tenant",
-                "config": {
-                    "client_id": "cd945f4b-0554-4a16-9a09-96a2f30bc0ef",
-                    "tenant": "1dc9b339-fadb-432e-86df-423c38a0fcb8",
-                    "skipped_subscriptions": {
-                        "CPA (Development and Test)": "Cloud account for this account already exist"
-                    },
-                },
-                "organization_id": "9044af7f-2f62-40cd-976f-1cbbbf1a0411",
-                "auto_import": False,
-                "import_period": 1,
-                "last_import_at": 0,
-                "last_import_modified_at": 0,
-                "account_id": "1dc9b339-fadb-432e-86df-423c38a0fcb8",
-                "process_recommendations": True,
-                "last_import_attempt_at": 0,
-                "last_import_attempt_error": None,
-                "last_getting_metrics_at": 0,
-                "last_getting_metric_attempt_at": 0,
-                "last_getting_metric_attempt_error": None,
-                "cleaned_at": 0,
-                "parent_id": None,
-                "details": {
-                    "cost": 0,
-                    "forecast": 0.0,
-                    "tracked": 0,
-                    "last_month_cost": 0,
-                    "discovery_infos": [],
-                },
-            },
-        ]
-    }
-
     httpx_mock.add_response(
         method="GET",
         url=f"{settings.opt_api_base_url}/organizations/{org.organization_id}/cloud_accounts?details=true",
         match_headers={"Secret": settings.opt_cluster_secret},
-        json=optscale_response,
+        json={
+            "cloud_accounts": [
+                optscale_azure_cnr_cloud_account_response_data(org.organization_id),
+                optscale_azure_tenant_cloud_account_response_data(org.organization_id),
+            ]
+        },
     )
 
     response = await authenticated_client.get(
@@ -122,3 +142,176 @@ async def test_get_cloud_accounts_for_organization_success(
     assert azure_tenant["resources_changed_this_month"] == 0
     assert azure_tenant["expenses_so_far_this_month"] == 0.0
     assert azure_tenant["expenses_forecast_this_month"] == 0.0
+
+
+async def test_get_cloud_accounts_for_missing_organization(
+    authenticated_client: AsyncClient,
+):
+    org_id = str(uuid.uuid4())
+    response = await authenticated_client.get(
+        f"/organizations/{org_id}/cloud-accounts",
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": f"Organization with ID `{org_id}` wasn't found"}
+
+
+async def test_get_cloud_accounts_for_organization_with_no_cloud_accounts(
+    organization_factory: ModelFactory[Organization],
+    authenticated_client: AsyncClient,
+    httpx_mock: HTTPXMock,
+):
+    org = await organization_factory(
+        organization_id=str(uuid.uuid4()),
+    )
+
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{settings.opt_api_base_url}/organizations/{org.organization_id}/cloud_accounts?details=true",
+        match_headers={"Secret": settings.opt_cluster_secret},
+        json={"cloud_accounts": []},
+    )
+
+    response = await authenticated_client.get(
+        f"/organizations/{org.id}/cloud-accounts",
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+async def test_get_cloud_accounts_for_organization_with_no_organization_id(
+    organization_factory: ModelFactory[Organization],
+    authenticated_client: AsyncClient,
+    httpx_mock: HTTPXMock,
+):
+    org = await organization_factory(
+        organization_id=None,
+    )
+
+    response = await authenticated_client.get(
+        f"/organizations/{org.id}/cloud-accounts",
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": f"Organization {org.name} has no associated FinOps for Cloud organization"
+    }
+
+
+async def test_get_cloud_accounts_for_organization_with_optscale_error(
+    organization_factory: ModelFactory[Organization],
+    authenticated_client: AsyncClient,
+    httpx_mock: HTTPXMock,
+):
+    org = await organization_factory(
+        organization_id=str(uuid.uuid4()),
+    )
+
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{settings.opt_api_base_url}/organizations/{org.organization_id}/cloud_accounts?details=true",
+        match_headers={"Secret": settings.opt_cluster_secret},
+        status_code=500,
+    )
+
+    response = await authenticated_client.get(
+        f"/organizations/{org.id}/cloud-accounts",
+    )
+
+    assert response.status_code == 502
+    assert f"Error fetching cloud accounts for organization {org.name}" in response.json()["detail"]
+
+
+# ================================================
+# Get a cloud account by ID within an organization
+# ================================================
+
+
+async def test_get_cloud_account_by_id_success(
+    organization_factory: ModelFactory[Organization],
+    mocker: MockerFixture,
+    httpx_mock: HTTPXMock,
+    authenticated_client: AsyncClient,
+):
+    org = await organization_factory(
+        organization_id=str(uuid.uuid4()),
+    )
+
+    cloud_account_data = optscale_azure_cnr_cloud_account_response_data(org.organization_id)
+
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{settings.opt_api_base_url}/cloud_accounts/{cloud_account_data['id']}?details=true",
+        match_headers={"Secret": settings.opt_cluster_secret},
+        json=cloud_account_data,
+    )
+
+    response = await authenticated_client.get(
+        f"/organizations/{org.id}/cloud-accounts/{cloud_account_data['id']}",
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "id": cloud_account_data["id"],
+        "organization_id": str(org.id),
+        "type": CloudAccountType.AZURE_CNR.value,
+        "resources_changed_this_month": 0,
+        "expenses_so_far_this_month": 0.0,
+        "expenses_forecast_this_month": 1099.0,
+    }
+
+
+async def test_get_cloud_account_by_id_for_missing_organization(
+    authenticated_client: AsyncClient,
+):
+    org_id = str(uuid.uuid4())
+    response = await authenticated_client.get(
+        f"/organizations/{org_id}/cloud-accounts/{uuid.uuid4()}",
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": f"Organization with ID `{org_id}` wasn't found"}
+
+
+async def test_get_cloud_account_by_id_for_missing_cloud_account(
+    organization_factory: ModelFactory[Organization],
+    authenticated_client: AsyncClient,
+    httpx_mock: HTTPXMock,
+):
+    org = await organization_factory(
+        organization_id=str(uuid.uuid4()),
+    )
+
+    cloud_account_id = str(uuid.uuid4())
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{settings.opt_api_base_url}/cloud_accounts/{cloud_account_id}?details=true",
+        match_headers={"Secret": settings.opt_cluster_secret},
+        status_code=404,
+    )
+
+    response = await authenticated_client.get(
+        f"/organizations/{org.id}/cloud-accounts/{cloud_account_id}",
+    )
+
+    assert response.status_code == 502
+    assert f"Error fetching cloud account with ID {cloud_account_id}" in response.json()["detail"]
+
+
+async def test_get_cloud_account_by_id_for_organization_with_no_organization_id(
+    organization_factory: ModelFactory[Organization],
+    authenticated_client: AsyncClient,
+):
+    org = await organization_factory(
+        organization_id=None,
+    )
+
+    response = await authenticated_client.get(
+        f"/organizations/{org.id}/cloud-accounts/{uuid.uuid4()}",
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": f"Organization {org.name} has no associated FinOps for Cloud organization"
+    }

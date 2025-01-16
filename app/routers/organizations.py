@@ -131,7 +131,7 @@ async def get_cloud_accounts_by_organization_id(
     ]
 
 
-@router.get("/{organization_id}/cloud-account/{cloud_account_id}", response_model=CloudAccountRead)
+@router.get("/{organization_id}/cloud-accounts/{cloud_account_id}", response_model=CloudAccountRead)
 async def get_cloud_account_by_id(
     organization_id: UUID,
     cloud_account_id: UUID,
@@ -158,9 +158,7 @@ async def get_cloud_account_by_id(
     optscale_client = await services.aget(OptscaleClient)
 
     async with wrap_http_error_in_502(f"Error fetching cloud account with ID {cloud_account_id}"):
-        response = await optscale_client.fetch_cloud_accounts_for_organization(
-            organization_id=db_organization.organization_id
-        )
+        response = await optscale_client.fetch_cloud_account_by_id(cloud_account_id)
 
     cloud_account = response.json()
 

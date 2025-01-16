@@ -36,9 +36,9 @@ class OptscaleClient(BaseAPIClient):
         response.raise_for_status()
         return response
 
-    async def fetch_cloud_account_by_id(self, id: UUID | str) -> httpx.Response:
+    async def fetch_cloud_account_by_id(self, cloud_account_id: UUID | str) -> httpx.Response:
         response = await self.httpx_client.get(
-            f"/cloud_accounts/{id}",
+            f"/cloud_accounts/{cloud_account_id}",
             params={
                 "details": "true",
             },
