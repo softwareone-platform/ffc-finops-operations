@@ -1,7 +1,7 @@
 import secrets
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from datetime import UTC, datetime, timedelta
-from typing import Any, Protocol, TypeVar
+from typing import Protocol, TypeVar
 
 import jwt
 import pytest
@@ -47,12 +47,17 @@ def mock_settings() -> None:
     settings.api_modifier_jwt_secret = "test_jwt_secret"
 
 
-@pytest.fixture(scope="session", autouse=True)
-async def fastapi_app(mock_settings) -> AsyncGenerator[Any, None]:
+@pytest.fixture(scope="session")
+async def fastapi_app(mock_settings) -> AsyncGenerator[FastAPI, None]:
     from app.main import app
 
-    async with LifespanManager(app) as lifespan_manager:
-        yield lifespan_manager.app
+    return app
+
+
+@pytest.fixture(scope="session", autouse=True)
+async def app_lifespan_manager(fastapi_app: FastAPI) -> AsyncGenerator[LifespanManager, None]:
+    async with LifespanManager(fastapi_app) as lifespan_manager:
+        yield lifespan_manager
 
 
 @pytest.fixture(autouse=True)
@@ -72,9 +77,10 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 @pytest.fixture(scope="session")
-async def api_client(fastapi_app: FastAPI):
+async def api_client(fastapi_app: FastAPI, app_lifespan_manager: LifespanManager):
     async with AsyncClient(
-        transport=ASGITransport(app=fastapi_app), base_url="http://v1/"
+        transport=ASGITransport(app=app_lifespan_manager.app),
+        base_url=f"http://localhost/{fastapi_app.root_path.removeprefix('/')}/",
     ) as client:
         yield client
 
