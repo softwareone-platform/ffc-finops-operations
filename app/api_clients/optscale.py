@@ -45,3 +45,13 @@ class OptscaleClient(BaseAPIClient):
         )
         response.raise_for_status()
         return response
+
+    async def fetch_users_for_organization(self, organization_id: UUID | str) -> httpx.Response:
+        response = await self.httpx_client.get(
+            f"/organizations/{organization_id}/employees",
+            params={
+                "roles": "true",
+            },
+        )
+        response.raise_for_status()
+        return response

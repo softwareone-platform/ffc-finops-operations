@@ -1,8 +1,12 @@
+import uuid
+
 from httpx import AsyncClient
 from pytest_httpx import HTTPXMock
 from pytest_mock import MockerFixture
 
 from app import settings
+from app.db.models import Organization
+from tests.conftest import ModelFactory
 
 
 async def test_can_create_users(
@@ -27,6 +31,7 @@ async def test_can_create_users(
             "id": "1bf6f063-d90b-4d45-8e7f-62fefa9f5471",
             "email": "test@example.com",
             "display_name": "Test User",
+            "created_at": 1736929940,
         },
         match_headers={"Authorization": "Bearer test_token"},
     )
@@ -51,6 +56,9 @@ async def test_can_create_users(
         "id": "1bf6f063-d90b-4d45-8e7f-62fefa9f5471",
         "email": "test@example.com",
         "display_name": "Test User",
+        "created_at": "2025-01-15T08:32:20Z",
+        "last_login": None,
+        "roles_count": None,
     }
 
     mocked_token_urlsafe.assert_called_once_with(128)
@@ -94,7 +102,7 @@ async def test_get_user_by_email(
                 "id": "1bf6f063-d90b-4d45-8e7f-62fefa9f5471",
                 "email": "test@example.com",
                 "display_name": "Test User",
-                "created_at": 13234,
+                "created_at": 1731059464,
             },
         },
         match_headers={"Secret": settings.opt_cluster_secret},
@@ -110,6 +118,9 @@ async def test_get_user_by_email(
         "id": "1bf6f063-d90b-4d45-8e7f-62fefa9f5471",
         "email": "test@example.com",
         "display_name": "Test User",
+        "created_at": "2024-11-08T09:51:04Z",
+        "last_login": None,
+        "roles_count": None,
     }
 
 
@@ -156,3 +167,175 @@ async def test_get_user_by_email_lookup_error(
     assert response.json() == {
         "detail": "Error checking user existence in FinOps for Cloud: 500 - Internal Server Error.",
     }
+
+
+# =============================================
+# Get users within an organization
+# =============================================
+
+
+async def test_get_users_for_organization_success(
+    organization_factory: ModelFactory[Organization],
+    mocker: MockerFixture,
+    httpx_mock: HTTPXMock,
+    authenticated_client: AsyncClient,
+):
+    org = await organization_factory(
+        organization_id=str(uuid.uuid4()),
+    )
+
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{settings.opt_api_base_url}/organizations/{org.organization_id}/employees?roles=true",
+        match_headers={"Secret": settings.opt_cluster_secret},
+        json={
+            "employees": [
+                {
+                    "deleted_at": 0,
+                    "id": "85a86112-a94f-4470-9343-f7d19101b15d",
+                    "created_at": 1730390070,
+                    "name": "Tim",
+                    "organization_id": org.organization_id,
+                    "auth_user_id": "989d185b-8c95-4104-b152-36148743e52d",
+                    "default_ssh_key_id": None,
+                    "slack_connected": False,
+                    "jira_connected": False,
+                    "last_login": 1730389262,
+                    "user_display_name": "Tim",
+                    "user_email": "tim.cook@apple.com",
+                    "assignments": [],
+                },
+                {
+                    "deleted_at": 0,
+                    "id": "0ae68497-a912-4fc1-a559-6f52a99bf12b",
+                    "created_at": 1736339978,
+                    "name": "Test User",
+                    "organization_id": org.organization_id,
+                    "auth_user_id": "c391517d-5c71-4195-82cf-47e7e44c06b1",
+                    "default_ssh_key_id": None,
+                    "slack_connected": False,
+                    "jira_connected": False,
+                    "last_login": 1737388179,
+                    "user_display_name": "Test User",
+                    "user_email": "FinOpsTest1@outlook.com",
+                    "assignments": [
+                        {
+                            "assignment_resource_id": "9044af7f-2f62-40cd-976f-1cbbbf1a0411",
+                            "role_name": "Manager",
+                            "assignment_resource_name": "Apple Inc",
+                            "assignment_resource_type": "organization",
+                            "assignment_resource_purpose": "business_unit",
+                            "assignment_id": "265b6597-d7f6-4de7-8afd-c3ab3c14bf66",
+                            "purpose": "optscale_manager",
+                        }
+                    ],
+                },
+            ]
+        },
+    )
+
+    response = await authenticated_client.get(
+        f"/organizations/{org.id}/users",
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert len(data) == 2
+    assert data == [
+        {
+            "created_at": "2024-10-31T15:54:30Z",
+            "display_name": "Tim",
+            "email": "tim.cook@apple.com",
+            "id": "85a86112-a94f-4470-9343-f7d19101b15d",
+            "last_login": "2024-10-31T15:41:02Z",
+            "roles_count": 0,
+        },
+        {
+            "created_at": "2025-01-08T12:39:38Z",
+            "display_name": "Test User",
+            "email": "FinOpsTest1@outlook.com",
+            "id": "0ae68497-a912-4fc1-a559-6f52a99bf12b",
+            "last_login": "2025-01-20T15:49:39Z",
+            "roles_count": 1,
+        },
+    ]
+
+
+async def test_get_users_for_missing_organization(
+    authenticated_client: AsyncClient,
+):
+    org_id = str(uuid.uuid4())
+    response = await authenticated_client.get(
+        f"/organizations/{org_id}/users",
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": f"Organization with ID `{org_id}` wasn't found"}
+
+
+async def test_get_users_for_organization_with_no_users(
+    organization_factory: ModelFactory[Organization],
+    authenticated_client: AsyncClient,
+    httpx_mock: HTTPXMock,
+):
+    org = await organization_factory(
+        organization_id=str(uuid.uuid4()),
+    )
+
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{settings.opt_api_base_url}/organizations/{org.organization_id}/employees?roles=true",
+        match_headers={"Secret": settings.opt_cluster_secret},
+        json={"employees": []},
+    )
+
+    response = await authenticated_client.get(
+        f"/organizations/{org.id}/users",
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+async def test_get_users_for_organization_with_no_organization_id(
+    organization_factory: ModelFactory[Organization],
+    authenticated_client: AsyncClient,
+    httpx_mock: HTTPXMock,
+):
+    org = await organization_factory(
+        organization_id=None,
+    )
+
+    response = await authenticated_client.get(
+        f"/organizations/{org.id}/users",
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": f"Organization {org.name} has no associated FinOps for Cloud organization"
+    }
+
+
+async def test_get_users_for_organization_with_optscale_error(
+    organization_factory: ModelFactory[Organization],
+    authenticated_client: AsyncClient,
+    httpx_mock: HTTPXMock,
+):
+    org = await organization_factory(
+        organization_id=str(uuid.uuid4()),
+    )
+
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{settings.opt_api_base_url}/organizations/{org.organization_id}/employees?roles=true",
+        match_headers={"Secret": settings.opt_cluster_secret},
+        status_code=500,
+    )
+
+    response = await authenticated_client.get(
+        f"/organizations/{org.id}/users",
+    )
+
+    assert response.status_code == 502
+    assert f"Error fetching users for organization {org.name}" in response.json()["detail"]

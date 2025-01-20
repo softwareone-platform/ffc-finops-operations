@@ -13,7 +13,7 @@ from app.db.models import Organization
 from app.enums import CloudAccountType
 from app.pagination import paginate
 from app.repositories import OrganizationRepository
-from app.schemas import CloudAccountRead, OrganizationCreate, OrganizationRead, from_orm
+from app.schemas import CloudAccountRead, OrganizationCreate, OrganizationRead, UserRead, from_orm
 from app.utils import wrap_http_error_in_502
 
 router = APIRouter()
@@ -160,3 +160,39 @@ async def get_cloud_account_by_id(
         expenses_so_far_this_month=cloud_account["details"]["cost"],
         expenses_forecast_this_month=cloud_account["details"]["forecast"],
     )
+
+
+@router.get("/{organization_id}/users", response_model=list[UserRead])
+async def get_users_by_organization_id(
+    organization: Annotated[Organization, Depends(fetch_organization_or_404)],
+    services: svcs.fastapi.DepContainer,
+):
+    if organization.organization_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Organization {organization.name} has no associated "
+                "FinOps for Cloud organization"
+            ),
+        )
+
+    optscale_client = await services.aget(OptscaleClient)
+
+    async with wrap_http_error_in_502(f"Error fetching users for organization {organization.name}"):
+        response = await optscale_client.fetch_users_for_organization(
+            organization_id=organization.organization_id
+        )
+
+    users = response.json()["employees"]
+
+    return [
+        UserRead(
+            id=user["id"],
+            email=user["user_email"],
+            display_name=user["user_display_name"],
+            created_at=user["created_at"],
+            last_login=user["last_login"],
+            roles_count=len(user["assignments"]),
+        )
+        for user in users
+    ]
