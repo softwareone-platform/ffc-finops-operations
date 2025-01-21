@@ -1,4 +1,3 @@
-import uuid
 from datetime import UTC, datetime, timedelta
 
 from httpx import AsyncClient
@@ -241,7 +240,7 @@ async def test_get_entitlement_by_id(
 
 
 async def test_get_non_existant_entitlement(api_client: AsyncClient, gcp_jwt_token: str):
-    id = str(uuid.uuid4())
+    id = "FENT-1234-5678-9012"
     response = await api_client.get(
         f"/entitlements/{id}",
         headers={"Authorization": f"Bearer {gcp_jwt_token}"},
@@ -261,7 +260,7 @@ async def test_get_invalid_id_format(api_client: AsyncClient, gcp_jwt_token: str
 
     [detail] = response.json()["detail"]
     assert detail["loc"] == ["path", "id"]
-    assert detail["type"] == "uuid_parsing"
+    assert detail["type"] == "string_pattern_mismatch"
 
 
 # =====================
@@ -355,7 +354,7 @@ async def test_terminate_non_existant_entitlement(
     gcp_extension: System,
     db_session: AsyncSession,
 ):
-    entitlement_id = str(uuid.uuid4())
+    entitlement_id = "FENT-1234-5678-9012"
     response = await api_client.post(
         f"/entitlements/{entitlement_id}/terminate",
         headers={"Authorization": f"Bearer {gcp_jwt_token}"},

@@ -1,4 +1,3 @@
-import uuid
 from datetime import UTC, datetime
 
 from app.db.models import Actor, Entitlement, Organization, System
@@ -20,7 +19,7 @@ from app.schemas import (
 
 def test_actor_read_from_orm():
     test_actor = Actor(
-        id=uuid.uuid4(),
+        id="OPE-1234-5678",
         type=ActorType.USER,
     )
     actor_read = from_orm(ActorRead, test_actor)
@@ -31,7 +30,7 @@ def test_actor_read_from_orm():
 
 def test_system_create_to_orm():
     data = {
-        "id": str(uuid.uuid4()),
+        "id": "FTKN-1234-5678",
         "name": "Test System",
         "external_id": "test-system",
         "jwt_secret": "secret",
@@ -51,7 +50,7 @@ def test_system_create_to_orm():
 
 def test_system_read_from_orm(gcp_extension: System):
     system = System(
-        id=uuid.uuid4(),
+        id="FTKN-1234-5678",
         name="Test System",
         external_id="test-system",
         jwt_secret="secret",
@@ -93,7 +92,7 @@ def test_entitlement_create_to_orm():
 
 def test_entitlement_read_from_orm(gcp_extension: System):
     entitlement = Entitlement(
-        id=uuid.uuid4(),
+        id="FENT-1234-5678-9012",
         sponsor_name="AWS",
         sponsor_external_id="ACC-123",
         sponsor_container_id="container-123",
@@ -157,7 +156,7 @@ def test_organization_create_to_orm():
 
 def test_organization_read_from_orm(ffc_extension: System):
     organization = Organization(
-        id=uuid.uuid4(),
+        id="FORG-1234-5678-9012",
         name="Test Org",
         external_id="ORG-123",
         organization_id="FFC-123",

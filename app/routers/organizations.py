@@ -9,9 +9,9 @@ from app.api_clients import APIModifierClient, OptscaleAuthClient, OptscaleClien
 from app.auth import CurrentSystem
 from app.db.handlers import NotFoundError
 from app.db.models import Organization
+from app.dependencies import OrganizationId, OrganizationRepository
 from app.enums import DatasourceType
 from app.pagination import paginate
-from app.repositories import OrganizationRepository
 from app.schemas import DatasourceRead, OrganizationCreate, OrganizationRead, UserRead, from_orm
 from app.utils import wrap_http_error_in_502
 
@@ -73,7 +73,7 @@ async def create_organization(
 
 
 async def fetch_organization_or_404(
-    organization_id: UUID, organization_repo: OrganizationRepository
+    organization_id: OrganizationId, organization_repo: OrganizationRepository
 ) -> Organization:
     try:
         return await organization_repo.get(id=organization_id)

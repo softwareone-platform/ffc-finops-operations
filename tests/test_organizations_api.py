@@ -1,5 +1,3 @@
-import uuid
-
 import pytest
 from httpx import AsyncClient
 from pytest_httpx import HTTPXMock
@@ -348,7 +346,7 @@ async def test_get_organization_by_id(
 
 
 async def test_get_non_existant_organization(api_client: AsyncClient, ffc_jwt_token: str):
-    id = str(uuid.uuid4())
+    id = "FORG-1234-5678-9012"
     response = await api_client.get(
         f"/organizations/{id}", headers={"Authorization": f"Bearer {ffc_jwt_token}"}
     )
@@ -367,4 +365,4 @@ async def test_get_invalid_id_format(api_client: AsyncClient, ffc_jwt_token: str
 
     [detail] = response.json()["detail"]
     assert detail["loc"] == ["path", "organization_id"]
-    assert detail["type"] == "uuid_parsing"
+    assert detail["type"] == "string_pattern_mismatch"
