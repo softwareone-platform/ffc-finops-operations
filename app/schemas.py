@@ -112,6 +112,9 @@ class OrganizationUpdate(OrganizationBase):
 class UserBase(BaseSchema):
     email: Annotated[str, Field(max_length=255)]
     display_name: Annotated[str, Field(max_length=255)]
+    created_at: datetime.datetime | None = None
+    last_login: datetime.datetime | None = None
+    roles_count: int | None = None
 
 
 class UserCreate(UserBase):

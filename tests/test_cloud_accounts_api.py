@@ -113,8 +113,8 @@ async def test_get_cloud_accounts_for_organization_success(
         match_headers={"Secret": settings.opt_cluster_secret},
         json={
             "cloud_accounts": [
-                optscale_azure_cnr_cloud_account_response_data(org.organization_id),
-                optscale_azure_tenant_cloud_account_response_data(org.organization_id),
+                optscale_azure_cnr_cloud_account_response_data(org.organization_id),  # type: ignore
+                optscale_azure_tenant_cloud_account_response_data(org.organization_id),  # type: ignore
             ]
         },
     )
@@ -238,7 +238,7 @@ async def test_get_cloud_account_by_id_success(
         organization_id=str(uuid.uuid4()),
     )
 
-    cloud_account_data = optscale_azure_cnr_cloud_account_response_data(org.organization_id)
+    cloud_account_data = optscale_azure_cnr_cloud_account_response_data(org.organization_id)  # type: ignore
 
     httpx_mock.add_response(
         method="GET",
