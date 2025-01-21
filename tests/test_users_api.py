@@ -21,7 +21,7 @@ async def test_can_create_users(
     )
     httpx_mock.add_response(
         method="POST",
-        url="https://api-modifier.ffc.com/admin/users",
+        url="https://api-modifier.ffc.com/users",
         match_json={
             "email": "test@example.com",
             "display_name": "Test User",
@@ -74,7 +74,7 @@ async def test_create_user_error_creating_user(
 
     httpx_mock.add_response(
         method="POST",
-        url="https://api-modifier.ffc.com/admin/users",
+        url="https://api-modifier.ffc.com/users",
         status_code=500,
         text="Internal Server Error",
     )

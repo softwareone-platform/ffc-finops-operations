@@ -18,7 +18,7 @@ class APIModifierClient(BaseAPIClient):
 
     async def create_user(self, email: str, display_name: str, password: str) -> httpx.Response:
         response = await self.httpx_client.post(
-            "/admin/users",
+            "/users",
             json={
                 "email": email,
                 "display_name": display_name,
@@ -36,7 +36,7 @@ class APIModifierClient(BaseAPIClient):
         currency: str,
     ) -> httpx.Response:
         response = await self.httpx_client.post(
-            "/admin/organizations",
+            "/organizations",
             json={
                 "org_name": org_name,
                 "user_id": user_id,
