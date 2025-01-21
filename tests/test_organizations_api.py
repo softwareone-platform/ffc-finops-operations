@@ -120,7 +120,7 @@ async def test_can_create_organizations(
     httpx_mock.add_response(
         method="POST",
         headers={"Authorization": f"Bearer {ffc_jwt_token}"},
-        url="https://api-modifier.ffc.com/admin/organizations",
+        url="https://api-modifier.ffc.com/organizations",
         json={"id": "UUID-yyyy-yyyy-yyyy-yyyy"},
         match_headers={"Authorization": "Bearer test_token"},
     )
@@ -201,7 +201,7 @@ async def test_create_organization_with_existing_db_organization(
     httpx_mock.add_response(
         method="POST",
         headers={"Authorization": f"Bearer {gcp_jwt_token}"},
-        url="https://api-modifier.ffc.com/admin/organizations",
+        url="https://api-modifier.ffc.com/organizations",
         json={"id": "UUID-yyyy-yyyy-yyyy-yyyy"},
         match_headers={"Authorization": "Bearer test_token"},
     )
@@ -290,7 +290,7 @@ async def test_create_organization_api_modifier_error(
 
     httpx_mock.add_response(
         method="POST",
-        url="https://api-modifier.ffc.com/admin/organizations",
+        url="https://api-modifier.ffc.com/organizations",
         status_code=500,
         text="Internal Server Error",
     )
