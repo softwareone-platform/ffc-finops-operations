@@ -109,10 +109,10 @@ async def test_get_datasources_for_organization_success(
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{settings.opt_api_base_url}/organizations/{org.organization_id}/datasources?details=true",
+        url=f"{settings.opt_api_base_url}/organizations/{org.organization_id}/cloud_accounts?details=true",
         match_headers={"Secret": settings.opt_cluster_secret},
         json={
-            "datasources": [
+            "cloud_accounts": [
                 optscale_azure_cnr_datasource_response_data(org.organization_id),  # type: ignore
                 optscale_azure_tenant_datasource_response_data(org.organization_id),  # type: ignore
             ]
@@ -167,9 +167,9 @@ async def test_get_datasources_for_organization_with_no_datasources(
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{settings.opt_api_base_url}/organizations/{org.organization_id}/datasources?details=true",
+        url=f"{settings.opt_api_base_url}/organizations/{org.organization_id}/cloud_accounts?details=true",
         match_headers={"Secret": settings.opt_cluster_secret},
-        json={"datasources": []},
+        json={"cloud_accounts": []},
     )
 
     response = await authenticated_client.get(
@@ -210,7 +210,7 @@ async def test_get_datasources_for_organization_with_optscale_error(
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{settings.opt_api_base_url}/organizations/{org.organization_id}/datasources?details=true",
+        url=f"{settings.opt_api_base_url}/organizations/{org.organization_id}/cloud_accounts?details=true",
         match_headers={"Secret": settings.opt_cluster_secret},
         status_code=500,
     )
@@ -242,7 +242,7 @@ async def test_get_datasource_by_id_success(
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{settings.opt_api_base_url}/datasources/{datasource_data['id']}?details=true",
+        url=f"{settings.opt_api_base_url}/cloud_accounts/{datasource_data['id']}?details=true",
         match_headers={"Secret": settings.opt_cluster_secret},
         json=datasource_data,
     )
@@ -286,7 +286,7 @@ async def test_get_datasource_by_id_for_missing_datasource(
     datasource_id = str(uuid.uuid4())
     httpx_mock.add_response(
         method="GET",
-        url=f"{settings.opt_api_base_url}/datasources/{datasource_id}?details=true",
+        url=f"{settings.opt_api_base_url}/cloud_accounts/{datasource_id}?details=true",
         match_headers={"Secret": settings.opt_cluster_secret},
         status_code=404,
     )
