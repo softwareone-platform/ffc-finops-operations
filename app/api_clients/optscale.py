@@ -28,7 +28,7 @@ class OptscaleClient(BaseAPIClient):
         self, organization_id: UUID | str
     ) -> httpx.Response:
         response = await self.httpx_client.get(
-            f"/organizations/{organization_id}/datasources",
+            f"/organizations/{organization_id}/cloud_accounts",
             params={
                 "details": "true",
             },
@@ -38,7 +38,7 @@ class OptscaleClient(BaseAPIClient):
 
     async def fetch_datasource_by_id(self, datasource_id: UUID | str) -> httpx.Response:
         response = await self.httpx_client.get(
-            f"/datasources/{datasource_id}",
+            f"/cloud_accounts/{datasource_id}",
             params={
                 "details": "true",
             },

@@ -115,7 +115,7 @@ async def get_datasources_by_organization_id(
             organization_id=organization.organization_id
         )
 
-    datasources = response.json()["datasources"]
+    datasources = response.json()["cloud_accounts"]
 
     return [
         DatasourceRead(
