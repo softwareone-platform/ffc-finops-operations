@@ -7,7 +7,7 @@ from pytest_mock import MockerFixture
 
 from app import settings
 from app.db.models import Organization
-from app.enums import CloudAccountType
+from app.enums import DatasourceType
 from tests.conftest import ModelFactory
 
 # ===========================
@@ -15,7 +15,7 @@ from tests.conftest import ModelFactory
 # ===========================
 
 
-def optscale_azure_cnr_cloud_account_response_data(
+def optscale_azure_cnr_datasource_response_data(
     organization_id: uuid.UUID | str,
 ) -> dict[str, Any]:
     return {
@@ -52,7 +52,7 @@ def optscale_azure_cnr_cloud_account_response_data(
     }
 
 
-def optscale_azure_tenant_cloud_account_response_data(
+def optscale_azure_tenant_datasource_response_data(
     organization_id: uuid.UUID | str,
 ) -> dict[str, Any]:
     return {
@@ -93,11 +93,11 @@ def optscale_azure_tenant_cloud_account_response_data(
 
 
 # =============================================
-# Get all cloud accounts within an organization
+# Get all datasources within an organization
 # =============================================
 
 
-async def test_get_cloud_accounts_for_organization_success(
+async def test_get_datasources_for_organization_success(
     organization_factory: ModelFactory[Organization],
     mocker: MockerFixture,
     httpx_mock: HTTPXMock,
@@ -109,18 +109,18 @@ async def test_get_cloud_accounts_for_organization_success(
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{settings.opt_api_base_url}/organizations/{org.organization_id}/cloud_accounts?details=true",
+        url=f"{settings.opt_api_base_url}/organizations/{org.organization_id}/datasources?details=true",
         match_headers={"Secret": settings.opt_cluster_secret},
         json={
-            "cloud_accounts": [
-                optscale_azure_cnr_cloud_account_response_data(org.organization_id),  # type: ignore
-                optscale_azure_tenant_cloud_account_response_data(org.organization_id),  # type: ignore
+            "datasources": [
+                optscale_azure_cnr_datasource_response_data(org.organization_id),  # type: ignore
+                optscale_azure_tenant_datasource_response_data(org.organization_id),  # type: ignore
             ]
         },
     )
 
     response = await authenticated_client.get(
-        f"/organizations/{org.id}/cloud-accounts",
+        f"/organizations/{org.id}/datasources",
     )
 
     assert response.status_code == 200
@@ -132,31 +132,31 @@ async def test_get_cloud_accounts_for_organization_success(
     azure_tenant = next(item for item in data if item["type"] == "azure_tenant")
 
     assert azure_cnr["organization_id"] == str(org.id)
-    assert azure_cnr["type"] == CloudAccountType.AZURE_CNR.value
+    assert azure_cnr["type"] == DatasourceType.AZURE_CNR.value
     assert azure_cnr["resources_changed_this_month"] == 0
     assert azure_cnr["expenses_so_far_this_month"] == 0.0
     assert azure_cnr["expenses_forecast_this_month"] == 1099.0
 
     assert azure_tenant["organization_id"] == str(org.id)
-    assert azure_tenant["type"] == CloudAccountType.AZURE_TENANT.value
+    assert azure_tenant["type"] == DatasourceType.AZURE_TENANT.value
     assert azure_tenant["resources_changed_this_month"] == 0
     assert azure_tenant["expenses_so_far_this_month"] == 0.0
     assert azure_tenant["expenses_forecast_this_month"] == 0.0
 
 
-async def test_get_cloud_accounts_for_missing_organization(
+async def test_get_datasources_for_missing_organization(
     authenticated_client: AsyncClient,
 ):
     org_id = str(uuid.uuid4())
     response = await authenticated_client.get(
-        f"/organizations/{org_id}/cloud-accounts",
+        f"/organizations/{org_id}/datasources",
     )
 
     assert response.status_code == 404
     assert response.json() == {"detail": f"Organization with ID `{org_id}` wasn't found"}
 
 
-async def test_get_cloud_accounts_for_organization_with_no_cloud_accounts(
+async def test_get_datasources_for_organization_with_no_datasources(
     organization_factory: ModelFactory[Organization],
     authenticated_client: AsyncClient,
     httpx_mock: HTTPXMock,
@@ -167,20 +167,20 @@ async def test_get_cloud_accounts_for_organization_with_no_cloud_accounts(
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{settings.opt_api_base_url}/organizations/{org.organization_id}/cloud_accounts?details=true",
+        url=f"{settings.opt_api_base_url}/organizations/{org.organization_id}/datasources?details=true",
         match_headers={"Secret": settings.opt_cluster_secret},
-        json={"cloud_accounts": []},
+        json={"datasources": []},
     )
 
     response = await authenticated_client.get(
-        f"/organizations/{org.id}/cloud-accounts",
+        f"/organizations/{org.id}/datasources",
     )
 
     assert response.status_code == 200
     assert response.json() == []
 
 
-async def test_get_cloud_accounts_for_organization_with_no_organization_id(
+async def test_get_datasources_for_organization_with_no_organization_id(
     organization_factory: ModelFactory[Organization],
     authenticated_client: AsyncClient,
     httpx_mock: HTTPXMock,
@@ -190,7 +190,7 @@ async def test_get_cloud_accounts_for_organization_with_no_organization_id(
     )
 
     response = await authenticated_client.get(
-        f"/organizations/{org.id}/cloud-accounts",
+        f"/organizations/{org.id}/datasources",
     )
 
     assert response.status_code == 400
@@ -199,7 +199,7 @@ async def test_get_cloud_accounts_for_organization_with_no_organization_id(
     }
 
 
-async def test_get_cloud_accounts_for_organization_with_optscale_error(
+async def test_get_datasources_for_organization_with_optscale_error(
     organization_factory: ModelFactory[Organization],
     authenticated_client: AsyncClient,
     httpx_mock: HTTPXMock,
@@ -210,17 +210,17 @@ async def test_get_cloud_accounts_for_organization_with_optscale_error(
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{settings.opt_api_base_url}/organizations/{org.organization_id}/cloud_accounts?details=true",
+        url=f"{settings.opt_api_base_url}/organizations/{org.organization_id}/datasources?details=true",
         match_headers={"Secret": settings.opt_cluster_secret},
         status_code=500,
     )
 
     response = await authenticated_client.get(
-        f"/organizations/{org.id}/cloud-accounts",
+        f"/organizations/{org.id}/datasources",
     )
 
     assert response.status_code == 502
-    assert f"Error fetching cloud accounts for organization {org.name}" in response.json()["detail"]
+    assert f"Error fetching datasources for organization {org.name}" in response.json()["detail"]
 
 
 # ================================================
@@ -228,7 +228,7 @@ async def test_get_cloud_accounts_for_organization_with_optscale_error(
 # ================================================
 
 
-async def test_get_cloud_account_by_id_success(
+async def test_get_datasource_by_id_success(
     organization_factory: ModelFactory[Organization],
     mocker: MockerFixture,
     httpx_mock: HTTPXMock,
@@ -238,43 +238,43 @@ async def test_get_cloud_account_by_id_success(
         organization_id=str(uuid.uuid4()),
     )
 
-    cloud_account_data = optscale_azure_cnr_cloud_account_response_data(org.organization_id)  # type: ignore
+    datasource_data = optscale_azure_cnr_datasource_response_data(org.organization_id)  # type: ignore
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{settings.opt_api_base_url}/cloud_accounts/{cloud_account_data['id']}?details=true",
+        url=f"{settings.opt_api_base_url}/datasources/{datasource_data['id']}?details=true",
         match_headers={"Secret": settings.opt_cluster_secret},
-        json=cloud_account_data,
+        json=datasource_data,
     )
 
     response = await authenticated_client.get(
-        f"/organizations/{org.id}/cloud-accounts/{cloud_account_data['id']}",
+        f"/organizations/{org.id}/datasources/{datasource_data['id']}",
     )
 
     assert response.status_code == 200
     assert response.json() == {
-        "id": cloud_account_data["id"],
+        "id": datasource_data["id"],
         "organization_id": str(org.id),
-        "type": CloudAccountType.AZURE_CNR.value,
+        "type": DatasourceType.AZURE_CNR.value,
         "resources_changed_this_month": 0,
         "expenses_so_far_this_month": 0.0,
         "expenses_forecast_this_month": 1099.0,
     }
 
 
-async def test_get_cloud_account_by_id_for_missing_organization(
+async def test_get_datasource_by_id_for_missing_organization(
     authenticated_client: AsyncClient,
 ):
     org_id = str(uuid.uuid4())
     response = await authenticated_client.get(
-        f"/organizations/{org_id}/cloud-accounts/{uuid.uuid4()}",
+        f"/organizations/{org_id}/datasources/{uuid.uuid4()}",
     )
 
     assert response.status_code == 404
     assert response.json() == {"detail": f"Organization with ID `{org_id}` wasn't found"}
 
 
-async def test_get_cloud_account_by_id_for_missing_cloud_account(
+async def test_get_datasource_by_id_for_missing_datasource(
     organization_factory: ModelFactory[Organization],
     authenticated_client: AsyncClient,
     httpx_mock: HTTPXMock,
@@ -283,23 +283,23 @@ async def test_get_cloud_account_by_id_for_missing_cloud_account(
         organization_id=str(uuid.uuid4()),
     )
 
-    cloud_account_id = str(uuid.uuid4())
+    datasource_id = str(uuid.uuid4())
     httpx_mock.add_response(
         method="GET",
-        url=f"{settings.opt_api_base_url}/cloud_accounts/{cloud_account_id}?details=true",
+        url=f"{settings.opt_api_base_url}/datasources/{datasource_id}?details=true",
         match_headers={"Secret": settings.opt_cluster_secret},
         status_code=404,
     )
 
     response = await authenticated_client.get(
-        f"/organizations/{org.id}/cloud-accounts/{cloud_account_id}",
+        f"/organizations/{org.id}/datasources/{datasource_id}",
     )
 
     assert response.status_code == 502
-    assert f"Error fetching cloud account with ID {cloud_account_id}" in response.json()["detail"]
+    assert f"Error fetching cloud account with ID {datasource_id}" in response.json()["detail"]
 
 
-async def test_get_cloud_account_by_id_for_organization_with_no_organization_id(
+async def test_get_datasource_by_id_for_organization_with_no_organization_id(
     organization_factory: ModelFactory[Organization],
     authenticated_client: AsyncClient,
 ):
@@ -308,7 +308,7 @@ async def test_get_cloud_account_by_id_for_organization_with_no_organization_id(
     )
 
     response = await authenticated_client.get(
-        f"/organizations/{org.id}/cloud-accounts/{uuid.uuid4()}",
+        f"/organizations/{org.id}/datasources/{uuid.uuid4()}",
     )
 
     assert response.status_code == 400

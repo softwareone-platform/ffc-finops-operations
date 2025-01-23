@@ -10,10 +10,10 @@ from app.api_clients.optscale import OptscaleClient
 from app.auth import CurrentSystem
 from app.db.handlers import NotFoundError
 from app.db.models import Organization
-from app.enums import CloudAccountType
+from app.enums import DatasourceType
 from app.pagination import paginate
 from app.repositories import OrganizationRepository
-from app.schemas import CloudAccountRead, OrganizationCreate, OrganizationRead, UserRead, from_orm
+from app.schemas import DatasourceRead, OrganizationCreate, OrganizationRead, UserRead, from_orm
 from app.utils import wrap_http_error_in_502
 
 router = APIRouter()
@@ -92,8 +92,8 @@ async def get_organization_by_id(
     return from_orm(OrganizationRead, organization)
 
 
-@router.get("/{organization_id}/cloud-accounts", response_model=list[CloudAccountRead])
-async def get_cloud_accounts_by_organization_id(
+@router.get("/{organization_id}/datasources", response_model=list[DatasourceRead])
+async def get_datasources_by_organization_id(
     organization: Annotated[Organization, Depends(fetch_organization_or_404)],
     services: svcs.fastapi.DepContainer,
 ):
@@ -109,31 +109,31 @@ async def get_cloud_accounts_by_organization_id(
     optscale_client = await services.aget(OptscaleClient)
 
     async with wrap_http_error_in_502(
-        f"Error fetching cloud accounts for organization {organization.name}"
+        f"Error fetching datasources for organization {organization.name}"
     ):
-        response = await optscale_client.fetch_cloud_accounts_for_organization(
+        response = await optscale_client.fetch_datasources_for_organization(
             organization_id=organization.organization_id
         )
 
-    cloud_accounts = response.json()["cloud_accounts"]
+    datasources = response.json()["datasources"]
 
     return [
-        CloudAccountRead(
+        DatasourceRead(
             id=acc["id"],
             organization_id=organization.id,
-            type=CloudAccountType(acc["type"]),
+            type=DatasourceType(acc["type"]),
             resources_changed_this_month=acc["details"]["tracked"],
             expenses_so_far_this_month=acc["details"]["cost"],
             expenses_forecast_this_month=acc["details"]["forecast"],
         )
-        for acc in cloud_accounts
+        for acc in datasources
     ]
 
 
-@router.get("/{organization_id}/cloud-accounts/{cloud_account_id}", response_model=CloudAccountRead)
-async def get_cloud_account_by_id(
+@router.get("/{organization_id}/datasources/{datasource_id}", response_model=DatasourceRead)
+async def get_datasource_by_id(
     organization: Annotated[Organization, Depends(fetch_organization_or_404)],
-    cloud_account_id: UUID,
+    datasource_id: UUID,
     services: svcs.fastapi.DepContainer,
 ):
     if organization.organization_id is None:
@@ -147,18 +147,18 @@ async def get_cloud_account_by_id(
 
     optscale_client = await services.aget(OptscaleClient)
 
-    async with wrap_http_error_in_502(f"Error fetching cloud account with ID {cloud_account_id}"):
-        response = await optscale_client.fetch_cloud_account_by_id(cloud_account_id)
+    async with wrap_http_error_in_502(f"Error fetching cloud account with ID {datasource_id}"):
+        response = await optscale_client.fetch_datasource_by_id(datasource_id)
 
-    cloud_account = response.json()
+    datasource = response.json()
 
-    return CloudAccountRead(
-        id=cloud_account["id"],
+    return DatasourceRead(
+        id=datasource["id"],
         organization_id=organization.id,
-        type=CloudAccountType(cloud_account["type"]),
-        resources_changed_this_month=cloud_account["details"]["tracked"],
-        expenses_so_far_this_month=cloud_account["details"]["cost"],
-        expenses_forecast_this_month=cloud_account["details"]["forecast"],
+        type=DatasourceType(datasource["type"]),
+        resources_changed_this_month=datasource["details"]["tracked"],
+        expenses_so_far_this_month=datasource["details"]["cost"],
+        expenses_forecast_this_month=datasource["details"]["forecast"],
     )
 
 
