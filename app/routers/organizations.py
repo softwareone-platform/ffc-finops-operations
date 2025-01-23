@@ -156,7 +156,7 @@ async def get_datasource_by_id(
         id=datasource["id"],
         organization_id=organization.id,
         type=DatasourceType(datasource["type"]),
-        resources_changed_this_month=datasource["details"]["tracked"],
+        resources_changed_this_month=datasource["details"]["resources"],
         expenses_so_far_this_month=datasource["details"]["cost"],
         expenses_forecast_this_month=datasource["details"]["forecast"],
     )

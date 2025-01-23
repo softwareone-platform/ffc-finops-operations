@@ -92,6 +92,40 @@ def optscale_azure_tenant_datasource_response_data(
     }
 
 
+def optscale_aws_cnr_datasource_get_by_id_response_data():
+    return {
+        "account_id": "[REDACTED]",
+        "id": "5cded1eb-4d7e-4df9-b76f-fc33b5df9eb3",
+        "last_getting_metric_attempt_at": 0,
+        "last_getting_metric_attempt_error": None,
+        "last_getting_metrics_at": 0,
+        "last_import_at": 0,
+        "last_import_attempt_at": 0,
+        "last_import_attempt_error": None,
+        "name": "swotest02",
+        "parent_id": None,
+        "type": "aws_cnr",
+        "details": {
+            "cost": 99.88,
+            "discovery_infos": [],
+            "forecast": 1234.56,
+            "last_month_cost": 0,
+            "resources": 5,
+        },
+        "config": {
+            "access_key_id": "[REDACTED]",
+            "linked": False,
+            "use_edp_discount": False,
+            "cur_version": 2,
+            "bucket_name": "optscale-billing-bucket",
+            "bucket_prefix": "reports",
+            "config_scheme": "create_report",
+            "region_name": False,
+            "report_name": "optscale-billing-export",
+        },
+    }
+
+
 # =============================================
 # Get all datasources within an organization
 # =============================================
@@ -238,7 +272,7 @@ async def test_get_datasource_by_id_success(
         organization_id=str(uuid.uuid4()),
     )
 
-    datasource_data = optscale_azure_cnr_datasource_response_data(org.organization_id)  # type: ignore
+    datasource_data = optscale_aws_cnr_datasource_get_by_id_response_data()  # type: ignore
 
     httpx_mock.add_response(
         method="GET",
@@ -255,10 +289,10 @@ async def test_get_datasource_by_id_success(
     assert response.json() == {
         "id": datasource_data["id"],
         "organization_id": str(org.id),
-        "type": DatasourceType.AZURE_CNR.value,
-        "resources_changed_this_month": 0,
-        "expenses_so_far_this_month": 0.0,
-        "expenses_forecast_this_month": 1099.0,
+        "type": DatasourceType.AWS_CNR.value,
+        "resources_changed_this_month": 5,
+        "expenses_so_far_this_month": 99.88,
+        "expenses_forecast_this_month": 1234.56,
     }
 
 
