@@ -289,7 +289,7 @@ async def test_get_datasource_by_id_success(
     assert response.json() == {
         "id": datasource_data["id"],
         "organization_id": str(org.id),
-        "type": DatasourceType.AZURE_CNR.value,
+        "type": DatasourceType.AWS_CNR.value,
         "resources_changed_this_month": 5,
         "expenses_so_far_this_month": 99.88,
         "expenses_forecast_this_month": 1234.56,
