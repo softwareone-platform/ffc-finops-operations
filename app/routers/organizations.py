@@ -5,8 +5,7 @@ import svcs
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi_pagination.limit_offset import LimitOffsetPage
 
-from app.api_clients import APIModifierClient
-from app.api_clients.optscale import OptscaleClient
+from app.api_clients import APIModifierClient, OptscaleAuthClient, OptscaleClient
 from app.auth import CurrentSystem
 from app.db.handlers import NotFoundError
 from app.db.models import Organization
@@ -196,3 +195,26 @@ async def get_users_by_organization_id(
         )
         for user in users
     ]
+
+
+@router.post(
+    "/{organization_id}/users/{user_id}/make-admin",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def make_organization_user_admin(
+    organization: Annotated[Organization, Depends(fetch_organization_or_404)],
+    user_id: UUID,
+    services: svcs.fastapi.DepContainer,
+):
+    optscale_auth_client = await services.aget(OptscaleAuthClient)
+    optscale_client = await services.aget(OptscaleClient)
+
+    async with wrap_http_error_in_502("Error making user admin in FinOps for Cloud"):
+        # check user exists in optscale
+        response = await optscale_client.fetch_user_by_id(str(user_id))
+        user = response.json()
+        # assign admin role of current organization to the user
+        await optscale_auth_client.make_user_admin(
+            str(organization.organization_id),
+            user["auth_user_id"],
+        )
