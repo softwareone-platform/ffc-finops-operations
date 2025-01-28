@@ -27,6 +27,8 @@ class ConstraintViolationError(DatabaseError):
 
 
 class ModelHandler[M: BaseModel]:
+    session: AsyncSession
+
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
@@ -43,6 +45,8 @@ class ModelHandler[M: BaseModel]:
         return self._get_generic_cls_args()[0]
 
     async def create(self, obj: M) -> M:
+        in_transaction = self.session.in_transaction()
+
         if isinstance(obj, AuditableMixin):
             if obj.created_by is None:
                 with suppress(LookupError):
@@ -54,7 +58,12 @@ class ModelHandler[M: BaseModel]:
 
         try:
             self.session.add(obj)
-            await self.session.commit()
+
+            if in_transaction:
+                await self.session.flush()
+            else:
+                await self.session.commit()
+
             await self.session.refresh(obj)
         except IntegrityError as e:
             raise ConstraintViolationError(
