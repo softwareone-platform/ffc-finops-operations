@@ -12,6 +12,11 @@ from sqlalchemy.ext.asyncio import (
 
 from app import settings
 
+
+class AsyncTxSession(AsyncSession):
+    pass
+
+
 db_engine = create_async_engine(
     str(settings.postgres_async_url),
     echo=settings.debug,
@@ -23,6 +28,17 @@ async def get_db_session() -> AsyncGenerator[AsyncSession]:
     async_session = async_sessionmaker(bind=db_engine, class_=AsyncSession, expire_on_commit=False)
     async with async_session() as session:
         yield session
+
+
+@asynccontextmanager
+async def get_tx_db_session() -> AsyncGenerator[AsyncSession]:
+    async_session = async_sessionmaker(
+        bind=db_engine, class_=AsyncTxSession, expire_on_commit=False
+    )
+    async with async_session() as session:
+        async with session.begin() as transaction:
+            yield session
+            await transaction.commit()
 
 
 DBSession = Annotated[AsyncSession, Depends(get_db_session)]
