@@ -1,8 +1,9 @@
-import uuid
 from datetime import UTC, datetime
 
 import pytest
+from pytest_mock import MockerFixture
 from sqlalchemy import select
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.handlers import (
@@ -79,7 +80,7 @@ async def test_get_entitlement_not_found(db_session: AsyncSession):
     entitlements_handler = EntitlementHandler(db_session)
 
     with pytest.raises(NotFoundError):
-        await entitlements_handler.get(uuid.uuid4())
+        await entitlements_handler.get("FENT-1234-4567-8901")
 
 
 async def test_update_entitlement(
@@ -124,7 +125,7 @@ async def test_update_entitlement_not_found(db_session: AsyncSession):
     entitlements_handler = EntitlementHandler(db_session)
 
     with pytest.raises(NotFoundError):
-        await entitlements_handler.update(uuid.uuid4(), {"sponsor_name": "Updated AWS"})
+        await entitlements_handler.update("FENT-1234-4567-8901", {"sponsor_name": "Updated AWS"})
 
 
 async def test_fetch_page_entitlements(
@@ -516,5 +517,30 @@ async def test_get_system_db_error(
 
     system_handler = SystemHandler(db_session)
     # Get using handl
+    with pytest.raises(DatabaseError):
+        await system_handler.get("abcd")
+
+
+async def test_get_system_db_api_error(
+    mocker: MockerFixture,
+    db_session: AsyncSession,
+):
+    # Create directly in DB
+    system = System(
+        name="Test System",
+        external_id="test-system",
+        jwt_secret="secret",
+    )
+    db_session.add(system)
+    await db_session.commit()
+    await db_session.refresh(system)
+
+    # Mock the database session to raise an error
+    mocker.patch(
+        "sqlalchemy.ext.asyncio.AsyncSession.get",
+        side_effect=DBAPIError("SELECT 1", {}, Exception("Mocked database error")),
+    )
+    system_handler = SystemHandler(db_session)
+    # Get using handler
     with pytest.raises(DatabaseError):
         await system_handler.get("abcd")

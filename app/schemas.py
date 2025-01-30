@@ -27,7 +27,7 @@ class BaseSchema(BaseModel):
 
 
 class BaseReadSchema(BaseSchema):
-    id: uuid.UUID
+    id: str
 
 
 class ActorBase(BaseSchema):
@@ -35,7 +35,7 @@ class ActorBase(BaseSchema):
 
 
 class ActorRead(ActorBase, BaseReadSchema):
-    id: uuid.UUID
+    id: str
 
 
 class SystemBase(BaseSchema):
@@ -127,7 +127,7 @@ class UserRead(UserBase):
 
 class DatasourceRead(BaseSchema):
     id: uuid.UUID
-    organization_id: uuid.UUID
+    organization_id: str
     type: DatasourceType
     resources_changed_this_month: int
     expenses_so_far_this_month: float

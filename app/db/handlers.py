@@ -2,7 +2,6 @@ from collections.abc import Sequence
 from contextlib import suppress
 from datetime import UTC, datetime
 from typing import Any
-from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import DBAPIError, IntegrityError
@@ -43,7 +42,7 @@ class ModelHandler[M: BaseModel]:
         return self._get_generic_cls_args()[0]
 
     async def create(self, obj: M) -> M:
-        if isinstance(obj, AuditableMixin):
+        if isinstance(obj, AuditableMixin):  # pragma: no branch
             if obj.created_by is None:
                 with suppress(LookupError):
                     obj.created_by = current_system.get()
@@ -63,7 +62,7 @@ class ModelHandler[M: BaseModel]:
 
         return obj
 
-    async def get(self, id: UUID | str) -> M:
+    async def get(self, id: str) -> M:
         try:
             result = await self.session.get(self.model_cls, id)
             if result is None:
@@ -93,14 +92,14 @@ class ModelHandler[M: BaseModel]:
         obj = await self.create(self.model_cls(**params))
         return obj, True
 
-    async def update(self, id: str | UUID, data: dict[str, Any]) -> M:
+    async def update(self, id: str, data: dict[str, Any]) -> M:
         # First fetch the object to ensure polymorphic loading
         obj = await self.get(id)
         # Update attributes
         for key, value in data.items():
             setattr(obj, key, value)
 
-        if isinstance(obj, AuditableMixin) and "updated_by" not in data:
+        if isinstance(obj, AuditableMixin) and "updated_by" not in data:  # pragma: no branch
             with suppress(LookupError):
                 obj.updated_by = current_system.get()
 

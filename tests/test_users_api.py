@@ -265,7 +265,7 @@ async def test_get_users_for_organization_success(
 async def test_get_users_for_missing_organization(
     authenticated_client: AsyncClient,
 ):
-    org_id = str(uuid.uuid4())
+    org_id = "FORG-1234-5678-9012"
     response = await authenticated_client.get(
         f"/organizations/{org_id}/users",
     )

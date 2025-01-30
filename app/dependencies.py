@@ -1,9 +1,11 @@
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, Path
 
 from app.db import DBSession
-from app.db.handlers import EntitlementHandler, OrganizationHandler, SystemHandler
+from app.db.handlers import EntitlementHandler, OrganizationHandler
+from app.db.human_readable_pk import build_id_regex
+from app.db.models import Entitlement, Organization
 
 
 def get_entitlement_handler(session: DBSession) -> EntitlementHandler:
@@ -14,10 +16,8 @@ def get_organization_handler(session: DBSession) -> OrganizationHandler:
     return OrganizationHandler(session)
 
 
-def get_system_handler(session: DBSession) -> SystemHandler:
-    return SystemHandler(session)
-
-
 EntitlementRepository = Annotated[EntitlementHandler, Depends(get_entitlement_handler)]
 OrganizationRepository = Annotated[OrganizationHandler, Depends(get_organization_handler)]
-SystemRepository = Annotated[SystemHandler, Depends(get_system_handler)]
+
+EntitlementId = Annotated[str, Path(pattern=build_id_regex(Entitlement))]
+OrganizationId = Annotated[str, Path(pattern=build_id_regex(Organization))]

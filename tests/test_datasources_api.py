@@ -16,7 +16,7 @@ from tests.conftest import ModelFactory
 
 
 def optscale_azure_cnr_datasource_response_data(
-    organization_id: uuid.UUID | str,
+    organization_id: str,
 ) -> dict[str, Any]:
     return {
         "deleted_at": 0,
@@ -53,7 +53,7 @@ def optscale_azure_cnr_datasource_response_data(
 
 
 def optscale_azure_tenant_datasource_response_data(
-    organization_id: uuid.UUID | str,
+    organization_id: str,
 ) -> dict[str, Any]:
     return {
         "deleted_at": 0,
@@ -140,7 +140,6 @@ async def test_get_datasources_for_organization_success(
     org = await organization_factory(
         organization_id=str(uuid.uuid4()),
     )
-
     httpx_mock.add_response(
         method="GET",
         url=f"{settings.opt_api_base_url}/organizations/{org.organization_id}/cloud_accounts?details=true",
@@ -181,7 +180,7 @@ async def test_get_datasources_for_organization_success(
 async def test_get_datasources_for_missing_organization(
     authenticated_client: AsyncClient,
 ):
-    org_id = str(uuid.uuid4())
+    org_id = "FORG-1234-5678-9012"
     response = await authenticated_client.get(
         f"/organizations/{org_id}/datasources",
     )
@@ -299,7 +298,7 @@ async def test_get_datasource_by_id_success(
 async def test_get_datasource_by_id_for_missing_organization(
     authenticated_client: AsyncClient,
 ):
-    org_id = str(uuid.uuid4())
+    org_id = "FORG-1234-5678-9012"
     response = await authenticated_client.get(
         f"/organizations/{org_id}/datasources/{uuid.uuid4()}",
     )

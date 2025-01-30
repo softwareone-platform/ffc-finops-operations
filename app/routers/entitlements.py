@@ -1,14 +1,13 @@
 from typing import Annotated
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi_pagination.limit_offset import LimitOffsetPage
 
 from app.db.handlers import NotFoundError
 from app.db.models import Entitlement
+from app.dependencies import EntitlementId, EntitlementRepository
 from app.enums import EntitlementStatus
 from app.pagination import paginate
-from app.repositories import EntitlementRepository
 from app.schemas import EntitlementCreate, EntitlementRead, from_orm, to_orm
 
 router = APIRouter()
@@ -30,7 +29,7 @@ async def create_entitlement(
 
 
 async def fetch_entitlement_or_404(
-    id: UUID, entitlement_repo: EntitlementRepository
+    id: EntitlementId, entitlement_repo: EntitlementRepository
 ) -> Entitlement:
     try:
         return await entitlement_repo.get(id=id)

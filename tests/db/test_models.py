@@ -1,7 +1,7 @@
-import uuid
 from datetime import UTC, datetime
 
 import pytest
+from pytest_mock import MockerFixture
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,6 +30,7 @@ async def test_actor_inheritance(db_session: AsyncSession):
 
     # Verify inheritance
     assert actor.id == system.id
+    assert system.id.startswith("FTKN-")
     assert actor.type == ActorType.SYSTEM
     assert system_from_db.id == system.id
     assert system_from_db.name == system.name
@@ -52,7 +53,7 @@ async def test_timestamp_mixin(db_session: AsyncSession):
     assert org.updated_at.tzinfo == UTC
 
 
-async def test_uuid_mixin(db_session: AsyncSession):
+async def test_id_mixin(mocker: MockerFixture, db_session: AsyncSession):
     org = Organization(
         name="Test Org",
         external_id="test-org",
@@ -62,7 +63,20 @@ async def test_uuid_mixin(db_session: AsyncSession):
     await db_session.refresh(org)
 
     assert org.id is not None
-    assert isinstance(org.id, uuid.UUID)
+    assert isinstance(org.id, str)
+    assert org.id.startswith("FORG-")
+
+    mocker.patch("app.db.human_readable_pk.generate_human_readable_pk", return_value=org.id)
+    new_org = Organization(
+        name="Test Org",
+        external_id="test-org",
+    )
+    db_session.add(new_org)
+    with pytest.raises(
+        ValueError,
+        match="Unable to generate unique primary key after 15 attempts.",
+    ):
+        await db_session.commit()
 
 
 async def test_auditable_mixin(db_session: AsyncSession, ffc_extension: System):
