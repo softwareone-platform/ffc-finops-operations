@@ -8,6 +8,7 @@ from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import current_system
+from app.db.db import AsyncTxSession
 from app.db.models import AuditableMixin, Entitlement, Organization, System
 from app.db.models import Base as BaseModel
 from app.enums import EntitlementStatus
@@ -28,6 +29,7 @@ class ConstraintViolationError(DatabaseError):
 class ModelHandler[M: BaseModel]:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
+        self.commit = not isinstance(self.session, AsyncTxSession)
 
     @classmethod
     def _get_generic_cls_args(cls):
@@ -53,8 +55,7 @@ class ModelHandler[M: BaseModel]:
 
         try:
             self.session.add(obj)
-            await self.session.commit()
-            await self.session.refresh(obj)
+            await self._save_changes(obj)
         except IntegrityError as e:
             raise ConstraintViolationError(
                 f"Failed to create {self.model_cls.__name__}: {e}"
@@ -103,8 +104,7 @@ class ModelHandler[M: BaseModel]:
             with suppress(LookupError):
                 obj.updated_by = current_system.get()
 
-        await self.session.commit()
-        await self.session.refresh(obj)
+        await self._save_changes(obj)
         return obj
 
     async def fetch_page(self, limit: int = 50, offset: int = 0) -> Sequence[M]:
@@ -115,18 +115,24 @@ class ModelHandler[M: BaseModel]:
         result = await self.session.execute(select(func.count(self.model_cls.id)))
         return result.scalars().one()
 
+    async def _save_changes(self, obj: M):
+        if self.commit:
+            await self.session.commit()
+        else:
+            await self.session.flush()
+        await self.session.refresh(obj)
+
 
 class EntitlementHandler(ModelHandler[Entitlement]):
     async def terminate(self, entitlement: Entitlement) -> Entitlement:
-        entitlement.status = EntitlementStatus.TERMINATED
-        entitlement.terminated_by = current_system.get()
-        entitlement.updated_by = current_system.get()
-        entitlement.terminated_at = datetime.now(UTC)
-
-        await self.session.commit()
-        await self.session.refresh(entitlement)
-
-        return entitlement
+        return await self.update(
+            entitlement.id,
+            {
+                "status": EntitlementStatus.TERMINATED,
+                "terminated_at": datetime.now(UTC),
+                "terminated_by": current_system.get(),
+            },
+        )
 
 
 class OrganizationHandler(ModelHandler[Organization]):

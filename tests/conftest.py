@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app import settings
 from app.db import db_engine
 from app.db.models import Actor, Base, Entitlement, Organization, System
+from tests.utils import SQLAlchemyCapturer
 
 ModelT = TypeVar("ModelT", bound=Base)
 ModelFactory = Callable[..., Awaitable[ModelT]]
@@ -48,7 +49,7 @@ def mock_settings() -> None:
 
 
 @pytest.fixture(scope="session")
-async def fastapi_app(mock_settings) -> AsyncGenerator[FastAPI, None]:
+async def fastapi_app(mock_settings) -> FastAPI:
     from app.main import app
 
     return app
@@ -58,6 +59,21 @@ async def fastapi_app(mock_settings) -> AsyncGenerator[FastAPI, None]:
 async def app_lifespan_manager(fastapi_app: FastAPI) -> AsyncGenerator[LifespanManager, None]:
     async with LifespanManager(fastapi_app) as lifespan_manager:
         yield lifespan_manager
+
+
+@pytest.fixture(scope="session")
+def capsql():
+    return SQLAlchemyCapturer(db_engine)
+
+
+def assert_num_queries(caplog: SQLAlchemyCapturer):
+    def _assert_num_queries(num: int):
+        with caplog:
+            yield
+        executed = len(caplog.queries)
+        assert executed == num, f"The number of executed queries ({executed}) exceed {num}"
+
+    return _assert_num_queries
 
 
 @pytest.fixture(autouse=True)
