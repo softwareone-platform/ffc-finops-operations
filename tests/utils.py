@@ -1,10 +1,14 @@
+from collections.abc import AsyncGenerator
 from types import TracebackType
-from typing import Any
+from typing import Any, Self
 
-from sqlalchemy import Connection, event
+import asyncpg
+import pytest
+import sqlalchemy.event
+from sqlalchemy import Connection, ExecutionContext, event
 from sqlalchemy.engine import ExecutionContext
 from sqlalchemy.engine.interfaces import DBAPICursor
-from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncSession
 
 from app.schemas import IdSchema
 
@@ -116,3 +120,95 @@ class SQLAlchemyCapturer:
             "before_cursor_execute",
             self.on_before_cursor_execute,
         )
+
+
+class CaptureQueriesContext:
+    """
+    Caputre SQL queries executed in a given context.
+    S̶t̶o̶l̶e̶n̶ Heavily inspired by django.test.utils.CaptureQueriesContext
+    """
+
+    connection: AsyncConnection
+    captured_queries: list[str]
+    enabled: bool
+
+    def __init__(self, connection: AsyncConnection):
+        self.connection = connection
+        self.captured_queries = []
+        self.enabled = False
+
+    def clear(self) -> None:
+        self.captured_queries = []
+
+    async def __aenter__(self) -> Self:
+        sqlalchemy.event.listen(self.connection, "after_cursor_execute", self._after_cursor_execute)
+        self.enabled = True
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None = None,
+        exc_val: BaseException | None = None,
+        exc_tb: TracebackType | None = None,
+    ) -> None:
+        sqlalchemy.event.remove(self.connection, "after_cursor_execute", self._after_cursor_execute)
+        self.enabled = False
+
+    async def _after_cursor_execute(
+        self,
+        conn: AsyncConnection,
+        cursor: asyncpg.cursor.Cursor,
+        statement: str,
+        parameters: dict[str, Any] | tuple[Any] | list[Any] | None,
+        context: ExecutionContext | None,
+        executemany: bool,
+    ):
+        if not self.enabled:
+            return
+
+        self.captured_queries.append(sqlalchemy.text(statement).bindparams(**parameters))
+
+
+class AssertDBCalls:
+    def __init__(self, full_test_context: CaptureQueriesContext):
+        self.full_test_context = full_test_context
+        self.snapshot = snapshot
+        self.partial_context: CaptureQueriesContext | None = None
+
+    @property
+    def session(self):
+        return self.full_test_context.session
+
+    async def __aenter__(self) -> Self:
+        self.partial_context = CaptureQueriesContext(self.session)
+        self.partial_context = await self.partial_context.__aenter__()
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None = None,
+        exc_val: BaseException | None = None,
+        exc_tb: TracebackType | None = None,
+    ) -> None:
+        if self.partial_context is None:
+            raise RuntimeError(
+                f"{self.__class__.__name__}: attempting to call __aexit__ before __aenter__"
+            )
+
+        if exc_type is None:
+            self.assert_db_calls_in_context(self.partial_context)
+
+        await self.partial_context.__aexit__(exc_type, exc_val, exc_tb)
+
+    def __call__(self):
+        return self.assert_db_calls_in_context(self.full_test_context)
+
+    def assert_db_calls_in_context(self, queries_context: CaptureQueriesContext):
+        assert queries_context.captured_queries == self.snapshot
+
+
+# TODO: Add snapshot fixture support
+@pytest.fixture
+async def assert_db_calls(db_session: AsyncSession) -> AsyncGenerator[AssertDBCalls, None]:
+    async with CaptureQueriesContext(db_session) as full_test_context:
+        yield AssertDBCalls(full_test_context)
