@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.human_readable_pk import HumanReadablePKMixin
 from app.db.models import Actor, Entitlement, Organization, System
 from app.enums import ActorType, EntitlementStatus
 
@@ -66,7 +67,7 @@ async def test_id_mixin(mocker: MockerFixture, db_session: AsyncSession):
     assert isinstance(org.id, str)
     assert org.id.startswith("FORG-")
 
-    mocker.patch("app.db.human_readable_pk.generate_human_readable_pk", return_value=org.id)
+    mocker.patch.object(HumanReadablePKMixin, "generate_human_readable_pk", return_value=org.id)
     new_org = Organization(
         name="Test Org",
         external_id="test-org",
