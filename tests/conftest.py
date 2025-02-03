@@ -1,5 +1,6 @@
 import secrets
 from collections.abc import AsyncGenerator, Awaitable, Callable
+from contextlib import AbstractContextManager, contextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Protocol, TypeVar
 
@@ -14,8 +15,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app import settings
 from app.db import db_engine
-from app.db.models import Account, Actor, Base, Entitlement, Organization, System
-from app.enums import AccountType
+from app.db.models import Account, AccountUser, Actor, Base, Entitlement, Organization, System, User
+from app.enums import AccountType, AccountUserStatus, SystemStatus, UserStatus
+from app.hasher import pbkdf2_sha256
 from tests.utils import SQLAlchemyCapturer
 
 ModelT = TypeVar("ModelT", bound=Base)
@@ -25,8 +27,9 @@ ModelFactory = Callable[..., Awaitable[ModelT]]
 class JWTTokenFactory(Protocol):
     def __call__(
         self,
-        user_id: str,
+        subject: str,
         secret: str,
+        account_id: str | None = None,
         exp: datetime | None = None,
         iat: datetime | None = None,
         nbf: datetime | None = None,
@@ -47,6 +50,7 @@ def mock_settings() -> None:
     settings.opt_auth_base_url = "https://opt-auth.ffc.com"
     settings.api_modifier_base_url = "https://api-modifier.ffc.com"
     settings.api_modifier_jwt_secret = "test_jwt_secret"
+    settings.auth_jwt_secret = "auth_jwt_secret"
 
 
 @pytest.fixture(scope="session")
@@ -67,12 +71,14 @@ def capsql():
     return SQLAlchemyCapturer(db_engine)
 
 
-def assert_num_queries(caplog: SQLAlchemyCapturer):
+@pytest.fixture
+def assert_num_queries(capsql: SQLAlchemyCapturer) -> Callable[[int], AbstractContextManager[None]]:
+    @contextmanager
     def _assert_num_queries(num: int):
-        with caplog:
+        with capsql:
             yield
-        executed = len(caplog.queries)
-        assert executed == num, f"The number of executed queries ({executed}) exceed {num}"
+        executed = len(capsql.queries)
+        assert executed == num, f"The number of executed is {executed} not {num}"
 
     return _assert_num_queries
 
@@ -197,12 +203,14 @@ def system_factory(
         external_id: str | None = None,
         jwt_secret: str | None = None,
         owner: Account | None = None,
+        status: SystemStatus = SystemStatus.ACTIVE,
     ) -> System:
         system = System(
             name=name or faker.company(),
             external_id=external_id or "GCP",
             jwt_secret=jwt_secret or secrets.token_hex(32),
             owner=owner or await account_factory(),
+            status=status,
         )
         db_session.add(system)
         await db_session.commit()
@@ -213,24 +221,64 @@ def system_factory(
 
 
 @pytest.fixture
+def user_factory(
+    faker: Faker, db_session: AsyncSession, account_factory: ModelFactory[Account]
+) -> ModelFactory[User]:
+    async def _user(
+        name: str | None = None,
+        email: str | None = None,
+        password: str | None = None,
+        status: UserStatus = UserStatus.ACTIVE,
+        account: Account | None = None,
+        accountuser_status: AccountUserStatus = AccountUserStatus.ACTIVE,
+    ) -> User:
+        account = account or await account_factory()
+        user = User(
+            name=name or faker.name(),
+            email=email or faker.email(),
+            password=pbkdf2_sha256.hash(password or "mySuperPass123$"),
+            last_used_account=account,
+            status=status,
+        )
+
+        db_session.add(user)
+        account_user = AccountUser(
+            user=user,
+            account=account or await account_factory(),
+            status=accountuser_status,
+        )
+        db_session.add(account_user)
+        await db_session.commit()
+        await db_session.refresh(user)
+        return user
+
+    return _user
+
+
+@pytest.fixture
 def jwt_token_factory() -> (
-    Callable[[str, str, datetime | None, datetime | None, datetime | None], str]
+    Callable[[str, str, str | None, datetime | None, datetime | None, datetime | None], str]
 ):
     def _jwt_token(
         subject: str,
         secret: str,
+        account_id: str | None = None,
         exp: datetime | None = None,
         nbf: datetime | None = None,
         iat: datetime | None = None,
     ) -> str:
         now = datetime.now(UTC)
+        claims = {
+            "sub": subject,
+            "iat": iat or now,
+            "nbf": nbf or now,
+            "exp": exp or now + timedelta(minutes=5),
+        }
+        if account_id:
+            claims["account_id"] = account_id
+
         return jwt.encode(
-            {
-                "sub": subject,
-                "iat": iat or now,
-                "nbf": nbf or now,
-                "exp": exp or now + timedelta(minutes=5),
-            },
+            claims,
             secret,
             algorithm="HS256",
         )
@@ -240,7 +288,9 @@ def jwt_token_factory() -> (
 
 @pytest.fixture
 def system_jwt_token_factory(
-    jwt_token_factory: Callable[[str, str, datetime | None, datetime | None, datetime | None], str],
+    jwt_token_factory: Callable[
+        [str, str, str | None, datetime | None, datetime | None, datetime | None], str
+    ],
 ) -> Callable[[System], str]:
     def _system_jwt_token(system: System) -> str:
         now = datetime.now(UTC)
@@ -248,6 +298,7 @@ def system_jwt_token_factory(
         return jwt_token_factory(
             str(system.id),
             system.jwt_secret,
+            None,
             now + timedelta(minutes=5),
             now,
             now,

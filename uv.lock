@@ -745,7 +745,7 @@ dev = [
     { name = "pytest-cov", specifier = ">=6.0.0,<7.0" },
     { name = "pytest-httpx", specifier = ">=0.34.0,<1.0" },
     { name = "pytest-mock", specifier = ">=3.14.0,<4.0" },
-    { name = "pytest-randomly", specifier = ">=3.16.0" },
+    { name = "pytest-randomly", specifier = ">=3.16.0,<4.0" },
     { name = "ruff", specifier = ">=0.8.0,<1.0" },
     { name = "types-pyyaml", specifier = ">=6.0.12.20241230,<7.0" },
 ]
