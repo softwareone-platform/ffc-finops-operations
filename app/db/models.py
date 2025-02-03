@@ -1,14 +1,23 @@
 import datetime
 
 import sqlalchemy as sa
-from sqlalchemy import Enum, ForeignKey, String
+from sqlalchemy import Enum, ForeignKey, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, mapped_column, relationship
 from sqlalchemy_utils import StringEncryptedType
 from sqlalchemy_utils.types.encrypted.encrypted_type import FernetEngine
 
 from app import settings
 from app.db.human_readable_pk import HumanReadablePKMixin
-from app.enums import ActorType, EntitlementStatus
+from app.enums import (
+    AccountStatus,
+    AccountType,
+    AccountUserStatus,
+    ActorType,
+    EntitlementStatus,
+    OrganizationStatus,
+    SystemStatus,
+    UserStatus,
+)
 
 
 class Base(DeclarativeBase):
@@ -33,6 +42,9 @@ class TimestampMixin:
         server_default=sa.func.current_timestamp(),
         onupdate=sa.func.current_timestamp(),
     )
+    deleted_at: Mapped[datetime.datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
 
 
 class Actor(Base, HumanReadablePKMixin):
@@ -47,7 +59,6 @@ class Actor(Base, HumanReadablePKMixin):
     )
 
     __mapper_args__ = {
-        "polymorphic_identity": ActorType.USER,
         "polymorphic_on": "type",
     }
 
@@ -55,6 +66,7 @@ class Actor(Base, HumanReadablePKMixin):
 class AuditableMixin(TimestampMixin):
     created_by_id: Mapped[str | None] = mapped_column(ForeignKey("actors.id"), name="created_by")
     updated_by_id: Mapped[str | None] = mapped_column(ForeignKey("actors.id"), name="updated_by")
+    deleted_by_id: Mapped[str | None] = mapped_column(ForeignKey("actors.id"), name="deleted_by")
 
     @declared_attr
     def created_by(cls) -> Mapped["Actor"]:
@@ -72,6 +84,36 @@ class AuditableMixin(TimestampMixin):
             lazy="joined",
         )
 
+    @declared_attr
+    def deleted_by(cls) -> Mapped["Actor"]:
+        return relationship(
+            "Actor",
+            foreign_keys=lambda: [cls.__dict__["deleted_by_id"]],
+            lazy="joined",
+        )
+
+
+class Account(Base, HumanReadablePKMixin, AuditableMixin):
+    __tablename__ = "accounts"
+
+    PK_PREFIX = "FACC"
+    PK_NUM_LENGTH = 8
+
+    type: Mapped[AccountType] = mapped_column(
+        Enum(AccountType, values_callable=lambda obj: [e.value for e in obj]),
+        nullable=False,
+        default=AccountType.AFFILIATE,
+        server_default=AccountType.AFFILIATE.value,
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[AccountStatus] = mapped_column(
+        Enum(AccountStatus, values_callable=lambda obj: [e.value for e in obj]),
+        nullable=False,
+        default=AccountStatus.ACTIVE,
+        server_default=AccountStatus.ACTIVE.value,
+    )
+    users: Mapped[list["AccountUser"]] = relationship(back_populates="account")
+
 
 class System(Actor, AuditableMixin):
     __tablename__ = "systems"
@@ -81,38 +123,81 @@ class System(Actor, AuditableMixin):
 
     id: Mapped[str] = mapped_column(ForeignKey("actors.id"), primary_key=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text(), nullable=True)
     external_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True, unique=True)
     jwt_secret: Mapped[str] = mapped_column(
         StringEncryptedType(String(255), settings.secrets_encryption_key, FernetEngine),
         nullable=False,
     )
-    description: Mapped[str | None] = mapped_column(String)
+    owner_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"))
+    owner: Mapped[Account] = relationship(foreign_keys=[owner_id])
+    status: Mapped[SystemStatus] = mapped_column(
+        Enum(SystemStatus, values_callable=lambda obj: [e.value for e in obj]),
+        nullable=False,
+        default=SystemStatus.ACTIVE,
+        server_default=SystemStatus.ACTIVE.value,
+    )
 
     __mapper_args__ = {
-        "polymorphic_identity": ActorType.SYSTEM,
+        "polymorphic_identity": ActorType.SYSTEM.value,
         "inherit_condition": id == Actor.id,
     }
 
 
-class Entitlement(Base, HumanReadablePKMixin, AuditableMixin):
-    __tablename__ = "entitlements"
+class User(Actor, HumanReadablePKMixin, AuditableMixin):
+    __tablename__ = "users"
 
-    PK_PREFIX = "FENT"
+    PK_PREFIX = "FUSR"
+    PK_NUM_LENGTH = 8
+
+    id: Mapped[str] = mapped_column(ForeignKey("actors.id"), primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    password: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    last_login_at: Mapped[datetime.datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
+    last_used_account_id: Mapped[str | None] = mapped_column(ForeignKey("accounts.id"))
+    last_used_account: Mapped[Account | None] = relationship(foreign_keys=[last_used_account_id])
+    pwd_reset_token: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    pwd_reset_token_expires_at: Mapped[datetime.datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
+    status: Mapped[UserStatus] = mapped_column(
+        Enum(UserStatus, values_callable=lambda obj: [e.value for e in obj]),
+        nullable=False,
+        default=UserStatus.DRAFT,
+        server_default=UserStatus.DRAFT.value,
+    )
+    accounts: Mapped[list["AccountUser"]] = relationship(back_populates="user")
+
+    __mapper_args__ = {
+        "polymorphic_identity": ActorType.USER.value,
+        "inherit_condition": id == Actor.id,
+    }
+
+
+class AccountUser(Base, AuditableMixin):
+    __tablename__ = "accounts_users"
+
+    PK_PREFIX = "FAUR"
     PK_NUM_LENGTH = 12
 
-    sponsor_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    sponsor_external_id: Mapped[str] = mapped_column(String(255), nullable=False)
-    sponsor_container_id: Mapped[str] = mapped_column(String(255), nullable=False)
-    status: Mapped[EntitlementStatus] = mapped_column(
-        Enum(EntitlementStatus, values_callable=lambda obj: [e.value for e in obj]),
-        nullable=False,
-        default=EntitlementStatus.NEW,
-        server_default=EntitlementStatus.NEW.value,
+    account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    account: Mapped["Account"] = relationship(back_populates="users", foreign_keys=[account_id])
+    user: Mapped["User"] = relationship(back_populates="accounts", foreign_keys=[user_id])
+    invitation_token: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    invitation_token_expires_at: Mapped[datetime.datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
     )
-    activated_at: Mapped[datetime.datetime | None] = mapped_column(sa.DateTime(timezone=True))
-    terminated_at: Mapped[datetime.datetime | None] = mapped_column(sa.DateTime(timezone=True))
-    terminated_by_id: Mapped[str | None] = mapped_column(ForeignKey("actors.id"))
-    terminated_by: Mapped[Actor | None] = relationship(foreign_keys=[terminated_by_id])
+    joined_at: Mapped[datetime.datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    status: Mapped[AccountUserStatus] = mapped_column(
+        Enum(AccountUserStatus, values_callable=lambda obj: [e.value for e in obj]),
+        nullable=False,
+        default=AccountUserStatus.INVITED,
+        server_default=AccountUserStatus.INVITED.value,
+    )
 
 
 class Organization(Base, AuditableMixin, HumanReadablePKMixin):
@@ -122,5 +207,45 @@ class Organization(Base, AuditableMixin, HumanReadablePKMixin):
     PK_NUM_LENGTH = 12
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    external_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True, unique=True)
-    organization_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    affiliate_external_id: Mapped[str] = mapped_column(
+        String(255), nullable=False, index=True, unique=True
+    )
+    operations_external_id: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, index=True
+    )
+    status: Mapped[OrganizationStatus] = mapped_column(
+        Enum(OrganizationStatus, values_callable=lambda obj: [e.value for e in obj]),
+        nullable=False,
+        default=OrganizationStatus.ACTIVE,
+        server_default=OrganizationStatus.ACTIVE.value,
+    )
+
+
+class Entitlement(Base, HumanReadablePKMixin, AuditableMixin):
+    __tablename__ = "entitlements"
+
+    PK_PREFIX = "FENT"
+    PK_NUM_LENGTH = 12
+
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    operations_external_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    affiliate_external_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    datasource_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    owner_id: Mapped[str | None] = mapped_column(
+        ForeignKey("accounts.id"), nullable=True
+    )  # TODO make required
+    owner: Mapped[Account] = relationship(foreign_keys=[owner_id])
+    status: Mapped[EntitlementStatus] = mapped_column(
+        Enum(EntitlementStatus, values_callable=lambda obj: [e.value for e in obj]),
+        nullable=False,
+        default=EntitlementStatus.NEW,
+        server_default=EntitlementStatus.NEW.value,
+    )
+    redeemed_at: Mapped[datetime.datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    redeemed_by_id: Mapped[str | None] = mapped_column(ForeignKey("organizations.id"))
+    redeemed_by: Mapped[Organization | None] = relationship(foreign_keys=[redeemed_by_id])
+
+    terminated_at: Mapped[datetime.datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    terminated_by_id: Mapped[str | None] = mapped_column(ForeignKey("actors.id"))
+    terminated_by: Mapped[Actor | None] = relationship(foreign_keys=[terminated_by_id])

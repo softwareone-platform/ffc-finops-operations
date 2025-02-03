@@ -14,7 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app import settings
 from app.db import db_engine
-from app.db.models import Actor, Base, Entitlement, Organization, System
+from app.db.models import Account, Actor, Base, Entitlement, Organization, System
+from app.enums import AccountType
 from tests.utils import SQLAlchemyCapturer
 
 ModelT = TypeVar("ModelT", bound=Base)
@@ -102,20 +103,44 @@ async def api_client(fastapi_app: FastAPI, app_lifespan_manager: LifespanManager
 
 
 @pytest.fixture
-def entitlement_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory[Entitlement]:
+def account_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory[Account]:
+    async def _account(
+        name: str | None = None,
+        type: str | None = None,
+    ) -> Account:
+        account = Account(
+            type=type or AccountType.AFFILIATE,
+            name=name or "AWS",
+        )
+        db_session.add(account)
+        await db_session.commit()
+        await db_session.refresh(account)
+        return account
+
+    return _account
+
+
+@pytest.fixture
+def entitlement_factory(
+    faker: Faker,
+    db_session: AsyncSession,
+    account_factory: ModelFactory[Account],
+) -> ModelFactory[Entitlement]:
     async def _entitlement(
-        sponsor_name: str | None = None,
-        sponsor_external_id: str | None = None,
-        sponsor_container_id: str | None = None,
+        name: str | None = None,
+        affiliate_external_id: str | None = None,
+        datasource_id: str | None = None,
         created_by: Actor | None = None,
         updated_by: Actor | None = None,
+        owner: Account | None = None,
     ) -> Entitlement:
         entitlement = Entitlement(
-            sponsor_name=sponsor_name or "AWS",
-            sponsor_external_id=sponsor_external_id or "ACC-1234-5678",
-            sponsor_container_id=sponsor_container_id or faker.uuid4(),
+            name=name or "AWS",
+            affiliate_external_id=affiliate_external_id or "ACC-1234-5678",
+            datasource_id=datasource_id or faker.uuid4(),
             created_by=created_by,
             updated_by=updated_by,
+            owner=owner or await account_factory(),
         )
         db_session.add(entitlement)
         await db_session.commit()
@@ -129,29 +154,29 @@ def entitlement_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory[
 async def entitlement_aws(
     entitlement_factory: ModelFactory[Entitlement], gcp_extension: System
 ) -> Entitlement:
-    return await entitlement_factory(
-        sponsor_name="AWS", created_by=gcp_extension, updated_by=gcp_extension
-    )
+    return await entitlement_factory(name="AWS", created_by=gcp_extension, updated_by=gcp_extension)
 
 
 @pytest.fixture
 async def entitlement_gcp(entitlement_factory: ModelFactory[Entitlement]) -> Entitlement:
-    return await entitlement_factory(sponsor_name="GCP")
+    return await entitlement_factory(name="GCP")
 
 
 @pytest.fixture
 def organization_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory[Organization]:
     async def _organization(
         name: str | None = None,
-        external_id: str | None = None,
-        organization_id: str | None = None,
+        currency: str | None = None,
+        affiliate_external_id: str | None = None,
+        operations_external_id: str | None = None,
         created_by: Actor | None = None,
         updated_by: Actor | None = None,
     ) -> Organization:
         organization = Organization(
             name=name or faker.company(),
-            external_id=external_id or "ACC-1234-5678",
-            organization_id=organization_id,
+            currency=currency or "EUR",
+            affiliate_external_id=affiliate_external_id or "AGR-1234-5678-9012",
+            operations_external_id=operations_external_id,
             created_by=created_by,
             updated_by=updated_by,
         )
@@ -164,16 +189,20 @@ def organization_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory
 
 
 @pytest.fixture
-def system_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory[System]:
+def system_factory(
+    faker: Faker, db_session: AsyncSession, account_factory: ModelFactory[Account]
+) -> ModelFactory[System]:
     async def _system(
         name: str | None = None,
         external_id: str | None = None,
         jwt_secret: str | None = None,
+        owner: Account | None = None,
     ) -> System:
         system = System(
             name=name or faker.company(),
             external_id=external_id or "GCP",
             jwt_secret=jwt_secret or secrets.token_hex(32),
+            owner=owner or await account_factory(),
         )
         db_session.add(system)
         await db_session.commit()

@@ -49,6 +49,7 @@ def openapi(
         version=main.app.version,
         openapi_version=main.app.openapi_version,
         description=main.app.description,
+        tags=main.app.openapi_tags,
         routes=main.app.routes,
     )
     with open(output, "w") as f:  # type: ignore

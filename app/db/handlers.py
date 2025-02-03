@@ -6,10 +6,12 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
+from sqlalchemy.orm.interfaces import ORMOption
 
 from app.auth import current_system
 from app.db.db import AsyncTxSession
-from app.db.models import AuditableMixin, Entitlement, Organization, System
+from app.db.models import Account, AuditableMixin, Entitlement, Organization, System
 from app.db.models import Base as BaseModel
 from app.enums import EntitlementStatus
 
@@ -30,6 +32,7 @@ class ModelHandler[M: BaseModel]:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
         self.commit = not isinstance(self.session, AsyncTxSession)
+        self.default_options: list[ORMOption] = []
 
     @classmethod
     def _get_generic_cls_args(cls):
@@ -65,7 +68,7 @@ class ModelHandler[M: BaseModel]:
 
     async def get(self, id: str) -> M:
         try:
-            result = await self.session.get(self.model_cls, id)
+            result = await self.session.get(self.model_cls, id, options=self.default_options)
             if result is None:
                 raise NotFoundError(f"{self.model_cls.__name__} with ID `{str(id)}` wasn't found")
             return result
@@ -78,10 +81,12 @@ class ModelHandler[M: BaseModel]:
         self, *, defaults: dict[str, Any] | None = None, **filters: Any
     ) -> tuple[M, bool]:
         defaults = defaults or {}
-        stmt = select(self.model_cls).where(
+        query = select(self.model_cls).where(
             *(getattr(self.model_cls, key) == value for key, value in filters.items())
         )
-        result = await self.session.execute(stmt)
+        if self.default_options:
+            query = query.options(*self.default_options)
+        result = await self.session.execute(query)
         obj = result.scalars().first()
 
         if obj:
@@ -108,7 +113,12 @@ class ModelHandler[M: BaseModel]:
         return obj
 
     async def fetch_page(self, limit: int = 50, offset: int = 0) -> Sequence[M]:
-        results = await self.session.execute(select(self.model_cls).offset(offset).limit(limit))
+        query = select(self.model_cls).offset(offset).limit(limit).order_by("id")
+
+        if self.default_options:
+            query = query.options(*self.default_options)
+
+        results = await self.session.execute(query)
         return results.scalars().all()
 
     async def count(self) -> int:
@@ -124,6 +134,10 @@ class ModelHandler[M: BaseModel]:
 
 
 class EntitlementHandler(ModelHandler[Entitlement]):
+    def __init__(self, session):
+        super().__init__(session)
+        self.default_options = [joinedload(Entitlement.owner)]
+
     async def terminate(self, entitlement: Entitlement) -> Entitlement:
         return await self.update(
             entitlement.id,
@@ -140,4 +154,8 @@ class OrganizationHandler(ModelHandler[Organization]):
 
 
 class SystemHandler(ModelHandler[System]):
+    pass
+
+
+class AccountHandler(ModelHandler[Account]):
     pass

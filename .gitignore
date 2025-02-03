@@ -173,6 +173,5 @@ bandit.json
 # Postgres data
 pg_data/
 
-
-# OpenAPI default spec file
+# Default OpenAPI spec file
 ffc_operations_openapi_spec.yml

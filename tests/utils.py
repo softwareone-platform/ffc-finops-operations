@@ -6,10 +6,10 @@ from sqlalchemy.engine import ExecutionContext
 from sqlalchemy.engine.interfaces import DBAPICursor
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from app.schemas import BaseReadSchema
+from app.schemas import IdSchema
 
 
-def assert_json_contains_model(json: dict[str, Any], expected_schema: BaseReadSchema) -> None:
+def assert_json_contains_model(json: dict[str, Any], expected_schema: IdSchema) -> None:
     assert all("id" in item for item in json["items"])
 
     items_by_id = {item["id"]: item for item in json["items"]}
@@ -21,7 +21,7 @@ def assert_json_contains_model(json: dict[str, Any], expected_schema: BaseReadSc
 
     for key, actual_value in actual_dict.items():
         if key not in expected_dict:
-            raise AssertionError(f"{expected_schema} has no attribute {key}")
+            raise AssertionError(f"{expected_schema.__class__.__name__} has no attribute {key}")
 
         assert expected_dict[key] == actual_value
 

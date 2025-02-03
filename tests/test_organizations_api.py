@@ -17,7 +17,7 @@ from tests.utils import assert_json_contains_model
 
 async def test_get_all_organizations_empty_db(api_client: AsyncClient, ffc_jwt_token: str):
     response = await api_client.get(
-        "/organizations/", headers={"Authorization": f"Bearer {ffc_jwt_token}"}
+        "/organizations", headers={"Authorization": f"Bearer {ffc_jwt_token}"}
     )
 
     assert response.status_code == 200
@@ -28,11 +28,11 @@ async def test_get_all_organizations_empty_db(api_client: AsyncClient, ffc_jwt_t
 async def test_get_all_organizations_single_page(
     organization_factory: ModelFactory[Organization], api_client: AsyncClient, ffc_jwt_token: str
 ):
-    organization_1 = await organization_factory(external_id="EXTERNAL_ID_1")
-    organization_2 = await organization_factory(external_id="EXTERNAL_ID_2")
+    organization_1 = await organization_factory(affiliate_external_id="EXTERNAL_ID_1")
+    organization_2 = await organization_factory(affiliate_external_id="EXTERNAL_ID_2")
 
     response = await api_client.get(
-        "/organizations/",
+        "/organizations",
         headers={"Authorization": f"Bearer {ffc_jwt_token}"},
     )
 
@@ -52,11 +52,11 @@ async def test_get_all_organizations_multiple_pages(
     for index in range(10):
         await organization_factory(
             name=f"Organization {index}",
-            external_id=f"EXTERNAL_ID_{index}",
+            affiliate_external_id=f"EXTERNAL_ID_{index}",
         )
 
     first_page_response = await api_client.get(
-        "/organizations/",
+        "/organizations",
         headers={"Authorization": f"Bearer {ffc_jwt_token}"},
         params={"limit": 5},
     )
@@ -69,7 +69,7 @@ async def test_get_all_organizations_multiple_pages(
     assert first_page_data["offset"] == 0
 
     second_page_response = await api_client.get(
-        "/organizations/",
+        "/organizations",
         headers={"Authorization": f"Bearer {ffc_jwt_token}"},
         params={"limit": 3, "offset": 5},
     )
@@ -82,7 +82,7 @@ async def test_get_all_organizations_multiple_pages(
     assert second_page_data["offset"] == 5
 
     third_page_response = await api_client.get(
-        "/organizations/",
+        "/organizations",
         headers={"Authorization": f"Bearer {ffc_jwt_token}"},
         params={"offset": 8},
     )
@@ -95,7 +95,7 @@ async def test_get_all_organizations_multiple_pages(
     assert third_page_data["offset"] == 8
 
     all_items = first_page_data["items"] + second_page_data["items"] + third_page_data["items"]
-    all_external_ids = {item["external_id"] for item in all_items}
+    all_external_ids = {item["affiliate_external_id"] for item in all_items}
     assert len(all_items) == 10
     assert all_external_ids == {f"EXTERNAL_ID_{index}" for index in range(10)}
 
@@ -124,11 +124,11 @@ async def test_can_create_organizations(
     )
 
     response = await api_client.post(
-        "/organizations/",
+        "/organizations",
         headers={"Authorization": f"Bearer {ffc_jwt_token}"},
         json={
             "name": "My Organization",
-            "external_id": "ACC-1234-5678",
+            "affiliate_external_id": "ACC-1234-5678",
             "user_id": "UUID-xxxx-xxxx-xxxx-xxxx",
             "currency": "USD",
         },
@@ -139,8 +139,8 @@ async def test_can_create_organizations(
 
     assert data["id"] is not None
     assert data["name"] == "My Organization"
-    assert data["external_id"] == "ACC-1234-5678"
-    assert data["organization_id"] == "UUID-yyyy-yyyy-yyyy-yyyy"
+    assert data["affiliate_external_id"] == "ACC-1234-5678"
+    assert data["operations_external_id"] == "UUID-yyyy-yyyy-yyyy-yyyy"
     assert data["created_at"] is not None
     assert data["created_by"]["id"] == str(ffc_extension.id)
     assert data["created_by"]["type"] == ffc_extension.type
@@ -154,20 +154,20 @@ async def test_can_create_organizations(
     assert result.one_or_none() is not None
 
 
-@pytest.mark.parametrize("missing_field", ["name", "external_id", "user_id", "currency"])
+@pytest.mark.parametrize("missing_field", ["name", "affiliate_external_id", "user_id", "currency"])
 async def test_create_organization_with_incomplete_data(
     api_client: AsyncClient, missing_field: str, ffc_jwt_token: str
 ):
     payload = {
         "name": "My Organization",
-        "external_id": "ACC-1234-5678",
+        "affiliate_external_id": "ACC-1234-5678",
         "user_id": "UUID-xxxx-xxxx-xxxx-xxxx",
         "currency": "USD",
     }
     payload.pop(missing_field)
 
     response = await api_client.post(
-        "/organizations/",
+        "/organizations",
         json=payload,
         headers={"Authorization": f"Bearer {ffc_jwt_token}"},
     )
@@ -188,10 +188,10 @@ async def test_create_organization_with_existing_db_organization(
 ):
     mocker.patch("app.api_clients.base.get_api_modifier_jwt_token", return_value="test_token")
 
-    existing_org = await organization_factory(external_id="ACC-1234-5678")
+    existing_org = await organization_factory(affiliate_external_id="ACC-1234-5678")
     payload = {
         "name": existing_org.name,
-        "external_id": "ACC-1234-5678",
+        "affiliate_external_id": "ACC-1234-5678",
         "user_id": "UUID-xxxx-xxxx-xxxx-xxxx",
         "currency": "USD",
     }
@@ -205,7 +205,7 @@ async def test_create_organization_with_existing_db_organization(
     )
 
     response = await api_client.post(
-        "/organizations/",
+        "/organizations",
         json=payload,
         headers={"Authorization": f"Bearer {gcp_jwt_token}"},
     )
@@ -215,8 +215,8 @@ async def test_create_organization_with_existing_db_organization(
 
     assert data["id"] == str(existing_org.id)
     assert data["name"] == existing_org.name
-    assert data["external_id"] == "ACC-1234-5678"
-    assert data["organization_id"] == "UUID-yyyy-yyyy-yyyy-yyyy"
+    assert data["affiliate_external_id"] == "ACC-1234-5678"
+    assert data["operations_external_id"] == "UUID-yyyy-yyyy-yyyy-yyyy"
     assert data["created_at"] is not None
 
 
@@ -229,16 +229,16 @@ async def test_create_organization_with_existing_db_organization_name_mismatch(
 ):
     mocker.patch("app.api_clients.base.get_api_modifier_jwt_token", return_value="test_token")
 
-    existing_org = await organization_factory(external_id="ACC-1234-5678")
+    existing_org = await organization_factory(affiliate_external_id="ACC-1234-5678")
     payload = {
         "name": f"{existing_org.name} Existing",
-        "external_id": "ACC-1234-5678",
+        "affiliate_external_id": "ACC-1234-5678",
         "user_id": "UUID-xxxx-xxxx-xxxx-xxxx",
         "currency": "USD",
     }
 
     response = await api_client.post(
-        "/organizations/",
+        "/organizations",
         json=payload,
         headers={"Authorization": f"Bearer {ffc_jwt_token}"},
     )
@@ -247,7 +247,7 @@ async def test_create_organization_with_existing_db_organization_name_mismatch(
     detail = response.json()["detail"]
     assert detail == (
         f"The name of a partially created Organization with "
-        f"external ID {existing_org.external_id}  doesn't match the "
+        f"external ID {existing_org.affiliate_external_id}  doesn't match the "
         f"current request: {existing_org.name}."
     )
 
@@ -257,18 +257,18 @@ async def test_create_organization_already_created(
 ):
     payload = {
         "name": "My Organization",
-        "external_id": "ACC-1234-5678",
+        "affiliate_external_id": "ACC-1234-5678",
         "user_id": "UUID-xxxx-xxxx-xxxx-xxxx",
         "currency": "USD",
     }
 
     await organization_factory(
-        external_id="ACC-1234-5678",
-        organization_id="957c9a0a-2d18-4015-b7b0-e1b4259b3167",
+        affiliate_external_id="ACC-1234-5678",
+        operations_external_id="957c9a0a-2d18-4015-b7b0-e1b4259b3167",
     )
 
     response = await api_client.post(
-        "/organizations/",
+        "/organizations",
         json=payload,
         headers={"Authorization": f"Bearer {gcp_jwt_token}"},
     )
@@ -294,10 +294,10 @@ async def test_create_organization_api_modifier_error(
     )
 
     response = await api_client.post(
-        "/organizations/",
+        "/organizations",
         json={
             "name": "My Organization",
-            "external_id": "ACC-1234-5678",
+            "affiliate_external_id": "ACC-1234-5678",
             "user_id": "UUID-xxxx-xxxx-xxxx-xxxx",
             "currency": "USD",
         },
@@ -334,7 +334,7 @@ async def test_get_organization_by_id(
 
     assert data["id"] == str(org.id)
     assert data["name"] == org.name
-    assert data["external_id"] == org.external_id
+    assert data["affiliate_external_id"] == org.affiliate_external_id
     assert data["created_at"] is not None
     assert data["created_by"]["id"] == str(ffc_extension.id)
     assert data["created_by"]["type"] == ffc_extension.type

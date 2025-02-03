@@ -9,7 +9,7 @@ from app.db.models import Organization
 from tests.conftest import ModelFactory
 
 
-async def test_can_create_users(
+async def test_can_create_employees(
     mocker: MockerFixture,
     httpx_mock: HTTPXMock,
     api_client: AsyncClient,
@@ -17,7 +17,7 @@ async def test_can_create_users(
 ):
     mocker.patch("app.api_clients.base.get_api_modifier_jwt_token", return_value="test_token")
     mocked_token_urlsafe = mocker.patch(
-        "app.routers.users.secrets.token_urlsafe", return_value="random_password"
+        "app.routers.employees.secrets.token_urlsafe", return_value="random_password"
     )
     httpx_mock.add_response(
         method="POST",
@@ -47,7 +47,7 @@ async def test_can_create_users(
     )
 
     response = await api_client.post(
-        "/users/",
+        "/employees",
         json={"email": "test@example.com", "display_name": "Test User"},
         headers={"Authorization": f"Bearer {ffc_jwt_token}"},
     )
@@ -64,7 +64,7 @@ async def test_can_create_users(
     mocked_token_urlsafe.assert_called_once_with(128)
 
 
-async def test_create_user_error_creating_user(
+async def test_create_employee_error_creating_employee(
     mocker: MockerFixture,
     httpx_mock: HTTPXMock,
     api_client: AsyncClient,
@@ -80,17 +80,17 @@ async def test_create_user_error_creating_user(
     )
 
     response = await api_client.post(
-        "/users/",
+        "/employees",
         json={"email": "test@example.com", "display_name": "Test User"},
         headers={"Authorization": f"Bearer {ffc_jwt_token}"},
     )
     assert response.status_code == 502
     assert response.json() == {
-        "detail": "Error creating user in FinOps for Cloud: 500 - Internal Server Error.",
+        "detail": "Error creating employee in FinOps for Cloud: 500 - Internal Server Error.",
     }
 
 
-async def test_get_user_by_email(
+async def test_get_employee_by_email(
     httpx_mock: HTTPXMock, api_client: AsyncClient, ffc_jwt_token: str
 ):
     httpx_mock.add_response(
@@ -109,7 +109,7 @@ async def test_get_user_by_email(
     )
 
     response = await api_client.get(
-        "/users/test@example.com",
+        "/employees/test@example.com",
         headers={"Authorization": f"Bearer {ffc_jwt_token}"},
     )
 
@@ -124,7 +124,7 @@ async def test_get_user_by_email(
     }
 
 
-async def test_get_user_by_email_not_found(
+async def test_get_employee_by_email_not_found(
     httpx_mock: HTTPXMock, api_client: AsyncClient, ffc_jwt_token: str
 ):
     httpx_mock.add_response(
@@ -137,17 +137,17 @@ async def test_get_user_by_email_not_found(
     )
 
     response = await api_client.get(
-        "/users/test@example.com",
+        "/employees/test@example.com",
         headers={"Authorization": f"Bearer {ffc_jwt_token}"},
     )
 
     assert response.status_code == 404
     assert response.json() == {
-        "detail": "A user with the email `test@example.com` wasn't found.",
+        "detail": "An employee with the email `test@example.com` wasn't found.",
     }
 
 
-async def test_get_user_by_email_lookup_error(
+async def test_get_employee_by_email_lookup_error(
     httpx_mock: HTTPXMock, api_client: AsyncClient, ffc_jwt_token: str
 ):
     httpx_mock.add_response(
@@ -159,34 +159,36 @@ async def test_get_user_by_email_lookup_error(
     )
 
     response = await api_client.get(
-        "/users/test@example.com",
+        "/employees/test@example.com",
         headers={"Authorization": f"Bearer {ffc_jwt_token}"},
     )
 
     assert response.status_code == 502
     assert response.json() == {
-        "detail": "Error checking user existence in FinOps for Cloud: 500 - Internal Server Error.",
+        "detail": (
+            "Error checking employee existence in FinOps " "for Cloud: 500 - Internal Server Error."
+        ),
     }
 
 
 # =============================================
-# Get users within an organization
+# Get employees within an organization
 # =============================================
 
 
-async def test_get_users_for_organization_success(
+async def test_get_employees_for_organization_success(
     organization_factory: ModelFactory[Organization],
     mocker: MockerFixture,
     httpx_mock: HTTPXMock,
     authenticated_client: AsyncClient,
 ):
     org = await organization_factory(
-        organization_id=str(uuid.uuid4()),
+        operations_external_id=str(uuid.uuid4()),
     )
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{settings.opt_api_base_url}/organizations/{org.organization_id}/employees?roles=true",
+        url=f"{settings.opt_api_base_url}/organizations/{org.operations_external_id}/employees?roles=true",
         match_headers={"Secret": settings.opt_cluster_secret},
         json={
             "employees": [
@@ -195,7 +197,7 @@ async def test_get_users_for_organization_success(
                     "id": "85a86112-a94f-4470-9343-f7d19101b15d",
                     "created_at": 1730390070,
                     "name": "Tim",
-                    "organization_id": org.organization_id,
+                    "organization_id": org.operations_external_id,
                     "auth_user_id": "989d185b-8c95-4104-b152-36148743e52d",
                     "default_ssh_key_id": None,
                     "slack_connected": False,
@@ -210,7 +212,7 @@ async def test_get_users_for_organization_success(
                     "id": "0ae68497-a912-4fc1-a559-6f52a99bf12b",
                     "created_at": 1736339978,
                     "name": "Test User",
-                    "organization_id": org.organization_id,
+                    "organization_id": org.operations_external_id,
                     "auth_user_id": "c391517d-5c71-4195-82cf-47e7e44c06b1",
                     "default_ssh_key_id": None,
                     "slack_connected": False,
@@ -235,7 +237,7 @@ async def test_get_users_for_organization_success(
     )
 
     response = await authenticated_client.get(
-        f"/organizations/{org.id}/users",
+        f"/organizations/{org.id}/employees",
     )
 
     assert response.status_code == 200
@@ -262,53 +264,53 @@ async def test_get_users_for_organization_success(
     ]
 
 
-async def test_get_users_for_missing_organization(
+async def test_get_employees_for_missing_organization(
     authenticated_client: AsyncClient,
 ):
     org_id = "FORG-1234-5678-9012"
     response = await authenticated_client.get(
-        f"/organizations/{org_id}/users",
+        f"/organizations/{org_id}/employees",
     )
 
     assert response.status_code == 404
     assert response.json() == {"detail": f"Organization with ID `{org_id}` wasn't found"}
 
 
-async def test_get_users_for_organization_with_no_users(
+async def test_get_employees_for_organization_with_no_employees(
     organization_factory: ModelFactory[Organization],
     authenticated_client: AsyncClient,
     httpx_mock: HTTPXMock,
 ):
     org = await organization_factory(
-        organization_id=str(uuid.uuid4()),
+        operations_external_id=str(uuid.uuid4()),
     )
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{settings.opt_api_base_url}/organizations/{org.organization_id}/employees?roles=true",
+        url=f"{settings.opt_api_base_url}/organizations/{org.operations_external_id}/employees?roles=true",
         match_headers={"Secret": settings.opt_cluster_secret},
         json={"employees": []},
     )
 
     response = await authenticated_client.get(
-        f"/organizations/{org.id}/users",
+        f"/organizations/{org.id}/employees",
     )
 
     assert response.status_code == 200
     assert response.json() == []
 
 
-async def test_get_users_for_organization_with_no_organization_id(
+async def test_get_employees_for_organization_with_no_organization_id(
     organization_factory: ModelFactory[Organization],
     authenticated_client: AsyncClient,
     httpx_mock: HTTPXMock,
 ):
     org = await organization_factory(
-        organization_id=None,
+        operations_external_id=None,
     )
 
     response = await authenticated_client.get(
-        f"/organizations/{org.id}/users",
+        f"/organizations/{org.id}/employees",
     )
 
     assert response.status_code == 400
@@ -317,43 +319,43 @@ async def test_get_users_for_organization_with_no_organization_id(
     }
 
 
-async def test_get_users_for_organization_with_optscale_error(
+async def test_get_employees_for_organization_with_optscale_error(
     organization_factory: ModelFactory[Organization],
     authenticated_client: AsyncClient,
     httpx_mock: HTTPXMock,
 ):
     org = await organization_factory(
-        organization_id=str(uuid.uuid4()),
+        operations_external_id=str(uuid.uuid4()),
     )
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{settings.opt_api_base_url}/organizations/{org.organization_id}/employees?roles=true",
+        url=f"{settings.opt_api_base_url}/organizations/{org.operations_external_id}/employees?roles=true",
         match_headers={"Secret": settings.opt_cluster_secret},
         status_code=500,
     )
 
     response = await authenticated_client.get(
-        f"/organizations/{org.id}/users",
+        f"/organizations/{org.id}/employees",
     )
 
     assert response.status_code == 502
-    assert f"Error fetching users for organization {org.name}" in response.json()["detail"]
+    assert f"Error fetching employees for organization {org.name}" in response.json()["detail"]
 
 
 # ===============
-# Make user admin
+# Make employee admin
 # ===============
 
 
-async def test_make_user_admin(
+async def test_make_employee_admin(
     organization_factory: ModelFactory[Organization],
     authenticated_client: AsyncClient,
     httpx_mock: HTTPXMock,
 ):
     user_id = str(uuid.uuid4())
     org = await organization_factory(
-        organization_id=str(uuid.uuid4()),
+        operations_external_id=str(uuid.uuid4()),
     )
     auth_user_id = str(uuid.uuid4())
 
@@ -367,7 +369,7 @@ async def test_make_user_admin(
             "id": "2c2e9705-8023-437c-b09d-8cbd49f0a682",
             "created_at": 1729156673,
             "name": "Ciccio",
-            "organization_id": org.organization_id,
+            "organization_id": org.operations_external_id,
             "auth_user_id": auth_user_id,
             "default_ssh_key_id": None,
         },
@@ -385,16 +387,16 @@ async def test_make_user_admin(
             "type_id": 2,
             "role_id": 3,
             "user_id": auth_user_id,
-            "resource_id": org.organization_id,
+            "resource_id": org.operations_external_id,
         },
         match_json={
             "role_id": 3,  # Admin
             "type_id": 2,  # Organization
-            "resource_id": org.organization_id,
+            "resource_id": org.operations_external_id,
         },
     )
     response = await authenticated_client.post(
-        f"/organizations/{org.id}/users/{user_id}/make-admin",
+        f"/organizations/{org.id}/employees/{user_id}/make-admin",
     )
     assert response.status_code == 204
 
@@ -406,7 +408,7 @@ async def test_make_user_admin_not_found(
 ):
     user_id = str(uuid.uuid4())
     org = await organization_factory(
-        organization_id=str(uuid.uuid4()),
+        operations_external_id=str(uuid.uuid4()),
     )
 
     httpx_mock.add_response(
@@ -417,10 +419,10 @@ async def test_make_user_admin_not_found(
     )
 
     response = await authenticated_client.post(
-        f"/organizations/{org.id}/users/{user_id}/make-admin",
+        f"/organizations/{org.id}/employees/{user_id}/make-admin",
     )
     assert response.status_code == 502
-    assert "Error making user admin in FinOps for Cloud: 404" in response.json()["detail"]
+    assert "Error making employee admin in FinOps for Cloud: 404" in response.json()["detail"]
 
 
 async def test_make_user_admin_error_assigning_role(
@@ -430,7 +432,7 @@ async def test_make_user_admin_error_assigning_role(
 ):
     user_id = str(uuid.uuid4())
     org = await organization_factory(
-        organization_id=str(uuid.uuid4()),
+        operations_external_id=str(uuid.uuid4()),
     )
     auth_user_id = str(uuid.uuid4())
 
@@ -444,7 +446,7 @@ async def test_make_user_admin_error_assigning_role(
             "id": "2c2e9705-8023-437c-b09d-8cbd49f0a682",
             "created_at": 1729156673,
             "name": "Ciccio",
-            "organization_id": org.organization_id,
+            "organization_id": org.operations_external_id,
             "auth_user_id": auth_user_id,
             "default_ssh_key_id": None,
         },
@@ -458,11 +460,11 @@ async def test_make_user_admin_error_assigning_role(
         match_json={
             "role_id": 3,  # Admin
             "type_id": 2,  # Organization
-            "resource_id": org.organization_id,
+            "resource_id": org.operations_external_id,
         },
     )
     response = await authenticated_client.post(
-        f"/organizations/{org.id}/users/{user_id}/make-admin",
+        f"/organizations/{org.id}/employees/{user_id}/make-admin",
     )
     assert response.status_code == 502
-    assert "Error making user admin in FinOps for Cloud: 400" in response.json()["detail"]
+    assert "Error making employee admin in FinOps for Cloud: 400" in response.json()["detail"]

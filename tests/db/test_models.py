@@ -7,17 +7,17 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.human_readable_pk import HumanReadablePKMixin
-from app.db.models import Actor, Entitlement, Organization, System
+from app.db.models import Account, Actor, Entitlement, Organization, System
 from app.enums import ActorType, EntitlementStatus
 
 
 async def test_actor_inheritance(db_session: AsyncSession):
     # Create a system which inherits from Actor
+    account = Account(name="test account")
     system = System(
-        name="Test System",
-        external_id="test-system",
-        jwt_secret="secret",
+        name="Test System", external_id="test-system", jwt_secret="secret", owner=account
     )
+    db_session.add(account)
     db_session.add(system)
     await db_session.commit()
     await db_session.refresh(system)
@@ -40,7 +40,8 @@ async def test_actor_inheritance(db_session: AsyncSession):
 async def test_timestamp_mixin(db_session: AsyncSession):
     org = Organization(
         name="Test Org",
-        external_id="test-org",
+        currency="EUR",
+        affiliate_external_id="test-org",
     )
     db_session.add(org)
     await db_session.commit()
@@ -57,7 +58,8 @@ async def test_timestamp_mixin(db_session: AsyncSession):
 async def test_id_mixin(mocker: MockerFixture, db_session: AsyncSession):
     org = Organization(
         name="Test Org",
-        external_id="test-org",
+        currency="EUR",
+        affiliate_external_id="test-org",
     )
     db_session.add(org)
     await db_session.commit()
@@ -70,7 +72,8 @@ async def test_id_mixin(mocker: MockerFixture, db_session: AsyncSession):
     mocker.patch.object(HumanReadablePKMixin, "generate_human_readable_pk", return_value=org.id)
     new_org = Organization(
         name="Test Org",
-        external_id="test-org",
+        currency="EUR",
+        affiliate_external_id="test-org",
     )
     db_session.add(new_org)
     with pytest.raises(
@@ -83,7 +86,8 @@ async def test_id_mixin(mocker: MockerFixture, db_session: AsyncSession):
 async def test_auditable_mixin(db_session: AsyncSession, ffc_extension: System):
     org = Organization(
         name="Test Org",
-        external_id="test-org",
+        currency="EUR",
+        affiliate_external_id="test-org",
         created_by=ffc_extension,
         updated_by=ffc_extension,
     )
@@ -102,11 +106,14 @@ async def test_auditable_mixin(db_session: AsyncSession, ffc_extension: System):
 
 
 async def test_entitlement_status_default(db_session: AsyncSession):
+    account = Account(name="test_account")
     entitlement = Entitlement(
-        sponsor_name="AWS",
-        sponsor_external_id="ACC-123",
-        sponsor_container_id="container-123",
+        name="AWS",
+        affiliate_external_id="ACC-123",
+        datasource_id="container-123",
+        owner=account,
     )
+    db_session.add(account)
     db_session.add(entitlement)
     await db_session.commit()
     await db_session.refresh(entitlement)
@@ -118,7 +125,8 @@ async def test_organization_unique_external_id(db_session: AsyncSession):
     # Create first organization
     org1 = Organization(
         name="Test Org 1",
-        external_id="test-org",
+        currency="EUR",
+        affiliate_external_id="test-org",
     )
     db_session.add(org1)
     await db_session.commit()
@@ -127,7 +135,8 @@ async def test_organization_unique_external_id(db_session: AsyncSession):
     # Try to create another with same external_id
     org2 = Organization(
         name="Test Org 2",
-        external_id="test-org",
+        currency="EUR",
+        affiliate_external_id="test-org",
     )
     db_session.add(org2)
 
@@ -137,11 +146,9 @@ async def test_organization_unique_external_id(db_session: AsyncSession):
 
 async def test_system_encrypted_jwt_secret(db_session: AsyncSession):
     secret = "test-secret"
-    system = System(
-        name="Test System",
-        external_id="test-system",
-        jwt_secret=secret,
-    )
+    account = Account(name="Test account")
+    system = System(name="Test System", external_id="test-system", jwt_secret=secret, owner=account)
+    db_session.add(account)
     db_session.add(system)
     await db_session.commit()
     await db_session.refresh(system)

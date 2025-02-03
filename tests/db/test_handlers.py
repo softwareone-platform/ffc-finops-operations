@@ -1,5 +1,3 @@
-from datetime import UTC, datetime
-
 import pytest
 from pytest_mock import MockerFixture
 from sqlalchemy import select
@@ -7,6 +5,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.handlers import (
+    AccountHandler,
     ConstraintViolationError,
     DatabaseError,
     EntitlementHandler,
@@ -14,7 +13,7 @@ from app.db.handlers import (
     OrganizationHandler,
     SystemHandler,
 )
-from app.db.models import Entitlement, Organization, System
+from app.db.models import Account, Entitlement, Organization, System
 from app.enums import ActorType, EntitlementStatus
 
 # =========================================================
@@ -26,12 +25,16 @@ async def test_create_entitlement(
     db_session: AsyncSession,
     gcp_extension: System,
 ):
+    account = Account(name="test_account")
+    account_handler = AccountHandler(db_session)
+    await account_handler.create(account)
     entitlement = Entitlement(
-        sponsor_name="AWS",
-        sponsor_external_id="ACC-123",
-        sponsor_container_id="container-123",
+        name="AWS",
+        affiliate_external_id="ACC-123",
+        datasource_id="container-123",
         created_by=gcp_extension,
         updated_by=gcp_extension,
+        owner=account,
     )
 
     entitlements_handler = EntitlementHandler(db_session)
@@ -42,25 +45,30 @@ async def test_create_entitlement(
     result = await db_session.execute(select(Entitlement).where(Entitlement.id == created.id))
     db_entitlement = result.scalar_one()
 
-    assert db_entitlement.sponsor_name == "AWS"
+    assert db_entitlement.name == "AWS"
     assert db_entitlement.status == EntitlementStatus.NEW
     assert db_entitlement.created_at is not None
     assert db_entitlement.updated_at is not None
     assert db_entitlement.created_by_id == gcp_extension.id
     assert db_entitlement.updated_by_id == gcp_extension.id
+    assert db_entitlement.owner == account
 
 
 async def test_get_entitlement(
     db_session: AsyncSession,
     gcp_extension: System,
 ):
+    account = Account(name="test_account")
+    account_handler = AccountHandler(db_session)
+    await account_handler.create(account)
     # Create directly in DB
     entitlement = Entitlement(
-        sponsor_name="AWS",
-        sponsor_external_id="ACC-123",
-        sponsor_container_id="container-123",
+        name="AWS",
+        affiliate_external_id="ACC-123",
+        datasource_id="container-123",
         created_by=gcp_extension,
         updated_by=gcp_extension,
+        owner=account,
     )
     db_session.add(entitlement)
     await db_session.commit()
@@ -71,9 +79,10 @@ async def test_get_entitlement(
     fetched = await entitlements_handler.get(entitlement.id)
 
     assert fetched.id == entitlement.id
-    assert fetched.sponsor_name == "AWS"
+    assert fetched.name == "AWS"
     assert fetched.created_by_id == gcp_extension.id
     assert fetched.updated_by_id == gcp_extension.id
+    assert fetched.owner == account
 
 
 async def test_get_entitlement_not_found(db_session: AsyncSession):
@@ -87,13 +96,17 @@ async def test_update_entitlement(
     db_session: AsyncSession,
     gcp_extension: System,
 ):
+    account = Account(name="test_account")
+    account_handler = AccountHandler(db_session)
+    await account_handler.create(account)
     # Create directly in DB
     entitlement = Entitlement(
-        sponsor_name="AWS",
-        sponsor_external_id="ACC-123",
-        sponsor_container_id="container-123",
+        name="AWS",
+        affiliate_external_id="ACC-123",
+        datasource_id="container-123",
         created_by=gcp_extension,
         updated_by=gcp_extension,
+        owner=account,
     )
     db_session.add(entitlement)
     await db_session.commit()
@@ -103,9 +116,8 @@ async def test_update_entitlement(
     updated = await entitlements_handler.update(
         entitlement.id,
         {
-            "sponsor_name": "Updated AWS",
+            "name": "Updated AWS",
             "status": EntitlementStatus.ACTIVE.value,
-            "activated_at": datetime.now(UTC),
             "updated_by_id": gcp_extension.id,
         },
     )
@@ -114,32 +126,36 @@ async def test_update_entitlement(
     result = await db_session.execute(select(Entitlement).where(Entitlement.id == updated.id))
     db_entitlement = result.scalar_one()
 
-    assert db_entitlement.sponsor_name == "Updated AWS"
+    assert db_entitlement.name == "Updated AWS"
     assert db_entitlement.status == EntitlementStatus.ACTIVE.value
-    assert db_entitlement.activated_at is not None
     assert db_entitlement.created_by_id == gcp_extension.id
     assert db_entitlement.updated_by_id == gcp_extension.id
+    assert db_entitlement.owner == account
 
 
 async def test_update_entitlement_not_found(db_session: AsyncSession):
     entitlements_handler = EntitlementHandler(db_session)
 
     with pytest.raises(NotFoundError):
-        await entitlements_handler.update("FENT-1234-4567-8901", {"sponsor_name": "Updated AWS"})
+        await entitlements_handler.update("FENT-1234-4567-8901", {"name": "Updated AWS"})
 
 
 async def test_fetch_page_entitlements(
     db_session: AsyncSession,
     gcp_extension: System,
 ):
+    account = Account(name="test_account")
+    account_handler = AccountHandler(db_session)
+    await account_handler.create(account)
     # Create 5 entitlements directly in DB
     for i in range(5):
         entitlement = Entitlement(
-            sponsor_name=f"AWS-{i}",
-            sponsor_external_id=f"ACC-{i}",
-            sponsor_container_id=f"container-{i}",
+            name=f"AWS-{i}",
+            affiliate_external_id=f"ACC-{i}",
+            datasource_id=f"container-{i}",
             created_by=gcp_extension,
             updated_by=gcp_extension,
+            owner=account,
         )
         db_session.add(entitlement)
     await db_session.commit()
@@ -162,14 +178,18 @@ async def test_count_entitlements(
     db_session: AsyncSession,
     gcp_extension: System,
 ):
+    account = Account(name="test_account")
+    account_handler = AccountHandler(db_session)
+    await account_handler.create(account)
     # Create 5 entitlements directly in DB
     for i in range(5):
         entitlement = Entitlement(
-            sponsor_name=f"AWS-{i}",
-            sponsor_external_id=f"ACC-{i}",
-            sponsor_container_id=f"container-{i}",
+            name=f"AWS-{i}",
+            affiliate_external_id=f"ACC-{i}",
+            datasource_id=f"container-{i}",
             created_by=gcp_extension,
             updated_by=gcp_extension,
+            owner=account,
         )
         db_session.add(entitlement)
     await db_session.commit()
@@ -191,7 +211,8 @@ async def test_create_organization(
 ):
     org = Organization(
         name="Test Org",
-        external_id="ORG-123",
+        currency="EUR",
+        affiliate_external_id="ORG-123",
         created_by=ffc_extension,
         updated_by=ffc_extension,
     )
@@ -204,7 +225,7 @@ async def test_create_organization(
     db_org = result.scalar_one()
 
     assert db_org.name == "Test Org"
-    assert db_org.external_id == "ORG-123"
+    assert db_org.affiliate_external_id == "ORG-123"
     assert db_org.created_by_id == ffc_extension.id
     assert db_org.updated_by_id == ffc_extension.id
 
@@ -216,7 +237,8 @@ async def test_create_organization_duplicate_external_id(
     # Create first organization directly in DB
     org1 = Organization(
         name="Test Org 1",
-        external_id="ORG-123",
+        currency="EUR",
+        affiliate_external_id="ORG-123",
         created_by=ffc_extension,
         updated_by=ffc_extension,
     )
@@ -227,7 +249,8 @@ async def test_create_organization_duplicate_external_id(
     # Try to create another with same external_id using handler
     org2 = Organization(
         name="Test Org 2",
-        external_id="ORG-123",
+        currency="EUR",
+        affiliate_external_id="ORG-123",
         created_by=ffc_extension,
         updated_by=ffc_extension,
     )
@@ -244,7 +267,8 @@ async def test_fetch_page_organizations(
     for i in range(5):
         org = Organization(
             name=f"Test Org {i}",
-            external_id=f"ORG-{i}",
+            currency="EUR",
+            affiliate_external_id=f"ORG-{i}",
             created_by=ffc_extension,
             updated_by=ffc_extension,
         )
@@ -278,7 +302,8 @@ async def test_count_organizations(
     for i in range(3):
         org = Organization(
             name=f"Test Org {i}",
-            external_id=f"ORG-{i}",
+            currency="EUR",
+            affiliate_external_id=f"ORG-{i}",
             created_by=ffc_extension,
             updated_by=ffc_extension,
         )
@@ -297,10 +322,11 @@ async def test_organization_get_or_create(
 ):
     organizations_handler = OrganizationHandler(db_session)
     db_org, created = await organizations_handler.get_or_create(
-        external_id="ORG-1234",
+        affiliate_external_id="ORG-1234",
         defaults={
             "name": "Test Org",
-            "external_id": "ORG-1234",
+            "currency": "EUR",
+            "affiliate_external_id": "ORG-1234",
             "created_by": ffc_extension,
             "updated_by": ffc_extension,
         },
@@ -309,7 +335,7 @@ async def test_organization_get_or_create(
     assert created is True
     assert db_org.id is not None
     assert db_org.name == "Test Org"
-    assert db_org.external_id == "ORG-1234"
+    assert db_org.affiliate_external_id == "ORG-1234"
     assert db_org.created_by == ffc_extension
     assert db_org.updated_by == ffc_extension
 
@@ -320,7 +346,8 @@ async def test_organization_get_or_create_exists(
 ):
     existing_org = Organization(
         name="Test Org",
-        external_id="ORG-1234",
+        currency="EUR",
+        affiliate_external_id="ORG-1234",
         created_by=ffc_extension,
         updated_by=ffc_extension,
     )
@@ -330,10 +357,10 @@ async def test_organization_get_or_create_exists(
 
     organizations_handler = OrganizationHandler(db_session)
     db_org, created = await organizations_handler.get_or_create(
-        external_id="ORG-1234",
+        affiliate_external_id="ORG-1234",
         defaults={
             "name": "Test Org",
-            "external_id": "ORG-1234",
+            "affiliate_external_id": "ORG-1234",
             "created_by": ffc_extension,
             "updated_by": ffc_extension,
         },
@@ -351,13 +378,16 @@ async def test_organization_get_or_create_exists(
 async def test_create_system(
     db_session: AsyncSession,
 ):
+    account = Account(name="test_account")
     system = System(
         name="Test System",
         external_id="test-system",
         jwt_secret="secret",
+        owner=account,
     )
-
+    account_handler = AccountHandler(db_session)
     system_handler = SystemHandler(db_session)
+    await account_handler.create(account)
     created = await system_handler.create(system)
 
     # Verify in DB directly
@@ -368,16 +398,21 @@ async def test_create_system(
     assert db_system.external_id == "test-system"
     assert db_system.jwt_secret == "secret"
     assert db_system.type == ActorType.SYSTEM
+    assert db_system.owner == account
 
 
 async def test_get_system(
     db_session: AsyncSession,
 ):
+    account = Account(name="test_account")
+    account_handler = AccountHandler(db_session)
+    await account_handler.create(account)
     # Create directly in DB
     system = System(
         name="Test System",
         external_id="test-system",
         jwt_secret="secret",
+        owner=account,
     )
     db_session.add(system)
     await db_session.commit()
@@ -390,16 +425,21 @@ async def test_get_system(
     assert fetched.id == system.id
     assert fetched.name == "Test System"
     assert fetched.type == ActorType.SYSTEM
+    assert fetched.owner == account
 
 
 async def test_create_system_duplicate_external_id(
     db_session: AsyncSession,
 ):
+    account = Account(name="test_account")
+    account_handler = AccountHandler(db_session)
+    await account_handler.create(account)
     # Create first system directly in DB
     system1 = System(
         name="Test System 1",
         external_id="test-system",
         jwt_secret="secret1",
+        owner=account,
     )
     db_session.add(system1)
     await db_session.commit()
@@ -410,6 +450,7 @@ async def test_create_system_duplicate_external_id(
         name="Test System 2",
         external_id="test-system",
         jwt_secret="secret2",
+        owner=account,
     )
     system_handler = SystemHandler(db_session)
 
@@ -420,11 +461,15 @@ async def test_create_system_duplicate_external_id(
 async def test_system_encrypted_jwt_secret(
     db_session: AsyncSession,
 ):
+    account = Account(name="test_account")
+    account_handler = AccountHandler(db_session)
+    await account_handler.create(account)
     secret = "test-secret"
     system = System(
         name="Test System",
         external_id="test-system",
         jwt_secret=secret,
+        owner=account,
     )
     system_handler = SystemHandler(db_session)
 
@@ -440,12 +485,16 @@ async def test_system_encrypted_jwt_secret(
 async def test_fetch_page_systems(
     db_session: AsyncSession,
 ):
+    account = Account(name="test_account")
+    account_handler = AccountHandler(db_session)
+    await account_handler.create(account)
     # Create 4 systems directly in DB
     for i in range(4):
         system = System(
             name=f"Test System {i}",
             external_id=f"system-{i}",
             jwt_secret=f"secret-{i}",
+            owner=account,
         )
         db_session.add(system)
     await db_session.commit()
@@ -468,12 +517,16 @@ async def test_fetch_page_systems(
 
 
 async def test_count_systems(db_session: AsyncSession):
+    account = Account(name="test_account")
+    account_handler = AccountHandler(db_session)
+    await account_handler.create(account)
     # Create 4 systems directly in DB
     for i in range(4):
         system = System(
             name=f"Test System {i}",
             external_id=f"system-{i}",
             jwt_secret=f"secret-{i}",
+            owner=account,
         )
         db_session.add(system)
     await db_session.commit()
@@ -485,12 +538,16 @@ async def test_count_systems(db_session: AsyncSession):
 
 
 async def test_update_system_jwt_secret(db_session: AsyncSession):
+    account = Account(name="test_account")
+    account_handler = AccountHandler(db_session)
+    await account_handler.create(account)
     system = System(
         name="Test System",
         external_id="test-system",
         jwt_secret="secret",
         created_by=None,
         updated_by=None,
+        owner=account,
     )
     db_session.add(system)
     await db_session.commit()
@@ -505,11 +562,15 @@ async def test_update_system_jwt_secret(db_session: AsyncSession):
 async def test_get_system_db_error(
     db_session: AsyncSession,
 ):
+    account = Account(name="test_account")
+    account_handler = AccountHandler(db_session)
+    await account_handler.create(account)
     # Create directly in DB
     system = System(
         name="Test System",
         external_id="test-system",
         jwt_secret="secret",
+        owner=account,
     )
     db_session.add(system)
     await db_session.commit()
@@ -525,11 +586,15 @@ async def test_get_system_db_api_error(
     mocker: MockerFixture,
     db_session: AsyncSession,
 ):
+    account = Account(name="test_account")
+    account_handler = AccountHandler(db_session)
+    await account_handler.create(account)
     # Create directly in DB
     system = System(
         name="Test System",
         external_id="test-system",
         jwt_secret="secret",
+        owner=account,
     )
     db_session.add(system)
     await db_session.commit()
