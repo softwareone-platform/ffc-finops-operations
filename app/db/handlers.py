@@ -3,17 +3,32 @@ from contextlib import suppress
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import ColumnExpressionArgument, func, select
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from sqlalchemy.orm.interfaces import ORMOption
 
-from app.auth import current_system
+from app.auth.context import auth_context
 from app.db.db import AsyncTxSession
-from app.db.models import Account, AuditableMixin, Entitlement, Organization, System
+from app.db.models import (
+    Account,
+    AccountUser,
+    AuditableMixin,
+    Entitlement,
+    Organization,
+    System,
+    User,
+)
 from app.db.models import Base as BaseModel
-from app.enums import EntitlementStatus
+from app.enums import (
+    AccountStatus,
+    AccountUserStatus,
+    EntitlementStatus,
+    OrganizationStatus,
+    SystemStatus,
+    UserStatus,
+)
 
 
 class DatabaseError(Exception):
@@ -33,6 +48,7 @@ class ModelHandler[M: BaseModel]:
         self.session = session
         self.commit = not isinstance(self.session, AsyncTxSession)
         self.default_options: list[ORMOption] = []
+        self.default_extra_conditions: list[ColumnExpressionArgument] | None = None
 
     @classmethod
     def _get_generic_cls_args(cls):
@@ -50,11 +66,11 @@ class ModelHandler[M: BaseModel]:
         if isinstance(obj, AuditableMixin):  # pragma: no branch
             if obj.created_by is None:
                 with suppress(LookupError):
-                    obj.created_by = current_system.get()
+                    obj.created_by = auth_context.get().get_actor()
 
             if obj.updated_by is None:
                 with suppress(LookupError):
-                    obj.updated_by = current_system.get()
+                    obj.updated_by = auth_context.get().get_actor()
 
         try:
             self.session.add(obj)
@@ -66,12 +82,23 @@ class ModelHandler[M: BaseModel]:
 
         return obj
 
-    async def get(self, id: str) -> M:
+    async def get(
+        self, id: str, extra_conditions: list[ColumnExpressionArgument] | None = None
+    ) -> M:
+        extra_conditions = extra_conditions or self.default_extra_conditions
         try:
-            result = await self.session.get(self.model_cls, id, options=self.default_options)
-            if result is None:
+            query = select(self.model_cls).where(
+                self.model_cls.id == id,
+            )
+            if extra_conditions:
+                query = query.where(*extra_conditions)
+            if self.default_options:
+                query = query.options(*self.default_options)
+            result = await self.session.execute(query)
+            instance = result.scalar_one_or_none()
+            if instance is None:
                 raise NotFoundError(f"{self.model_cls.__name__} with ID `{str(id)}` wasn't found")
-            return result
+            return instance
         except DBAPIError as e:
             raise DatabaseError(
                 f"Failed to get {self.model_cls.__name__} with ID `{str(id)}`: {e}"
@@ -99,30 +126,40 @@ class ModelHandler[M: BaseModel]:
         return obj, True
 
     async def update(self, id: str, data: dict[str, Any]) -> M:
-        # First fetch the object to ensure polymorphic loading
         obj = await self.get(id)
-        # Update attributes
+
         for key, value in data.items():
             setattr(obj, key, value)
 
         if isinstance(obj, AuditableMixin) and "updated_by" not in data:  # pragma: no branch
             with suppress(LookupError):
-                obj.updated_by = current_system.get()
+                obj.updated_by = auth_context.get().get_actor()
 
         await self._save_changes(obj)
         return obj
 
-    async def fetch_page(self, limit: int = 50, offset: int = 0) -> Sequence[M]:
+    async def fetch_page(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        extra_conditions: list[ColumnExpressionArgument] | None = None,
+    ) -> Sequence[M]:
+        extra_conditions = extra_conditions or self.default_extra_conditions
         query = select(self.model_cls).offset(offset).limit(limit).order_by("id")
-
+        if extra_conditions:
+            query = query.where(*extra_conditions)
         if self.default_options:
             query = query.options(*self.default_options)
 
         results = await self.session.execute(query)
         return results.scalars().all()
 
-    async def count(self) -> int:
-        result = await self.session.execute(select(func.count(self.model_cls.id)))
+    async def count(self, extra_conditions: list[ColumnExpressionArgument] | None = None) -> int:
+        extra_conditions = extra_conditions or self.default_extra_conditions
+        query = select(func.count(self.model_cls.id))
+        if extra_conditions:
+            query = query.where(*extra_conditions)
+        result = await self.session.execute(query)
         return result.scalars().one()
 
     async def _save_changes(self, obj: M):
@@ -137,6 +174,7 @@ class EntitlementHandler(ModelHandler[Entitlement]):
     def __init__(self, session):
         super().__init__(session)
         self.default_options = [joinedload(Entitlement.owner)]
+        self.default_extra_conditions = [Entitlement.status != EntitlementStatus.DELETED]
 
     async def terminate(self, entitlement: Entitlement) -> Entitlement:
         return await self.update(
@@ -144,18 +182,55 @@ class EntitlementHandler(ModelHandler[Entitlement]):
             {
                 "status": EntitlementStatus.TERMINATED,
                 "terminated_at": datetime.now(UTC),
-                "terminated_by": current_system.get(),
+                "terminated_by": auth_context.get().get_actor(),
             },
         )
 
 
 class OrganizationHandler(ModelHandler[Organization]):
-    pass
+    def __init__(self, session):
+        super().__init__(session)
+        self.default_extra_conditions = [Organization.status != OrganizationStatus.DELETED]
 
 
 class SystemHandler(ModelHandler[System]):
-    pass
+    def __init__(self, session):
+        super().__init__(session)
+        self.default_options = [joinedload(System.owner)]
+        self.default_extra_conditions = [System.status != SystemStatus.DELETED]
 
 
 class AccountHandler(ModelHandler[Account]):
-    pass
+    def __init__(self, session):
+        super().__init__(session)
+        self.default_extra_conditions = [Account.status != AccountStatus.DELETED]
+
+
+class UserHandler(ModelHandler[User]):
+    def __init__(self, session):
+        super().__init__(session)
+        self.default_extra_conditions = [User.status != UserStatus.DELETED]
+
+
+class AccountUserHandler(ModelHandler[AccountUser]):
+    def __init__(self, session):
+        super().__init__(session)
+        self.default_extra_conditions = [AccountUser.status != AccountUserStatus.DELETED]
+
+    async def get_account_user(
+        self,
+        account_id: str,
+        user_id: str,
+        extra_conditions: list[ColumnExpressionArgument] | None = None,
+    ) -> AccountUser | None:
+        extra_conditions = extra_conditions or self.default_extra_conditions
+        query = select(self.model_cls).where(
+            self.model_cls.account_id == account_id,
+            self.model_cls.user_id == user_id,
+        )
+        if extra_conditions:
+            query = query.where(*extra_conditions)
+        if self.default_options:
+            query = query.options(*self.default_options)
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()

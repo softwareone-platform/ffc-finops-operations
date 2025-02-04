@@ -177,7 +177,7 @@ class User(Actor, HumanReadablePKMixin, AuditableMixin):
     }
 
 
-class AccountUser(Base, AuditableMixin):
+class AccountUser(Base, AuditableMixin, HumanReadablePKMixin):
     __tablename__ = "accounts_users"
 
     PK_PREFIX = "FAUR"

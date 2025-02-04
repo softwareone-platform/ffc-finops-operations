@@ -6,7 +6,7 @@ from fastapi import Depends, FastAPI
 
 from app import settings
 from app.api_clients import BaseAPIClient
-from app.auth import get_current_system
+from app.auth.auth import get_authentication_context
 from app.db import verify_db_connection
 from app.routers import accounts, auth, employees, entitlements, organizations, systems, users
 
@@ -58,7 +58,7 @@ app = FastAPI(
     root_path="/ops/v1",
     debug=settings.debug,
     lifespan=lifespan,
-    dependencies=[Depends(get_current_system)],
+    dependencies=[Depends(get_authentication_context)],
 )
 
 

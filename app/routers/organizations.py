@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi_pagination.limit_offset import LimitOffsetPage
 
 from app.api_clients import APIModifierClient, OptscaleAuthClient, OptscaleClient
-from app.auth import CurrentSystem
+from app.auth.context import auth_context
 from app.db.handlers import NotFoundError
 from app.db.models import Organization
 from app.dependencies import OrganizationId, OrganizationRepository
@@ -27,15 +27,14 @@ async def get_organizations(organization_repo: OrganizationRepository):
 async def create_organization(
     data: OrganizationCreate,
     organization_repo: OrganizationRepository,
-    current_system: CurrentSystem,
     services: svcs.fastapi.DepContainer,
 ):
     api_modifier_client = await services.aget(APIModifierClient)
 
     db_organization: Organization | None = None
     defaults = data.model_dump(exclude_unset=True, exclude={"user_id"})
-    defaults["created_by"] = current_system
-    defaults["updated_by"] = current_system
+    defaults["created_by"] = auth_context.get().get_actor()
+    defaults["updated_by"] = auth_context.get().get_actor()
     db_organization, created = await organization_repo.get_or_create(
         defaults=defaults,
         affiliate_external_id=data.affiliate_external_id,
