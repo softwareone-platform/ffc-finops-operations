@@ -8,7 +8,7 @@ from app.db import get_tx_db_session
 from app.db.handlers import AccountHandler, EntitlementHandler, SystemHandler
 from app.db.models import Account, Entitlement, System
 from app.enums import DatasourceType
-from tests.utils import SQLAlchemyCapturer
+from tests.pytest_plugins.capsql import SQLAlchemyCapturer
 
 
 def random_account() -> Account:
@@ -35,12 +35,6 @@ def random_system(account_id) -> System:
     )
 
 
-def get_sql_query_types(statements: list[str]) -> list[str]:
-    return [
-        first_word for statement in statements if (first_word := statement.split()[0]).isupper()
-    ]
-
-
 # ==================
 # Using the handlers
 # ==================
@@ -52,19 +46,18 @@ async def test_handler_simple_insert(db_session: AsyncSession, capsql: SQLAlchem
     account = random_account()
     assert account.id is None
 
-    with capsql:
-        await account_handler.create(account)
+    await account_handler.create(account)
 
     assert account.id is not None
 
-    assert get_sql_query_types(capsql.statements) == [
+    assert capsql.assert_query_types(
         "BEGIN",
         "SELECT",  # check PK
         "INSERT",
         "COMMIT",
         "BEGIN",
         "SELECT",
-    ]
+    )
 
 
 async def test_handler_insert_three_models(db_session: AsyncSession, capsql: SQLAlchemyCapturer):
@@ -73,13 +66,11 @@ async def test_handler_insert_three_models(db_session: AsyncSession, capsql: SQL
     systems_handler = SystemHandler(db_session)
     account = random_account()
 
-    with capsql:
-        account = await account_handler.create(account)
-        await entitlements_handler.create(random_entitlement(account.id))
-        await systems_handler.create(random_system(account.id))
+    account = await account_handler.create(account)
+    await entitlements_handler.create(random_entitlement(account.id))
+    await systems_handler.create(random_system(account.id))
 
-    statements = get_sql_query_types(capsql.statements)
-    assert statements == [
+    assert capsql.assert_query_types(
         "BEGIN",
         "SELECT",  # check account PK
         "INSERT",  # insert account
@@ -97,7 +88,7 @@ async def test_handler_insert_three_models(db_session: AsyncSession, capsql: SQL
         "COMMIT",
         "BEGIN",
         "SELECT",  # refresh system
-    ]
+    )
 
 
 async def test_handler_insert_two_models_with_session_begin(
@@ -107,6 +98,7 @@ async def test_handler_insert_two_models_with_session_begin(
     account = random_account()
     account = await account_handler.create(account)
     db_session.expunge_all()
+
     with capsql:
         async with get_tx_db_session() as tx_session:
             entitlements_handler = EntitlementHandler(tx_session)
@@ -114,17 +106,17 @@ async def test_handler_insert_two_models_with_session_begin(
             await entitlements_handler.create(random_entitlement(account.id))
             await systems_handler.create(random_system(account.id))
 
-    assert get_sql_query_types(capsql.statements) == [
-        "BEGIN",
-        "SELECT",  # check PK
-        "INSERT",
-        "SELECT",  # check PK
-        "SELECT",  # check PK
-        "INSERT",  # insert actor
-        "INSERT",  # insert system
-        "SELECT",
-        "COMMIT",
-    ]
+        assert capsql.assert_query_types(
+            "BEGIN",
+            "SELECT",  # check PK
+            "INSERT",
+            "SELECT",  # check PK
+            "SELECT",  # check PK
+            "INSERT",  # insert actor
+            "INSERT",  # insert system
+            "SELECT",
+            "COMMIT",
+        )
 
 
 async def test_handler_insert_two_models_with_session_begin_rollback(
@@ -145,17 +137,17 @@ async def test_handler_insert_two_models_with_session_begin_rollback(
         except Exception:
             pass
 
-    assert get_sql_query_types(capsql.statements) == [
-        "BEGIN",
-        "SELECT",  # check PK
-        "INSERT",
-        "SELECT",  # check PK
-        "SELECT",  # check PK
-        "INSERT",  # insert actor
-        "INSERT",  # insert system
-        "SELECT",
-        "ROLLBACK",
-    ]
+        assert capsql.assert_query_types(
+            "BEGIN",
+            "SELECT",  # check PK
+            "INSERT",
+            "SELECT",  # check PK
+            "SELECT",  # check PK
+            "INSERT",  # insert actor
+            "INSERT",  # insert system
+            "SELECT",
+            "ROLLBACK",
+        )
 
 
 async def test_handler_insert_two_models_with_session_begin_multiple_transactions(
@@ -166,7 +158,6 @@ async def test_handler_insert_two_models_with_session_begin_multiple_transaction
     account = random_account()
     account = await account_handler.create(account)
     db_session.expunge_all()
-    statements = []
     with capsql:
         async with get_tx_db_session() as tx_session:
             entitlements_handler = EntitlementHandler(tx_session)
@@ -174,34 +165,29 @@ async def test_handler_insert_two_models_with_session_begin_multiple_transaction
             await entitlements_handler.create(random_entitlement(account.id))
             await systems_handler.create(random_system(account.id))
 
-    statements.extend(capsql.statements)
-
-    with capsql:
         async with get_tx_db_session() as tx_session:
             entitlements_handler = EntitlementHandler(tx_session)
             systems_handler = SystemHandler(tx_session)
             await entitlements_handler.create(random_entitlement(account.id))
             await systems_handler.create(random_system(account.id))
 
-    statements.extend(capsql.statements)
-
-    assert get_sql_query_types(statements) == [
-        "BEGIN",
-        "SELECT",  # check PK
-        "INSERT",
-        "SELECT",  # check PK
-        "SELECT",  # check PK
-        "INSERT",  # insert actor
-        "INSERT",  # insert system
-        "SELECT",
-        "COMMIT",
-        "BEGIN",
-        "SELECT",  # check PK
-        "INSERT",
-        "SELECT",  # check PK
-        "SELECT",  # check PK
-        "INSERT",  # insert actor
-        "INSERT",  # insert system
-        "SELECT",
-        "COMMIT",
-    ]
+        capsql.assert_query_types(
+            "BEGIN",
+            "SELECT",  # check PK
+            "INSERT",
+            "SELECT",  # check PK
+            "SELECT",  # check PK
+            "INSERT",  # insert actor
+            "INSERT",  # insert system
+            "SELECT",
+            "COMMIT",
+            "BEGIN",
+            "SELECT",  # check PK
+            "INSERT",
+            "SELECT",  # check PK
+            "SELECT",  # check PK
+            "INSERT",  # insert actor
+            "INSERT",  # insert system
+            "SELECT",
+            "COMMIT",
+        )
