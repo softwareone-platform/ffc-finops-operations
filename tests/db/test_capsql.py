@@ -129,6 +129,6 @@ async def test_insert_with_relationship(db_session: AsyncSession, capsql: SQLAlc
 
     capsql.assert_captured_queries(
         "INSERT INTO orders (recipient) VALUES (:recipient)",
-        "INSERT INTO order_items (item_name, price, order_id) VALUES (:item_name_m0, :price_m0, :order_id_m0), (:item_name_m1, :price_m1, :order_id_m1)",
+        "INSERT INTO order_items (item_name, price, order_id) VALUES (:item_name_m0, :price_m0, :order_id_m0), (:item_name_m1, :price_m1, :order_id_m1)",  # noqa: E501
         include_transaction_queries=False,
     )
