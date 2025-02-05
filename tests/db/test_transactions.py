@@ -50,7 +50,7 @@ async def test_handler_simple_insert(db_session: AsyncSession, capsql: SQLAlchem
 
     assert account.id is not None
 
-    assert capsql.assert_query_types(
+    capsql.assert_query_types(
         "BEGIN",
         "SELECT",  # check PK
         "INSERT",
@@ -70,7 +70,7 @@ async def test_handler_insert_three_models(db_session: AsyncSession, capsql: SQL
     await entitlements_handler.create(random_entitlement(account.id))
     await systems_handler.create(random_system(account.id))
 
-    assert capsql.assert_query_types(
+    capsql.assert_query_types(
         "BEGIN",
         "SELECT",  # check account PK
         "INSERT",  # insert account
@@ -106,7 +106,7 @@ async def test_handler_insert_two_models_with_session_begin(
             await entitlements_handler.create(random_entitlement(account.id))
             await systems_handler.create(random_system(account.id))
 
-        assert capsql.assert_query_types(
+        capsql.assert_query_types(
             "BEGIN",
             "SELECT",  # check PK
             "INSERT",
@@ -137,7 +137,7 @@ async def test_handler_insert_two_models_with_session_begin_rollback(
         except Exception:
             pass
 
-        assert capsql.assert_query_types(
+        capsql.assert_query_types(
             "BEGIN",
             "SELECT",  # check PK
             "INSERT",
