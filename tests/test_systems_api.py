@@ -1,11 +1,140 @@
 from collections.abc import Callable
 from datetime import datetime
 
+import pytest
 from httpx import AsyncClient
 
 from app.db.models import Account, System
 from app.enums import SystemStatus
 from tests.conftest import ModelFactory
+
+# ===============
+# Get all systems
+# ===============
+
+
+async def test_get_all_systems_single_active_record(
+    api_client: AsyncClient,
+    gcp_extension: System,
+    gcp_jwt_token: str,
+):
+    response = await api_client.get(
+        "/systems", headers={"Authorization": f"Bearer {gcp_jwt_token}"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["total"] == 1
+    assert response.json()["items"][0]["id"] == gcp_extension.id
+
+
+async def test_get_all_systems_multiple_systems_single_account(
+    api_client: AsyncClient,
+    account_factory: ModelFactory[Account],
+    system_factory: ModelFactory[System],
+    system_jwt_token_factory: Callable[[System], str],
+):
+    account = await account_factory()
+    expected_systems = [
+        await system_factory(owner=account),
+        await system_factory(owner=account),
+        await system_factory(owner=account, status=SystemStatus.DISABLED),
+        await system_factory(owner=account, status=SystemStatus.DISABLED),
+        await system_factory(owner=account),
+    ]
+
+    await system_factory(owner=account, status=SystemStatus.DELETED)
+
+    response = await api_client.get(
+        "/systems",
+        headers={"Authorization": f"Bearer {system_jwt_token_factory(expected_systems[0])}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["total"] == 5
+
+    ids = {system["id"] for system in response.json()["items"]}
+    assert ids == {system.id for system in expected_systems}
+
+
+async def test_get_all_systems_multiple_systems_in_different_accounts(
+    api_client: AsyncClient,
+    account_factory: ModelFactory[Account],
+    system_factory: ModelFactory[System],
+    system_jwt_token_factory: Callable[[System], str],
+):
+    first_account = await account_factory()
+    second_account = await account_factory()
+
+    expected_systems = [
+        await system_factory(owner=first_account),
+        await system_factory(owner=first_account),
+        await system_factory(owner=first_account, status=SystemStatus.DISABLED),
+        await system_factory(owner=first_account, status=SystemStatus.DISABLED),
+        await system_factory(owner=first_account),
+    ]
+
+    await system_factory(owner=first_account, status=SystemStatus.DELETED)
+
+    await system_factory(owner=second_account)
+    await system_factory(owner=second_account, status=SystemStatus.DISABLED)
+    await system_factory(owner=second_account, status=SystemStatus.DELETED)
+
+    response = await api_client.get(
+        "/systems",
+        headers={"Authorization": f"Bearer {system_jwt_token_factory(expected_systems[0])}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["total"] == 5
+
+    ids = {system["id"] for system in response.json()["items"]}
+    assert ids == {system.id for system in expected_systems}
+
+
+@pytest.mark.parametrize(
+    ("create_systems_count", "limit", "offset", "expected_total", "page_count"),
+    [
+        (100, None, None, 100, 50),
+        (100, 10, None, 100, 10),
+        (100, None, 95, 100, 5),
+        (100, 10, 95, 100, 5),
+        (2, 5, 1, 2, 1),
+    ],
+)
+async def test_get_all_systems_pagination(
+    create_systems_count: int,
+    limit: int | None,
+    offset: int | None,
+    expected_total: int,
+    page_count: int,
+    api_client: AsyncClient,
+    account_factory: ModelFactory[Account],
+    system_factory: ModelFactory[System],
+    system_jwt_token_factory: Callable[[System], str],
+):
+    account = await account_factory()
+
+    for _ in range(create_systems_count):
+        system = await system_factory(owner=account)
+
+    params = {}
+
+    if limit is not None:
+        params["limit"] = limit
+
+    if offset is not None:
+        params["offset"] = offset
+
+    response = await api_client.get(
+        "/systems",
+        params=params,
+        headers={"Authorization": f"Bearer {system_jwt_token_factory(system)}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["total"] == expected_total
+    assert len(response.json()["items"]) == page_count
+
 
 # ================
 # Get System by ID

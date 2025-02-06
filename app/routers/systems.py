@@ -7,8 +7,9 @@ from sqlalchemy import ColumnExpressionArgument
 from app.auth.context import auth_context
 from app.db.handlers import NotFoundError
 from app.db.models import System
-from app.dependencies import SystemId, SystemRepository
+from app.dependencies import CurrentAuthContext, SystemId, SystemRepository
 from app.enums import AccountType
+from app.pagination import paginate
 from app.schemas import SystemCreate, SystemRead, SystemUpdate, from_orm
 
 router = APIRouter()
@@ -32,8 +33,14 @@ async def fetch_system_or_404(id: SystemId, system_repo: SystemRepository) -> Sy
 
 
 @router.get("", response_model=LimitOffsetPage[SystemRead])
-async def get_systems():
-    pass
+async def get_systems(system_repo: SystemRepository, auth_ctx: CurrentAuthContext):
+    return await paginate(
+        system_repo,
+        SystemRead,
+        extra_conditions=[
+            System.owner_id == auth_ctx.account.id,
+        ],
+    )
 
 
 @router.post("", response_model=SystemRead, status_code=status.HTTP_201_CREATED)
