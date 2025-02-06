@@ -96,7 +96,7 @@ async def api_client(fastapi_app: FastAPI, app_lifespan_manager: LifespanManager
 
 
 @pytest.fixture
-def account_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory[Account]:
+async def account_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory[Account]:
     async def _account(
         name: str | None = None,
         type: str | None = None,
@@ -116,7 +116,7 @@ def account_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory[Acco
 
 
 @pytest.fixture
-def entitlement_factory(
+async def entitlement_factory(
     faker: Faker,
     db_session: AsyncSession,
     account_factory: ModelFactory[Account],
@@ -184,7 +184,7 @@ def organization_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory
 
 
 @pytest.fixture
-def system_factory(
+async def system_factory(
     faker: Faker, db_session: AsyncSession, account_factory: ModelFactory[Account]
 ) -> ModelFactory[System]:
     async def _system(
@@ -194,6 +194,7 @@ def system_factory(
         owner: Account | None = None,
         status: SystemStatus = SystemStatus.ACTIVE,
     ) -> System:
+        owner = owner or await account_factory()
         system = System(
             name=name or faker.company(),
             external_id=external_id or "GCP",
