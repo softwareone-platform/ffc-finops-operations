@@ -1,6 +1,5 @@
 import secrets
 from collections.abc import AsyncGenerator, Awaitable, Callable
-from contextlib import AbstractContextManager, contextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Protocol, TypeVar
 
@@ -11,14 +10,12 @@ from faker import Faker
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from pytest_asyncio import is_async_test
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from app import settings
-from app.db import db_engine
 from app.db.models import Account, AccountUser, Actor, Base, Entitlement, Organization, System, User
 from app.enums import AccountType, AccountUserStatus, SystemStatus, UserStatus
 from app.hasher import pbkdf2_sha256
-from tests.utils import SQLAlchemyCapturer
 
 ModelT = TypeVar("ModelT", bound=Base)
 ModelFactory = Callable[..., Awaitable[ModelT]]
@@ -34,6 +31,9 @@ class JWTTokenFactory(Protocol):
         iat: datetime | None = None,
         nbf: datetime | None = None,
     ) -> str: ...
+
+
+pytest_plugins = ["tests.pytest_plugins.capsql"]
 
 
 def pytest_collection_modifyitems(items):
@@ -67,24 +67,14 @@ async def app_lifespan_manager(fastapi_app: FastAPI) -> AsyncGenerator[LifespanM
 
 
 @pytest.fixture(scope="session")
-def capsql():
-    return SQLAlchemyCapturer(db_engine)
+async def db_engine() -> AsyncEngine:
+    from app.db import db_engine
 
-
-@pytest.fixture
-def assert_num_queries(capsql: SQLAlchemyCapturer) -> Callable[[int], AbstractContextManager[None]]:
-    @contextmanager
-    def _assert_num_queries(num: int):
-        with capsql:
-            yield
-        executed = len(capsql.queries)
-        assert executed == num, f"The number of executed is {executed} not {num}"
-
-    return _assert_num_queries
+    return db_engine
 
 
 @pytest.fixture(autouse=True)
-async def db_session() -> AsyncGenerator[AsyncSession, None]:
+async def db_session(db_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, None]:
     session = async_sessionmaker(db_engine, expire_on_commit=False)
 
     async with session() as s:
