@@ -66,9 +66,6 @@ class SQLAlchemyCaptureContext:
         execution_options: Mapping[str, Any],
         result: CursorResult,
     ) -> None:
-        # High-level execute (e.g. ORM queries) -- we can introspect these,
-        # however raw sql queries are not going to be captured here
-
         self.captured_expressions.append(
             SQLExpression(executable=clauseelement, params=params, multiparams=multiparams)
         )
