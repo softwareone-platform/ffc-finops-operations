@@ -71,15 +71,25 @@ async def test_get_system_with_deleted_status(
     )
 
     assert response.status_code == 200
-    assert response.json()["id"] == second_active_system.id
+    data = response.json()
+
+    assert data["id"] == second_active_system.id
+    assert data["status"] == "active"
 
     response = await api_client.get(
         f"/systems/{deleted_system.id}",
         headers={"Authorization": f"Bearer {system_jwt_token_factory(first_active_system)}"},
     )
 
-    assert response.status_code == 404
-    assert response.json()["detail"] == f"System with ID `{deleted_system.id}` wasn't found"
+    # Even though a system is marked as deleted, it should still be retrievable
+    # This is because the API is used for an admin interface, so the user
+    # should be able to see all systems
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["id"] == deleted_system.id
+    assert data["status"] == "deleted"
 
 
 async def test_get_system_by_id_auth_different_account(
@@ -99,8 +109,8 @@ async def test_get_system_by_id_auth_different_account(
         headers={"Authorization": f"Bearer {system_jwt_token_factory(second_system)}"},
     )
 
-    assert response.status_code == 401
-    assert response.json()["detail"] == "Unauthorized"
+    assert response.status_code == 404
+    assert response.json()["detail"] == f"System with ID `{first_system.id}` wasn't found"
 
 
 async def test_get_non_existant_system(api_client: AsyncClient, gcp_jwt_token: str):
