@@ -4,6 +4,7 @@ from datetime import datetime
 from httpx import AsyncClient
 
 from app.db.models import Account, System
+from app.enums import SystemStatus
 from tests.conftest import ModelFactory
 
 # ================
@@ -49,6 +50,36 @@ async def test_get_system_by_id_no_auth(
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Unauthorized"
+
+
+async def test_get_system_with_deleted_status(
+    api_client: AsyncClient,
+    account_factory: ModelFactory[Account],
+    system_factory: ModelFactory[System],
+    system_jwt_token_factory: Callable[[System], str],
+):
+    account = await account_factory()
+    first_active_system = await system_factory(owner=account, external_id="first-active-system")
+    second_active_system = await system_factory(owner=account, external_id="second-active-system")
+    deleted_system = await system_factory(
+        owner=account, status=SystemStatus.DELETED, external_id="deleted-system"
+    )
+
+    response = await api_client.get(
+        f"/systems/{second_active_system.id}",
+        headers={"Authorization": f"Bearer {system_jwt_token_factory(first_active_system)}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["id"] == second_active_system.id
+
+    response = await api_client.get(
+        f"/systems/{deleted_system.id}",
+        headers={"Authorization": f"Bearer {system_jwt_token_factory(first_active_system)}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == f"System with ID `{deleted_system.id}` wasn't found"
 
 
 async def test_get_system_by_id_auth_different_account(
