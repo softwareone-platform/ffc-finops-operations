@@ -1,8 +1,7 @@
 import secrets
-from collections.abc import AsyncGenerator, Awaitable, Callable
+from collections.abc import AsyncGenerator, Callable
 from contextlib import AbstractContextManager, contextmanager
 from datetime import UTC, datetime, timedelta
-from typing import Protocol, TypeVar
 
 import jwt
 import pytest
@@ -16,24 +15,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app import settings
 from app.db import db_engine
 from app.db.models import Account, AccountUser, Actor, Base, Entitlement, Organization, System, User
-from app.enums import AccountType, AccountUserStatus, SystemStatus, UserStatus
+from app.enums import AccountStatus, AccountType, AccountUserStatus, SystemStatus, UserStatus
 from app.hasher import pbkdf2_sha256
+from tests.db.models import ModelForTests, ParentModelForTests  # noqa: F401
+from tests.types import ModelFactory
 from tests.utils import SQLAlchemyCapturer
-
-ModelT = TypeVar("ModelT", bound=Base)
-ModelFactory = Callable[..., Awaitable[ModelT]]
-
-
-class JWTTokenFactory(Protocol):
-    def __call__(
-        self,
-        subject: str,
-        secret: str,
-        account_id: str | None = None,
-        exp: datetime | None = None,
-        iat: datetime | None = None,
-        nbf: datetime | None = None,
-    ) -> str: ...
 
 
 def pytest_collection_modifyitems(items):
@@ -50,7 +36,8 @@ def mock_settings() -> None:
     settings.opt_auth_base_url = "https://opt-auth.ffc.com"
     settings.api_modifier_base_url = "https://api-modifier.ffc.com"
     settings.api_modifier_jwt_secret = "test_jwt_secret"
-    settings.auth_jwt_secret = "auth_jwt_secret"
+    settings.auth_access_jwt_secret = "auth_access_jwt_secret"
+    settings.auth_refresh_jwt_secret = "auth_refresh_jwt_secret"
 
 
 @pytest.fixture(scope="session")
@@ -113,10 +100,12 @@ def account_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory[Acco
     async def _account(
         name: str | None = None,
         type: str | None = None,
+        status: AccountStatus | None = None,
     ) -> Account:
         account = Account(
             type=type or AccountType.AFFILIATE,
             name=name or "AWS",
+            status=status or AccountStatus.ACTIVE,
         )
         db_session.add(account)
         await db_session.commit()
@@ -218,6 +207,26 @@ def system_factory(
         return system
 
     return _system
+
+
+@pytest.fixture
+def accountuser_factory(db_session: AsyncSession):
+    async def _accountuser(
+        user_id: str,
+        account_id: str,
+        status: AccountUserStatus = AccountUserStatus.ACTIVE,
+    ) -> AccountUser:
+        account_user = AccountUser(
+            user_id=user_id,
+            account_id=account_id,
+            status=status,
+        )
+        db_session.add(account_user)
+        await db_session.commit()
+        await db_session.refresh(account_user)
+        return account_user
+
+    return _accountuser
 
 
 @pytest.fixture

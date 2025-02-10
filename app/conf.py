@@ -22,7 +22,10 @@ class Settings(BaseSettings):
     api_modifier_base_url: str
     api_modifier_jwt_secret: str
     secrets_encryption_key: str
-    auth_jwt_secret: str
+    auth_access_jwt_secret: str
+    auth_access_jwt_lifespan_minutes: int = 5
+    auth_refresh_jwt_secret: str
+    auth_refresh_jwt_lifespan_days: int = 7
 
     opt_auth_base_url: str
     opt_api_base_url: str

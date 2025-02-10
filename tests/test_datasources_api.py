@@ -8,7 +8,7 @@ from pytest_mock import MockerFixture
 from app import settings
 from app.db.models import Organization
 from app.enums import DatasourceType
-from tests.conftest import ModelFactory
+from tests.types import ModelFactory
 
 # ===========================
 # Optscale API Mock responses

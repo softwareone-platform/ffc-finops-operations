@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Organization, System
 from app.schemas import OrganizationRead, from_orm
-from tests.conftest import ModelFactory
+from tests.types import ModelFactory
 from tests.utils import assert_json_contains_model
 
 # =================

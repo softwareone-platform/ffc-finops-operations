@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Entitlement, System
 from app.enums import EntitlementStatus
-from tests.conftest import JWTTokenFactory, ModelFactory
+from tests.types import JWTTokenFactory, ModelFactory
 
 # ====================
 # Authentication Tests

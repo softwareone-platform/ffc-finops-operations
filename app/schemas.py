@@ -185,7 +185,7 @@ class AccountUserRead(IdSchema, CommonEventsSchema, AccountUserBase):
 class Login(BaseSchema):
     email: Annotated[EmailStr, Field(examples=["lady.gaga@bennett.tony"])]
     password: Annotated[str, Field(examples=["PKH7aqr_gwh5fgm!xdk"])]
-    account: IdSchema
+    account: IdSchema | None = None
 
 
 class LoginRead(BaseSchema):

@@ -1,10 +1,11 @@
 from typing import Annotated, Any
 
 import jwt
-from fastapi import Depends, HTTPException, Request
+from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app import settings
+from app.auth.constants import JWT_ALGORITHM, JWT_LEEWAY, UNAUTHORIZED_EXCEPTION
 from app.auth.context import AuthenticationContext, auth_context
 from app.db.db import DBSession
 from app.db.handlers import (
@@ -14,17 +15,12 @@ from app.db.handlers import (
     SystemHandler,
     UserHandler,
 )
-from app.db.models import AccountUser, System, User
-from app.enums import AccountUserStatus, ActorType, SystemStatus, UserStatus
-
-JWT_ALGORITHM = "HS256"
+from app.db.models import Account, AccountUser, System, User
+from app.enums import AccountStatus, AccountUserStatus, ActorType, SystemStatus, UserStatus
 
 
 class JWTCredentials(HTTPAuthorizationCredentials):
     claim: dict[str, Any]
-
-
-UNAUTHORIZED_EXCEPTION = HTTPException(status_code=401, detail="Unauthorized")
 
 
 class JWTBearer(HTTPBearer):
@@ -72,7 +68,9 @@ async def get_authentication_context(
                 system.jwt_secret,
                 options={"require": ["exp", "nbf", "iat", "sub"]},
                 algorithms=[JWT_ALGORITHM],
+                leeway=JWT_LEEWAY,
             )
+            # TODO check maximum allowed lifespan
             context = AuthenticationContext(
                 account=system.owner,
                 actor_type=ActorType.SYSTEM,
@@ -81,16 +79,20 @@ async def get_authentication_context(
         else:
             jwt.decode(
                 credentials.credentials,
-                settings.auth_jwt_secret,
+                settings.auth_access_jwt_secret,
                 options={"require": ["exp", "nbf", "iat", "sub"]},
                 algorithms=[JWT_ALGORITHM],
+                leeway=JWT_LEEWAY,
             )
             user = await user_handler.get(
                 actor_id,
                 extra_conditions=[User.status == UserStatus.ACTIVE],
             )
             account_id = credentials.claim.get("account_id", user.last_used_account_id)
-            account = await account_handler.get(account_id)
+            account = await account_handler.get(
+                account_id,
+                extra_conditions=[Account.status == AccountStatus.ACTIVE],
+            )
             account_user = await account_user_handler.get_account_user(
                 account_id=account_id,
                 user_id=actor_id,

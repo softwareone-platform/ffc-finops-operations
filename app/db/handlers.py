@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import ColumnExpressionArgument, func, select
-from sqlalchemy.exc import DBAPIError, IntegrityError
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from sqlalchemy.orm.interfaces import ORMOption
@@ -22,12 +22,7 @@ from app.db.models import (
 )
 from app.db.models import Base as BaseModel
 from app.enums import (
-    AccountStatus,
-    AccountUserStatus,
     EntitlementStatus,
-    OrganizationStatus,
-    SystemStatus,
-    UserStatus,
 )
 
 
@@ -48,7 +43,6 @@ class ModelHandler[M: BaseModel]:
         self.session = session
         self.commit = not isinstance(self.session, AsyncTxSession)
         self.default_options: list[ORMOption] = []
-        self.default_extra_conditions: list[ColumnExpressionArgument] | None = None
 
     @classmethod
     def _get_generic_cls_args(cls):
@@ -85,24 +79,18 @@ class ModelHandler[M: BaseModel]:
     async def get(
         self, id: str, extra_conditions: list[ColumnExpressionArgument] | None = None
     ) -> M:
-        extra_conditions = extra_conditions or self.default_extra_conditions
-        try:
-            query = select(self.model_cls).where(
-                self.model_cls.id == id,
-            )
-            if extra_conditions:
-                query = query.where(*extra_conditions)
-            if self.default_options:
-                query = query.options(*self.default_options)
-            result = await self.session.execute(query)
-            instance = result.scalar_one_or_none()
-            if instance is None:
-                raise NotFoundError(f"{self.model_cls.__name__} with ID `{str(id)}` wasn't found")
-            return instance
-        except DBAPIError as e:
-            raise DatabaseError(
-                f"Failed to get {self.model_cls.__name__} with ID `{str(id)}`: {e}"
-            ) from e
+        query = select(self.model_cls).where(
+            self.model_cls.id == id,
+        )
+        if extra_conditions:
+            query = query.where(*extra_conditions)
+        if self.default_options:
+            query = query.options(*self.default_options)
+        result = await self.session.execute(query)
+        instance = result.scalar_one_or_none()
+        if instance is None:
+            raise NotFoundError(f"{self.model_cls.__name__} with ID `{str(id)}` wasn't found")
+        return instance
 
     async def get_or_create(
         self, *, defaults: dict[str, Any] | None = None, **filters: Any
@@ -144,7 +132,6 @@ class ModelHandler[M: BaseModel]:
         offset: int = 0,
         extra_conditions: list[ColumnExpressionArgument] | None = None,
     ) -> Sequence[M]:
-        extra_conditions = extra_conditions or self.default_extra_conditions
         query = select(self.model_cls).offset(offset).limit(limit).order_by("id")
         if extra_conditions:
             query = query.where(*extra_conditions)
@@ -155,12 +142,27 @@ class ModelHandler[M: BaseModel]:
         return results.scalars().all()
 
     async def count(self, extra_conditions: list[ColumnExpressionArgument] | None = None) -> int:
-        extra_conditions = extra_conditions or self.default_extra_conditions
         query = select(func.count(self.model_cls.id))
         if extra_conditions:
             query = query.where(*extra_conditions)
         result = await self.session.execute(query)
         return result.scalars().one()
+
+    async def filter(self, *conditions: Any) -> Sequence[M]:
+        query = select(self.model_cls).where(*conditions)
+        if self.default_options:
+            query = query.options(*self.default_options)
+
+        results = await self.session.execute(query)
+        return results.scalars().all()
+
+    async def first(self, *conditions: Any) -> M | None:
+        query = select(self.model_cls).where(*conditions)
+        if self.default_options:
+            query = query.options(*self.default_options)
+
+        result = await self.session.execute(query)
+        return result.scalars().first()
 
     async def _save_changes(self, obj: M):
         if self.commit:
@@ -174,7 +176,6 @@ class EntitlementHandler(ModelHandler[Entitlement]):
     def __init__(self, session):
         super().__init__(session)
         self.default_options = [joinedload(Entitlement.owner)]
-        self.default_extra_conditions = [Entitlement.status != EntitlementStatus.DELETED]
 
     async def terminate(self, entitlement: Entitlement) -> Entitlement:
         return await self.update(
@@ -188,34 +189,25 @@ class EntitlementHandler(ModelHandler[Entitlement]):
 
 
 class OrganizationHandler(ModelHandler[Organization]):
-    def __init__(self, session):
-        super().__init__(session)
-        self.default_extra_conditions = [Organization.status != OrganizationStatus.DELETED]
+    pass
 
 
 class SystemHandler(ModelHandler[System]):
     def __init__(self, session):
         super().__init__(session)
         self.default_options = [joinedload(System.owner)]
-        self.default_extra_conditions = [System.status != SystemStatus.DELETED]
 
 
 class AccountHandler(ModelHandler[Account]):
-    def __init__(self, session):
-        super().__init__(session)
-        self.default_extra_conditions = [Account.status != AccountStatus.DELETED]
+    pass
 
 
 class UserHandler(ModelHandler[User]):
-    def __init__(self, session):
-        super().__init__(session)
-        self.default_extra_conditions = [User.status != UserStatus.DELETED]
+    pass
 
 
 class AccountUserHandler(ModelHandler[AccountUser]):
-    def __init__(self, session):
-        super().__init__(session)
-        self.default_extra_conditions = [AccountUser.status != AccountUserStatus.DELETED]
+    pass
 
     async def get_account_user(
         self,
@@ -223,7 +215,6 @@ class AccountUserHandler(ModelHandler[AccountUser]):
         user_id: str,
         extra_conditions: list[ColumnExpressionArgument] | None = None,
     ) -> AccountUser | None:
-        extra_conditions = extra_conditions or self.default_extra_conditions
         query = select(self.model_cls).where(
             self.model_cls.account_id == account_id,
             self.model_cls.user_id == user_id,

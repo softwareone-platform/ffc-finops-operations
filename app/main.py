@@ -58,7 +58,6 @@ app = FastAPI(
     root_path="/ops/v1",
     debug=settings.debug,
     lifespan=lifespan,
-    dependencies=[Depends(get_authentication_context)],
 )
 
 
@@ -66,14 +65,42 @@ fastapi_pagination.add_pagination(app)
 
 # TODO: Add healthcheck
 
-app.include_router(entitlements.router, prefix="/entitlements", tags=["Billing"])
 app.include_router(
-    organizations.router, prefix="/organizations", tags=["FinOps for Cloud Provisioning"]
+    entitlements.router,
+    prefix="/entitlements",
+    dependencies=[Depends(get_authentication_context)],
+    tags=["Billing"],
 )
-app.include_router(employees.router, prefix="/employees", tags=["FinOps for Cloud Provisioning"])
-app.include_router(accounts.router, prefix="/accounts", tags=["Portal Administration"])
+app.include_router(
+    organizations.router,
+    prefix="/organizations",
+    dependencies=[Depends(get_authentication_context)],
+    tags=["FinOps for Cloud Provisioning"],
+)
+app.include_router(
+    employees.router,
+    prefix="/employees",
+    dependencies=[Depends(get_authentication_context)],
+    tags=["FinOps for Cloud Provisioning"],
+)
+app.include_router(
+    accounts.router,
+    prefix="/accounts",
+    dependencies=[Depends(get_authentication_context)],
+    tags=["Portal Administration"],
+)
 
 
-app.include_router(users.router, prefix="/users", tags=["Portal Settings"])
-app.include_router(systems.router, prefix="/systems", tags=["Portal Settings"])
+app.include_router(
+    users.router,
+    prefix="/users",
+    dependencies=[Depends(get_authentication_context)],
+    tags=["Portal Settings"],
+)
+app.include_router(
+    systems.router,
+    prefix="/systems",
+    dependencies=[Depends(get_authentication_context)],
+    tags=["Portal Settings"],
+)
 app.include_router(auth.router, prefix="/auth", tags=["Auth"])
