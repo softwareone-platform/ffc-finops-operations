@@ -2,6 +2,7 @@ import logging
 
 import fastapi_pagination
 import svcs
+import uvicorn
 from fastapi import Depends, FastAPI
 
 from app import settings
@@ -104,3 +105,6 @@ app.include_router(
     tags=["Portal Settings"],
 )
 app.include_router(auth.router, prefix="/auth", tags=["Auth"])
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", port=8080, host="0.0.0.0", reload=True)  # nosec B104

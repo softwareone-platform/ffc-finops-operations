@@ -46,11 +46,13 @@ class ModelHandler[M: BaseModel]:
 
     @classmethod
     def _get_generic_cls_args(cls):
-        return next(
-            base_cls.__args__
-            for base_cls in cls.__orig_bases__
-            if base_cls.__origin__ is ModelHandler
-        )
+        """
+        Retrieves the generic model class arg dynamically
+        """
+        for base_cls in getattr(cls, "__orig_bases__", []):
+            if getattr(base_cls, "__origin__", None) is ModelHandler:
+                return base_cls.__args__
+        raise TypeError(f"Cannot determine generic model class for {cls}")
 
     @property
     def model_cls(self) -> type[M]:
@@ -75,6 +77,22 @@ class ModelHandler[M: BaseModel]:
             ) from e
 
         return obj
+
+    async def filter(self, *conditions: Any) -> Sequence[M]:
+        query = select(self.model_cls).where(*conditions)
+        if self.default_options:
+            query = query.options(*self.default_options)
+
+        results = await self.session.execute(query)
+        return results.scalars().all()
+
+    async def first(self, *conditions: Any) -> M | None:
+        query = select(self.model_cls).where(*conditions)
+        if self.default_options:
+            query = query.options(*self.default_options)
+
+        result = await self.session.execute(query)
+        return result.scalars().first()
 
     async def get(
         self, id: str, extra_conditions: list[ColumnExpressionArgument] | None = None

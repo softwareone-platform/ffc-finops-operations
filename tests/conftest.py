@@ -102,11 +102,13 @@ def account_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory[Acco
         name: str | None = None,
         type: str | None = None,
         status: AccountStatus | None = None,
+        external_id: str | None = None
     ) -> Account:
         account = Account(
             type=type or AccountType.AFFILIATE,
             name=name or "AWS",
             status=status or AccountStatus.ACTIVE,
+            external_id=external_id or str(faker.uuid4()),
         )
         db_session.add(account)
         await db_session.commit()
@@ -337,6 +339,11 @@ async def gcp_extension(system_factory: ModelFactory[System], gcp_account: Accou
 @pytest.fixture
 async def aws_extension(system_factory: ModelFactory[System], aws_account: Account) -> System:
     return await system_factory(external_id="AWS", owner=aws_account)
+
+
+@pytest.fixture
+async def operations_account(account_factory: ModelFactory[Account]) -> Account:
+    return await account_factory(type=AccountType.OPERATIONS)
 
 
 @pytest.fixture

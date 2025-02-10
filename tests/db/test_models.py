@@ -13,7 +13,7 @@ from app.enums import ActorType, EntitlementStatus
 
 async def test_actor_inheritance(db_session: AsyncSession):
     # Create a system which inherits from Actor
-    account = Account(name="test account")
+    account = Account(name="test account", external_id="my_id")
     system = System(
         name="Test System", external_id="test-system", jwt_secret="secret", owner=account
     )
@@ -106,7 +106,7 @@ async def test_auditable_mixin(db_session: AsyncSession, ffc_extension: System):
 
 
 async def test_entitlement_status_default(db_session: AsyncSession):
-    account = Account(name="test_account")
+    account = Account(name="test_account", external_id="my_id")
     entitlement = Entitlement(
         name="AWS",
         affiliate_external_id="ACC-123",
@@ -146,7 +146,7 @@ async def test_organization_unique_external_id(db_session: AsyncSession):
 
 async def test_system_encrypted_jwt_secret(db_session: AsyncSession):
     secret = "test-secret"
-    account = Account(name="Test account")
+    account = Account(name="Test account", external_id="my_id")
     system = System(name="Test System", external_id="test-system", jwt_secret=secret, owner=account)
     db_session.add(account)
     db_session.add(system)

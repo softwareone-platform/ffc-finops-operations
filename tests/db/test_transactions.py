@@ -12,9 +12,7 @@ from tests.utils import SQLAlchemyCapturer
 
 
 def random_account() -> Account:
-    return Account(
-        name=str(uuid.uuid4()),
-    )
+    return Account(name=str(uuid.uuid4()), external_id=str(uuid.uuid4()))
 
 
 def random_entitlement(account_id) -> Entitlement:
