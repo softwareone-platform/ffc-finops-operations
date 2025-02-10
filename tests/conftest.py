@@ -101,12 +101,14 @@ async def account_factory(faker: Faker, db_session: AsyncSession) -> ModelFactor
     async def _account(
         name: str | None = None,
         type: str | None = None,
+        external_id: str | None = None,
         status: AccountStatus | None = None,
         external_id: str | None = None
     ) -> Account:
         account = Account(
             type=type or AccountType.AFFILIATE,
             name=name or "AWS",
+            external_id=external_id or str(faker.uuid4()),
             status=status or AccountStatus.ACTIVE,
             external_id=external_id or str(faker.uuid4()),
         )
