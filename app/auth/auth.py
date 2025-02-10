@@ -1,7 +1,6 @@
 from typing import Annotated, Any
 
 import jwt
-from fastapi import Depends, Request
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -17,11 +16,17 @@ from app.db.handlers import (
     UserHandler,
 )
 from app.db.models import Account, AccountUser, System, User
-from app.enums import AccountStatus, AccountUserStatus, ActorType, SystemStatus, UserStatus
-from app.db.models import AccountUser, System, User
-from app.enums import AccountUserStatus, ActorType, SystemStatus, UserStatus, AccountType
+from app.enums import (
+    AccountStatus,
+    AccountType,
+    AccountUserStatus,
+    ActorType,
+    SystemStatus,
+    UserStatus,
+)
 
 JWT_ALGORITHM = "HS256"
+
 
 
 class JWTCredentials(HTTPAuthorizationCredentials):
