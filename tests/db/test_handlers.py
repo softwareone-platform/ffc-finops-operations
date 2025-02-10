@@ -1,611 +1,207 @@
 import pytest
-from pytest_mock import MockerFixture
-from sqlalchemy import select
-from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from app.db.handlers import (
-    AccountHandler,
     ConstraintViolationError,
-    DatabaseError,
-    EntitlementHandler,
+    ModelHandler,
     NotFoundError,
-    OrganizationHandler,
-    SystemHandler,
 )
-from app.db.models import Account, Entitlement, Organization, System
-from app.enums import ActorType, EntitlementStatus
-
-# =========================================================
-# Entitlement Handler Tests
-# =========================================================
+from tests.db.models import ModelForTests, ParentModelForTests
 
 
-async def test_create_entitlement(
-    db_session: AsyncSession,
-    gcp_extension: System,
-):
-    account = Account(name="test_account")
-    account_handler = AccountHandler(db_session)
-    await account_handler.create(account)
-    entitlement = Entitlement(
-        name="AWS",
-        affiliate_external_id="ACC-123",
-        datasource_id="container-123",
-        created_by=gcp_extension,
-        updated_by=gcp_extension,
-        owner=account,
-    )
-
-    entitlements_handler = EntitlementHandler(db_session)
-
-    created = await entitlements_handler.create(entitlement)
-
-    # Verify in DB directly
-    result = await db_session.execute(select(Entitlement).where(Entitlement.id == created.id))
-    db_entitlement = result.scalar_one()
-
-    assert db_entitlement.name == "AWS"
-    assert db_entitlement.status == EntitlementStatus.NEW
-    assert db_entitlement.created_at is not None
-    assert db_entitlement.updated_at is not None
-    assert db_entitlement.created_by_id == gcp_extension.id
-    assert db_entitlement.updated_by_id == gcp_extension.id
-    assert db_entitlement.owner == account
+class Model4TestsHandler(ModelHandler[ModelForTests]):
+    pass
 
 
-async def test_get_entitlement(
-    db_session: AsyncSession,
-    gcp_extension: System,
-):
-    account = Account(name="test_account")
-    account_handler = AccountHandler(db_session)
-    await account_handler.create(account)
-    # Create directly in DB
-    entitlement = Entitlement(
-        name="AWS",
-        affiliate_external_id="ACC-123",
-        datasource_id="container-123",
-        created_by=gcp_extension,
-        updated_by=gcp_extension,
-        owner=account,
-    )
-    db_session.add(entitlement)
-    await db_session.commit()
-    await db_session.refresh(entitlement)
+async def test_create_success(db_session: AsyncSession):
+    handler = Model4TestsHandler(db_session)
+    test_obj = ModelForTests(name="Test Object")
 
-    # Get using handler
-    entitlements_handler = EntitlementHandler(db_session)
-    fetched = await entitlements_handler.get(entitlement.id)
+    created_obj = await handler.create(test_obj)
 
-    assert fetched.id == entitlement.id
-    assert fetched.name == "AWS"
-    assert fetched.created_by_id == gcp_extension.id
-    assert fetched.updated_by_id == gcp_extension.id
-    assert fetched.owner == account
+    assert created_obj.id is not None
+    assert created_obj.id.startswith(ModelForTests.PK_PREFIX)
+    assert created_obj.name == "Test Object"
 
 
-async def test_get_entitlement_not_found(db_session: AsyncSession):
-    entitlements_handler = EntitlementHandler(db_session)
+async def test_create_constraint_violation(db_session: AsyncSession):
+    handler = Model4TestsHandler(db_session)
+    obj1 = ModelForTests(name="Duplicate Name")
+    await handler.create(obj1)
+
+    obj2 = ModelForTests(name="Duplicate Name")
+
+    with pytest.raises(ConstraintViolationError):
+        await handler.create(obj2)
+
+
+async def test_get_success(db_session: AsyncSession):
+    handler = Model4TestsHandler(db_session)
+    test_obj = ModelForTests(name="Get Test Object")
+    await handler.create(test_obj)
+
+    fetched_obj = await handler.get(test_obj.id)
+    assert fetched_obj.id == test_obj.id
+    assert fetched_obj.name == "Get Test Object"
+
+
+async def test_get_not_found(db_session: AsyncSession):
+    handler = Model4TestsHandler(db_session)
 
     with pytest.raises(NotFoundError):
-        await entitlements_handler.get("FENT-1234-4567-8901")
+        await handler.get("not-found")
 
 
-async def test_update_entitlement(
-    db_session: AsyncSession,
-    gcp_extension: System,
-):
-    account = Account(name="test_account")
-    account_handler = AccountHandler(db_session)
-    await account_handler.create(account)
-    # Create directly in DB
-    entitlement = Entitlement(
-        name="AWS",
-        affiliate_external_id="ACC-123",
-        datasource_id="container-123",
-        created_by=gcp_extension,
-        updated_by=gcp_extension,
-        owner=account,
-    )
-    db_session.add(entitlement)
-    await db_session.commit()
-    await db_session.refresh(entitlement)
+async def test_update_success(db_session: AsyncSession):
+    handler = Model4TestsHandler(db_session)
+    test_obj = ModelForTests(name="Update Test Object")
+    created_obj = await handler.create(test_obj)
 
-    entitlements_handler = EntitlementHandler(db_session)
-    updated = await entitlements_handler.update(
-        entitlement.id,
-        {
-            "name": "Updated AWS",
-            "status": EntitlementStatus.ACTIVE.value,
-            "updated_by_id": gcp_extension.id,
-        },
-    )
-
-    # Verify in DB directly
-    result = await db_session.execute(select(Entitlement).where(Entitlement.id == updated.id))
-    db_entitlement = result.scalar_one()
-
-    assert db_entitlement.name == "Updated AWS"
-    assert db_entitlement.status == EntitlementStatus.ACTIVE.value
-    assert db_entitlement.created_by_id == gcp_extension.id
-    assert db_entitlement.updated_by_id == gcp_extension.id
-    assert db_entitlement.owner == account
+    updated_obj = await handler.update(created_obj.id, {"name": "Updated Name"})
+    assert updated_obj.name == "Updated Name"
 
 
-async def test_update_entitlement_not_found(db_session: AsyncSession):
-    entitlements_handler = EntitlementHandler(db_session)
+async def test_fetch_page(db_session: AsyncSession):
+    handler = Model4TestsHandler(db_session)
 
-    with pytest.raises(NotFoundError):
-        await entitlements_handler.update("FENT-1234-4567-8901", {"name": "Updated AWS"})
-
-
-async def test_fetch_page_entitlements(
-    db_session: AsyncSession,
-    gcp_extension: System,
-):
-    account = Account(name="test_account")
-    account_handler = AccountHandler(db_session)
-    await account_handler.create(account)
-    # Create 5 entitlements directly in DB
+    # Create multiple objects
     for i in range(5):
-        entitlement = Entitlement(
-            name=f"AWS-{i}",
-            affiliate_external_id=f"ACC-{i}",
-            datasource_id=f"container-{i}",
-            created_by=gcp_extension,
-            updated_by=gcp_extension,
-            owner=account,
-        )
-        db_session.add(entitlement)
-    await db_session.commit()
-    await db_session.refresh(entitlement)
+        await handler.create(ModelForTests(name=f"Object {i}"))
 
-    # Test first page
-    entitlements_handler = EntitlementHandler(db_session)
-    items = await entitlements_handler.fetch_page(limit=3, offset=0)
-    assert len(items) == 3
-    for item in items:
-        assert item.created_by_id == gcp_extension.id
-        assert item.updated_by_id == gcp_extension.id
-
-    # Test second page
-    items = await entitlements_handler.fetch_page(limit=3, offset=3)
-    assert len(items) == 2
+    results = await handler.fetch_page(limit=3, offset=1)
+    assert len(results) == 3
 
 
-async def test_count_entitlements(
-    db_session: AsyncSession,
-    gcp_extension: System,
-):
-    account = Account(name="test_account")
-    account_handler = AccountHandler(db_session)
-    await account_handler.create(account)
-    # Create 5 entitlements directly in DB
+async def test_count(db_session: AsyncSession):
+    handler = Model4TestsHandler(db_session)
     for i in range(5):
-        entitlement = Entitlement(
-            name=f"AWS-{i}",
-            affiliate_external_id=f"ACC-{i}",
-            datasource_id=f"container-{i}",
-            created_by=gcp_extension,
-            updated_by=gcp_extension,
-            owner=account,
-        )
-        db_session.add(entitlement)
-    await db_session.commit()
-    await db_session.refresh(entitlement)
-
-    entitlements_handler = EntitlementHandler(db_session)
-    count = await entitlements_handler.count()
+        await handler.create(ModelForTests(name=f"Object {i}"))
+    count = await handler.count()
     assert count == 5
 
 
-# =========================================================
-# Organization Handler Tests
-# =========================================================
-
-
-async def test_create_organization(
-    db_session: AsyncSession,
-    ffc_extension: System,
-):
-    org = Organization(
-        name="Test Org",
-        currency="EUR",
-        affiliate_external_id="ORG-123",
-        created_by=ffc_extension,
-        updated_by=ffc_extension,
-    )
-
-    organizations_handler = OrganizationHandler(db_session)
-    created = await organizations_handler.create(org)
-
-    # Verify in DB directly
-    result = await db_session.execute(select(Organization).where(Organization.id == created.id))
-    db_org = result.scalar_one()
-
-    assert db_org.name == "Test Org"
-    assert db_org.affiliate_external_id == "ORG-123"
-    assert db_org.created_by_id == ffc_extension.id
-    assert db_org.updated_by_id == ffc_extension.id
-
-
-async def test_create_organization_duplicate_external_id(
-    db_session: AsyncSession,
-    ffc_extension: System,
-):
-    # Create first organization directly in DB
-    org1 = Organization(
-        name="Test Org 1",
-        currency="EUR",
-        affiliate_external_id="ORG-123",
-        created_by=ffc_extension,
-        updated_by=ffc_extension,
-    )
-    db_session.add(org1)
-    await db_session.commit()
-    await db_session.refresh(org1)
-
-    # Try to create another with same external_id using handler
-    org2 = Organization(
-        name="Test Org 2",
-        currency="EUR",
-        affiliate_external_id="ORG-123",
-        created_by=ffc_extension,
-        updated_by=ffc_extension,
-    )
-    organizations_handler = OrganizationHandler(db_session)
-    with pytest.raises(ConstraintViolationError):
-        await organizations_handler.create(org2)
-
-
-async def test_fetch_page_organizations(
-    db_session: AsyncSession,
-    ffc_extension: System,
-):
-    # Create 5 organizations directly in DB
+async def test_filter(db_session: AsyncSession):
+    handler = Model4TestsHandler(db_session)
     for i in range(5):
-        org = Organization(
-            name=f"Test Org {i}",
-            currency="EUR",
-            affiliate_external_id=f"ORG-{i}",
-            created_by=ffc_extension,
-            updated_by=ffc_extension,
-        )
-        db_session.add(org)
+        await handler.create(ModelForTests(name=f"Object {i}"))
+    results = await handler.filter(ModelForTests.name.like("Object%"))
+
+    assert len(results) == 5
+
+
+async def test_first(db_session: AsyncSession):
+    handler = Model4TestsHandler(db_session)
+    for i in range(5):
+        await handler.create(ModelForTests(name=f"Object {i}"))
+    first_result = await handler.first(ModelForTests.name.like("Object%"))
+
+    assert first_result is not None
+    assert first_result.name.startswith("Object")
+
+
+async def test_fetch_page_extra_conditions(db_session: AsyncSession):
+    handler = Model4TestsHandler(db_session)
+    test_obj1 = ModelForTests(name="Condition Test 1", status="inactive")
+    test_obj2 = ModelForTests(name="Condition Test 2", status="active")
+
+    await handler.create(test_obj1)
+    await handler.create(test_obj2)
+
+    # Fetch with extra condition to only get active status
+    results = await handler.fetch_page(extra_conditions=[ModelForTests.status == "active"])
+    assert len(results) == 1
+    assert results[0].name == "Condition Test 2"
+
+
+async def test_get_extra_conditions(db_session: AsyncSession):
+    handler = Model4TestsHandler(db_session)
+    test_obj1 = ModelForTests(name="Condition Test 1", status="inactive")
+    test_obj2 = ModelForTests(name="Condition Test 2", status="active")
+
+    await handler.create(test_obj1)
+    await handler.create(test_obj2)
+
+    # Fetch with extra condition to only get active status
+    result = await handler.get(test_obj2.id, extra_conditions=[ModelForTests.status == "active"])
+    assert result == test_obj2
+
+
+async def test_get_default_options_with_joinedload(db_session: AsyncSession):
+    parent_obj = ParentModelForTests(description="Parent Description")
+    db_session.add(parent_obj)
     await db_session.commit()
-    await db_session.refresh(org)
+    handler = Model4TestsHandler(db_session)
+    handler.default_options = [joinedload(ModelForTests.parent)]
+    test_obj = ModelForTests(name="With Related")
+    test_obj.parent = parent_obj
+    await handler.create(test_obj)
+    db_session.expunge_all()
 
-    organizations_handler = OrganizationHandler(db_session)
-
-    # Test first page
-    items = await organizations_handler.fetch_page(limit=2, offset=0)
-    assert len(items) == 2
-    for item in items:
-        assert item.created_by_id == ffc_extension.id
-        assert item.updated_by_id == ffc_extension.id
-
-    # Test second page
-    items = await organizations_handler.fetch_page(limit=2, offset=2)
-    assert len(items) == 2
-
-    # Test last page
-    items = await organizations_handler.fetch_page(limit=2, offset=4)
-    assert len(items) == 1
+    fetched_obj = await handler.get(test_obj.id)
+    assert fetched_obj.parent.description == "Parent Description"
 
 
-async def test_count_organizations(
-    db_session: AsyncSession,
-    ffc_extension: System,
-):
-    # Create 3 organizations directly in DB
-    for i in range(3):
-        org = Organization(
-            name=f"Test Org {i}",
-            currency="EUR",
-            affiliate_external_id=f"ORG-{i}",
-            created_by=ffc_extension,
-            updated_by=ffc_extension,
-        )
-        db_session.add(org)
+async def test_count_with_extra_conditions(db_session: AsyncSession):
+    handler = Model4TestsHandler(db_session)
+
+    await handler.create(ModelForTests(name="Object 1", status="inactive"))
+    await handler.create(ModelForTests(name="Object 2", status="active"))
+
+    count_active = await handler.count(extra_conditions=[ModelForTests.status == "active"])
+    assert count_active == 1
+
+
+async def test_filter_with_default_load_options(db_session: AsyncSession):
+    handler = Model4TestsHandler(db_session)
+    parent = ParentModelForTests(description="Parent Description")
+    db_session.add(parent)
     await db_session.commit()
-    await db_session.refresh(org)
+    await db_session.refresh(parent)
 
-    organizations_handler = OrganizationHandler(db_session)
-    count = await organizations_handler.count()
-    assert count == 3
+    model = ModelForTests(name="Test Object", parent=parent)
+    await handler.create(model)
+
+    handler.default_options = [joinedload(ModelForTests.parent)]
+    results = await handler.filter(ModelForTests.name == "Test Object")
+    assert len(results) == 1
+    assert results[0].parent.description == "Parent Description"
 
 
-async def test_organization_get_or_create(
-    db_session: AsyncSession,
-    ffc_extension: System,
-):
-    organizations_handler = OrganizationHandler(db_session)
-    db_org, created = await organizations_handler.get_or_create(
-        affiliate_external_id="ORG-1234",
-        defaults={
-            "name": "Test Org",
-            "currency": "EUR",
-            "affiliate_external_id": "ORG-1234",
-            "created_by": ffc_extension,
-            "updated_by": ffc_extension,
-        },
+async def test_first_with_default_load_options(db_session: AsyncSession):
+    handler = Model4TestsHandler(db_session)
+    parent = ParentModelForTests(description="First Parent Description")
+    db_session.add(parent)
+    await db_session.commit()
+    await db_session.refresh(parent)
+
+    model = ModelForTests(name="First Test Object", parent=parent)
+    await handler.create(model)
+
+    handler.default_options = [joinedload(ModelForTests.parent)]
+    first_result = await handler.first(ModelForTests.name == "First Test Object")
+    assert first_result is not None
+    assert first_result.parent.description == "First Parent Description"
+
+
+async def test_get_or_create_with_default_load_options(db_session: AsyncSession):
+    handler = Model4TestsHandler(db_session)
+    parent = ParentModelForTests(description="GetOrCreate Parent")
+    db_session.add(parent)
+    await db_session.commit()
+    await db_session.refresh(parent)
+
+    handler.default_options = [joinedload(ModelForTests.parent)]
+
+    obj, created = await handler.get_or_create(
+        defaults={"parent_id": parent.id}, name="GetOrCreate Object"
     )
-
     assert created is True
-    assert db_org.id is not None
-    assert db_org.name == "Test Org"
-    assert db_org.affiliate_external_id == "ORG-1234"
-    assert db_org.created_by == ffc_extension
-    assert db_org.updated_by == ffc_extension
+    assert obj.parent.description == "GetOrCreate Parent"
 
-
-async def test_organization_get_or_create_exists(
-    db_session: AsyncSession,
-    ffc_extension: System,
-):
-    existing_org = Organization(
-        name="Test Org",
-        currency="EUR",
-        affiliate_external_id="ORG-1234",
-        created_by=ffc_extension,
-        updated_by=ffc_extension,
+    # Ensure fetching without creation
+    obj, created = await handler.get_or_create(
+        defaults={"parent_id": parent.id}, name="GetOrCreate Object"
     )
-    db_session.add(existing_org)
-    await db_session.commit()
-    await db_session.refresh(existing_org)
-
-    organizations_handler = OrganizationHandler(db_session)
-    db_org, created = await organizations_handler.get_or_create(
-        affiliate_external_id="ORG-1234",
-        defaults={
-            "name": "Test Org",
-            "affiliate_external_id": "ORG-1234",
-            "created_by": ffc_extension,
-            "updated_by": ffc_extension,
-        },
-    )
-
     assert created is False
-    assert db_org.id == existing_org.id
-
-
-# =========================================================
-# System Handler Tests
-# =========================================================
-
-
-async def test_create_system(
-    db_session: AsyncSession,
-):
-    account = Account(name="test_account")
-    system = System(
-        name="Test System",
-        external_id="test-system",
-        jwt_secret="secret",
-        owner=account,
-    )
-    account_handler = AccountHandler(db_session)
-    system_handler = SystemHandler(db_session)
-    await account_handler.create(account)
-    created = await system_handler.create(system)
-
-    # Verify in DB directly
-    result = await db_session.execute(select(System).where(System.id == created.id))
-    db_system = result.scalar_one()
-
-    assert db_system.name == "Test System"
-    assert db_system.external_id == "test-system"
-    assert db_system.jwt_secret == "secret"
-    assert db_system.type == ActorType.SYSTEM
-    assert db_system.owner == account
-
-
-async def test_get_system(
-    db_session: AsyncSession,
-):
-    account = Account(name="test_account")
-    account_handler = AccountHandler(db_session)
-    await account_handler.create(account)
-    # Create directly in DB
-    system = System(
-        name="Test System",
-        external_id="test-system",
-        jwt_secret="secret",
-        owner=account,
-    )
-    db_session.add(system)
-    await db_session.commit()
-    await db_session.refresh(system)
-
-    system_handler = SystemHandler(db_session)
-    # Get using handler
-    fetched = await system_handler.get(system.id)
-
-    assert fetched.id == system.id
-    assert fetched.name == "Test System"
-    assert fetched.type == ActorType.SYSTEM
-    assert fetched.owner == account
-
-
-async def test_create_system_duplicate_external_id(
-    db_session: AsyncSession,
-):
-    account = Account(name="test_account")
-    account_handler = AccountHandler(db_session)
-    await account_handler.create(account)
-    # Create first system directly in DB
-    system1 = System(
-        name="Test System 1",
-        external_id="test-system",
-        jwt_secret="secret1",
-        owner=account,
-    )
-    db_session.add(system1)
-    await db_session.commit()
-    await db_session.refresh(system1)
-
-    # Try to create another with same external_id using handler
-    system2 = System(
-        name="Test System 2",
-        external_id="test-system",
-        jwt_secret="secret2",
-        owner=account,
-    )
-    system_handler = SystemHandler(db_session)
-
-    with pytest.raises(ConstraintViolationError):
-        await system_handler.create(system2)
-
-
-async def test_system_encrypted_jwt_secret(
-    db_session: AsyncSession,
-):
-    account = Account(name="test_account")
-    account_handler = AccountHandler(db_session)
-    await account_handler.create(account)
-    secret = "test-secret"
-    system = System(
-        name="Test System",
-        external_id="test-system",
-        jwt_secret=secret,
-        owner=account,
-    )
-    system_handler = SystemHandler(db_session)
-
-    created = await system_handler.create(system)
-
-    # Verify in DB directly
-    result = await db_session.execute(select(System).where(System.id == created.id))
-    db_system = result.scalar_one()
-
-    assert db_system.jwt_secret == secret  # Should be automatically decrypted
-
-
-async def test_fetch_page_systems(
-    db_session: AsyncSession,
-):
-    account = Account(name="test_account")
-    account_handler = AccountHandler(db_session)
-    await account_handler.create(account)
-    # Create 4 systems directly in DB
-    for i in range(4):
-        system = System(
-            name=f"Test System {i}",
-            external_id=f"system-{i}",
-            jwt_secret=f"secret-{i}",
-            owner=account,
-        )
-        db_session.add(system)
-    await db_session.commit()
-    await db_session.refresh(system)
-
-    system_handler = SystemHandler(db_session)
-    # Test first page
-    items = await system_handler.fetch_page(limit=2, offset=0)
-    assert len(items) == 2
-    for item in items:
-        assert item.type == ActorType.SYSTEM
-
-    # Test second page
-    items = await system_handler.fetch_page(limit=2, offset=2)
-    assert len(items) == 2
-
-    # Test empty page
-    items = await system_handler.fetch_page(limit=2, offset=4)
-    assert len(items) == 0
-
-
-async def test_count_systems(db_session: AsyncSession):
-    account = Account(name="test_account")
-    account_handler = AccountHandler(db_session)
-    await account_handler.create(account)
-    # Create 4 systems directly in DB
-    for i in range(4):
-        system = System(
-            name=f"Test System {i}",
-            external_id=f"system-{i}",
-            jwt_secret=f"secret-{i}",
-            owner=account,
-        )
-        db_session.add(system)
-    await db_session.commit()
-    await db_session.refresh(system)
-
-    system_handler = SystemHandler(db_session)
-    count = await system_handler.count()
-    assert count == 4
-
-
-async def test_update_system_jwt_secret(db_session: AsyncSession):
-    account = Account(name="test_account")
-    account_handler = AccountHandler(db_session)
-    await account_handler.create(account)
-    system = System(
-        name="Test System",
-        external_id="test-system",
-        jwt_secret="secret",
-        created_by=None,
-        updated_by=None,
-        owner=account,
-    )
-    db_session.add(system)
-    await db_session.commit()
-    await db_session.refresh(system)
-
-    system_handler = SystemHandler(db_session)
-    updated = await system_handler.update(system.id, {"jwt_secret": "new-secret"})
-
-    assert updated.jwt_secret == "new-secret"
-
-
-async def test_get_system_db_error(
-    db_session: AsyncSession,
-):
-    account = Account(name="test_account")
-    account_handler = AccountHandler(db_session)
-    await account_handler.create(account)
-    # Create directly in DB
-    system = System(
-        name="Test System",
-        external_id="test-system",
-        jwt_secret="secret",
-        owner=account,
-    )
-    db_session.add(system)
-    await db_session.commit()
-    await db_session.refresh(system)
-
-    system_handler = SystemHandler(db_session)
-    # Get using handl
-    with pytest.raises(DatabaseError):
-        await system_handler.get("abcd")
-
-
-async def test_get_system_db_api_error(
-    mocker: MockerFixture,
-    db_session: AsyncSession,
-):
-    account = Account(name="test_account")
-    account_handler = AccountHandler(db_session)
-    await account_handler.create(account)
-    # Create directly in DB
-    system = System(
-        name="Test System",
-        external_id="test-system",
-        jwt_secret="secret",
-        owner=account,
-    )
-    db_session.add(system)
-    await db_session.commit()
-    await db_session.refresh(system)
-
-    # Mock the database session to raise an error
-    mocker.patch(
-        "sqlalchemy.ext.asyncio.AsyncSession.get",
-        side_effect=DBAPIError("SELECT 1", {}, Exception("Mocked database error")),
-    )
-    system_handler = SystemHandler(db_session)
-    # Get using handler
-    with pytest.raises(DatabaseError):
-        await system_handler.get("abcd")
+    assert obj.parent.description == "GetOrCreate Parent"

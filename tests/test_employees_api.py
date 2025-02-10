@@ -6,7 +6,7 @@ from pytest_mock import MockerFixture
 
 from app import settings
 from app.db.models import Organization
-from tests.conftest import ModelFactory
+from tests.types import ModelFactory
 
 
 async def test_can_create_employees(

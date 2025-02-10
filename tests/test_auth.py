@@ -11,7 +11,7 @@ from app.auth.auth import JWTBearer, JWTCredentials, get_authentication_context
 from app.auth.context import AuthenticationContext, auth_context
 from app.db.models import System, User
 from app.enums import AccountUserStatus, ActorType, SystemStatus, UserStatus
-from tests.conftest import JWTTokenFactory, ModelFactory
+from tests.types import JWTTokenFactory, ModelFactory
 
 
 async def test_jwt_bearer(mocker: MockerFixture, jwt_token_factory: JWTTokenFactory):
@@ -107,6 +107,39 @@ async def test_get_authentication_context_system_not_active(
         auth_context.get()
 
 
+async def test_get_authentication_context_user(
+    mocker: MockerFixture,
+    user_factory: ModelFactory[User],
+    jwt_token_factory: JWTTokenFactory,
+    db_session: AsyncSession,
+    assert_num_queries: Callable[[int], AbstractContextManager[None]],
+):
+    user = await user_factory()
+    jwt_token = jwt_token_factory(user.id, settings.auth_access_jwt_secret)
+    bearer = JWTBearer()
+    request = mocker.Mock()
+    request.headers = {"Authorization": f"Bearer {jwt_token}"}
+    credentials = await bearer(request)
+
+    with pytest.raises(LookupError):
+        auth_context.get()
+
+    with assert_num_queries(3):
+        async with asynccontextmanager(get_authentication_context)(
+            db_session, credentials
+        ) as context:
+            assert isinstance(context, AuthenticationContext)
+            assert context.actor_type == ActorType.USER
+            assert context.system is None
+            assert context.user == user
+            assert context.account == user.last_used_account
+            assert context.get_actor() == user
+            assert auth_context.get() == context
+
+    with pytest.raises(LookupError):
+        auth_context.get()
+
+
 @pytest.mark.parametrize(
     "user_status",
     [UserStatus.DELETED, UserStatus.DISABLED, UserStatus.DRAFT],
@@ -119,7 +152,7 @@ async def test_get_authentication_context_user_invalid_status(
     user_status: UserStatus,
 ):
     user = await user_factory(status=user_status)
-    jwt_token = jwt_token_factory(user.id, settings.auth_jwt_secret)
+    jwt_token = jwt_token_factory(user.id, settings.auth_access_jwt_secret)
 
     bearer = JWTBearer()
     request = mocker.Mock()
@@ -153,7 +186,7 @@ async def test_get_authentication_context_user_invalid_accountuser_status(
     accountuser_status: AccountUserStatus,
 ):
     user = await user_factory(accountuser_status=accountuser_status)
-    jwt_token = jwt_token_factory(user.id, settings.auth_jwt_secret)
+    jwt_token = jwt_token_factory(user.id, settings.auth_access_jwt_secret)
 
     bearer = JWTBearer()
     request = mocker.Mock()
@@ -178,7 +211,9 @@ async def test_get_authentication_context_user_account_does_not_exist(
     db_session: AsyncSession,
 ):
     user = await user_factory()
-    jwt_token = jwt_token_factory(user.id, settings.auth_jwt_secret, account_id="FACC-0000-0000")
+    jwt_token = jwt_token_factory(
+        user.id, settings.auth_access_jwt_secret, account_id="FACC-0000-0000"
+    )
 
     bearer = JWTBearer()
     request = mocker.Mock()
