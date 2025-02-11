@@ -216,11 +216,15 @@ def accountuser_factory(db_session: AsyncSession):
         user_id: str,
         account_id: str,
         status: AccountUserStatus = AccountUserStatus.ACTIVE,
+        invitation_token: str | None = None,
+        invitation_token_expires_at: datetime | None = None,
     ) -> AccountUser:
         account_user = AccountUser(
             user_id=user_id,
             account_id=account_id,
             status=status,
+            invitation_token=invitation_token,
+            invitation_token_expires_at=invitation_token_expires_at,
         )
         db_session.add(account_user)
         await db_session.commit()
@@ -325,6 +329,11 @@ async def gcp_extension(system_factory: ModelFactory[System]) -> System:
 @pytest.fixture
 def gcp_jwt_token(system_jwt_token_factory: Callable[[System], str], gcp_extension: System) -> str:
     return system_jwt_token_factory(gcp_extension)
+
+
+@pytest.fixture
+async def operations_account(account_factory: ModelFactory[Account]) -> Account:
+    return await account_factory(type=AccountType.OPERATIONS)
 
 
 @pytest.fixture
