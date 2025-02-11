@@ -7,7 +7,7 @@ from sqlalchemy import ColumnExpressionArgument
 from app.auth.context import auth_context
 from app.db.handlers import NotFoundError
 from app.db.models import System
-from app.dependencies import CurrentAuthContext, SystemId, SystemRepository
+from app.dependencies import SystemId, SystemRepository
 from app.enums import AccountType
 from app.schemas import SystemCreate, SystemRead, SystemUpdate, from_orm
 
@@ -42,9 +42,7 @@ async def create_system(data: SystemCreate):
 
 
 @router.get("/{id}", response_model=SystemRead)
-async def get_system_by_id(
-    system: Annotated[System, Depends(fetch_system_or_404)], auth_ctx: CurrentAuthContext
-):
+async def get_system_by_id(system: Annotated[System, Depends(fetch_system_or_404)]):
     return from_orm(SystemRead, system)
 
 
