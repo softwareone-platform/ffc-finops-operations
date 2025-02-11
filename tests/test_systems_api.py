@@ -5,7 +5,7 @@ import pytest
 from httpx import AsyncClient
 
 from app.db.models import Account, System
-from app.enums import SystemStatus
+from app.enums import AccountType, SystemStatus
 from tests.conftest import ModelFactory
 
 # ================
@@ -262,3 +262,27 @@ async def test_get_all_systems_pagination(
     assert response.status_code == 200
     assert response.json()["total"] == expected_total
     assert len(response.json()["items"]) == page_count
+
+
+async def test_get_systems_with_operations_api(
+    api_client: AsyncClient,
+    account_factory: ModelFactory[Account],
+    system_factory: ModelFactory[System],
+    system_jwt_token_factory: Callable[[System], str],
+):
+    operations_account = await account_factory(type=AccountType.OPERATIONS)
+    operations_system = await system_factory(owner=operations_account)
+
+    affilaite_account = await account_factory(type=AccountType.AFFILIATE)
+    affiliate_system = await system_factory(owner=affilaite_account)
+
+    response = await api_client.get(
+        "/systems",
+        headers={"Authorization": f"Bearer {system_jwt_token_factory(operations_system)}"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["total"] == 2
+    assert {system["id"] for system in data["items"]} == {operations_system.id, affiliate_system.id}
