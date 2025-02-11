@@ -194,7 +194,6 @@ def system_factory(
         owner: Account | None = None,
         status: SystemStatus = SystemStatus.ACTIVE,
     ) -> System:
-        owner = owner or await account_factory()
         system = System(
             name=name or faker.company(),
             external_id=external_id or "GCP",

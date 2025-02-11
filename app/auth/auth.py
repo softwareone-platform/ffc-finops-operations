@@ -12,7 +12,6 @@ from app.db.handlers import (
     AccountHandler,
     AccountUserHandler,
     DatabaseError,
-    NotFoundError,
     SystemHandler,
     UserHandler,
 )
@@ -60,13 +59,10 @@ async def get_authentication_context(
     context = None
     try:
         if actor_id.startswith(System.PK_PREFIX):
-            try:
-                system = await system_handler.get(
-                    actor_id,
-                    [System.status == SystemStatus.ACTIVE],
-                )
-            except NotFoundError as exc:
-                raise UNAUTHORIZED_EXCEPTION from exc
+            system = await system_handler.get(
+                actor_id,
+                [System.status == SystemStatus.ACTIVE],
+            )
 
             jwt.decode(
                 credentials.credentials,
