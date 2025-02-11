@@ -63,6 +63,7 @@ async def get_authentication_context(
                 actor_id,
                 [System.status == SystemStatus.ACTIVE],
             )
+
             jwt.decode(
                 credentials.credentials,
                 system.jwt_secret,

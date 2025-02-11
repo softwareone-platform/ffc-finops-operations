@@ -79,17 +79,19 @@ class ModelHandler[M: BaseModel]:
     async def get(
         self, id: str, extra_conditions: list[ColumnExpressionArgument] | None = None
     ) -> M:
-        query = select(self.model_cls).where(
-            self.model_cls.id == id,
-        )
+        query = select(self.model_cls).where(self.model_cls.id == id)
         if extra_conditions:
             query = query.where(*extra_conditions)
+
         if self.default_options:
             query = query.options(*self.default_options)
+
         result = await self.session.execute(query)
         instance = result.scalar_one_or_none()
+
         if instance is None:
             raise NotFoundError(f"{self.model_cls.__name__} with ID `{str(id)}` wasn't found")
+
         return instance
 
     async def get_or_create(
