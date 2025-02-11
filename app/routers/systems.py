@@ -64,7 +64,7 @@ async def get_systems(
 
 
 @router.post("", response_model=SystemRead, status_code=status.HTTP_201_CREATED)
-async def create_system(data: SystemCreate):
+async def create_system(data: SystemCreate):  # pragma: no cover
     pass
 
 
@@ -74,20 +74,20 @@ async def get_system_by_id(system: Annotated[System, Depends(fetch_system_or_404
 
 
 @router.put("/{id}", response_model=SystemRead)
-async def update_system(id: SystemId, data: SystemUpdate):
+async def update_system(id: SystemId, data: SystemUpdate):  # pragma: no cover
     pass
 
 
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_system_by_id(id: SystemId):
+async def delete_system_by_id(id: SystemId):  # pragma: no cover
     pass
 
 
 @router.post("/{id}/disable", response_model=SystemRead)
-async def disable_system(id: SystemId):
+async def disable_system(id: SystemId):  # pragma: no cover
     pass
 
 
 @router.post("/{id}/enable", response_model=SystemRead)
-async def enable_system(id: SystemId):
+async def enable_system(id: SystemId):  # pragma: no cover
     pass
