@@ -6,6 +6,13 @@ from typing import Annotated
 import typer
 import yaml
 from fastapi.openapi.utils import get_openapi
+from rich import print
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import sessionmaker
+
+from app import settings
+from app.db.models import Account
+from app.enums import AccountStatus, AccountType
 
 
 class OutputFormat(str, Enum):
@@ -17,6 +24,44 @@ app = typer.Typer(
     add_completion=False,
     rich_markup_mode="rich",
 )
+
+
+@app.command()
+def create_op_account():
+    """
+    Create the SoftwareOne Operations Account.
+    """
+    db_engine = create_engine(
+        str(settings.postgres_url),
+        echo=settings.debug,
+        future=True,
+    )
+    session = sessionmaker(bind=db_engine)
+    with session() as session:
+        query = select(Account).where(
+            Account.type == AccountType.OPERATIONS, Account.status != AccountStatus.DELETED
+        )
+        result = session.execute(query)
+        instance = result.scalar_one_or_none()
+        if instance:
+            print(
+                "[orange3]The Operations Account already exist: [/orange3]"
+                f"[blue]{instance.id} - {instance.name}[/blue]."
+            )
+            return
+
+        account = Account(
+            name="SoftwareOne",
+            type=AccountType.OPERATIONS,
+            status=AccountStatus.ACTIVE,
+        )
+        session.add(account)
+        session.commit()
+        session.refresh(account)
+        print(
+            "[green]The Operations Account has been created: [/green]"
+            f"[blue]{account.id} - {account.name}[/blue]."
+        )
 
 
 @app.command()
