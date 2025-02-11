@@ -6,7 +6,7 @@ from sqlalchemy import ColumnExpressionArgument
 
 from app.db.handlers import NotFoundError
 from app.db.models import System
-from app.dependencies import CurrentAuthContext, SystemId, SystemRepository
+from app.dependencies import SystemId, SystemRepository
 from app.enums import AccountType
 from app.pagination import paginate
 from app.schemas import SystemCreate, SystemRead, SystemUpdate, from_orm
