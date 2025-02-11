@@ -16,7 +16,7 @@ services:
     ports:
       - "8000:8000"
 
-  db:
+  db: &db
     image: postgres:17
     restart: unless-stopped
     environment:
@@ -33,12 +33,19 @@ services:
     volumes:
       - ./pg_data:/var/lib/postgresql/data
 
+  test_db:
+    <<: *db
+    environment:
+      POSTGRES_DB: "${FFC_OPERATIONS_POSTGRES_DB}_test"
+    volumes:
+      - ./test_pg_data:/var/lib/postgresql/data
+
   app_test:
     build:
       context: .
       dockerfile: dev.Dockerfile
     depends_on:
-      db:
+      test_db:
         condition: "service_healthy"
     command: >
       bash -c "
@@ -54,7 +61,7 @@ services:
         uv run pytest
       "
     environment:
-      FFC_OPERATIONS_POSTGRES_HOST: db
+      FFC_OPERATIONS_POSTGRES_HOST: test_db
     env_file:
       - .env
 
