@@ -141,7 +141,7 @@ class ModelHandler[M: BaseModel]:
         results = await self.session.execute(query)
         return results.scalars().all()
 
-    async def count(self, extra_conditions: list[ColumnExpressionArgument] | None = None) -> int:
+    async def count(self, *extra_conditions: ColumnExpressionArgument) -> int:
         query = select(func.count(self.model_cls.id))
         if extra_conditions:
             query = query.where(*extra_conditions)

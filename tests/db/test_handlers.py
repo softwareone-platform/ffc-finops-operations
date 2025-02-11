@@ -148,7 +148,7 @@ async def test_count_with_extra_conditions(db_session: AsyncSession):
     await handler.create(ModelForTests(name="Object 1", status="inactive"))
     await handler.create(ModelForTests(name="Object 2", status="active"))
 
-    count_active = await handler.count(extra_conditions=[ModelForTests.status == "active"])
+    count_active = await handler.count(ModelForTests.status == "active")
     assert count_active == 1
 
 
