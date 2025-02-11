@@ -1,7 +1,7 @@
 """Phase 2 models
 
 Revision ID: 085245566812
-Revises: f9b61f58c1d4
+Revises:
 Create Date: 2025-02-03 18:14:57.275316
 
 """
@@ -14,7 +14,7 @@ import sqlalchemy_utils
 
 # revision identifiers, used by Alembic.
 revision: str = '085245566812'
-down_revision: Union[str, None] = 'f9b61f58c1d4'
+down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
