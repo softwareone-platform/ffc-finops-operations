@@ -4,6 +4,9 @@ import fastapi_pagination
 import svcs
 import uvicorn
 from fastapi import Depends, FastAPI
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from httpx import Request
 
 from app import settings
 from app.api_clients import BaseAPIClient
@@ -12,6 +15,8 @@ from app.db import verify_db_connection
 from app.routers import accounts, auth, employees, entitlements, organizations, systems, users
 
 logger = logging.getLogger(__name__)
+
+
 
 
 @svcs.fastapi.lifespan
@@ -63,6 +68,29 @@ app = FastAPI(
 
 
 fastapi_pagination.add_pagination(app)
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_exception_handler(request: Request, exc: RequestValidationError):
+    """
+    This middleware intercepts all the ValidationError exceptions raised by Pydantic
+    when there is a mismatch with the defined Model.
+    FastAPI wraps it in RequestValidationError, which is a subclass of ValidationError,
+    for requests.
+    This middleware in the end returns a 400 status code instead of the
+    default 422 for validation errors.
+
+    """
+    return JSONResponse(
+        status_code=400,
+        content={
+            "detail": [
+                {"loc": error["loc"], "msg": error["msg"], "type": error["type"]}
+                for error in exc.errors()
+            ],
+            "body": str(exc.body) if hasattr(exc, "body") else None,
+        },
+    )
 
 # TODO: Add healthcheck
 

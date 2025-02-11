@@ -37,8 +37,8 @@ async def persist_data_and_format_response(account_repo, data):
 
 async def validate_account_type_and_required_conditions(account_repo, data):
     """
-    This function performs the required checks before
-    proceeding to create an Account.
+    This function performs the following required checks before
+    proceeding to create an Account:
     1. Only Accounts classified as of type “Affiliate” can be created.
     2. The external_id field has to be unique and not in DELETED status.
 
@@ -54,7 +54,7 @@ async def validate_account_type_and_required_conditions(account_repo, data):
     ):  # noqa: E501
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=("An Account with external ID " f"`{data.external_id}` already exists."),
+            detail="An Account with external ID " f"`{data.external_id}` already exists.",
         )
 
 
@@ -94,6 +94,23 @@ async def create_account(data: AccountCreate, account_repo: AccountRepository):
     Raises:
         - HTTPException with status 403 if the check (1) fails
         - HTTPException with status 400 if the checks (2) or (3) fail.
+    Return: A dict like the following one
+    {
+        'id': 'FACC-1369-9180',
+        'name': 'Microsoft',
+        'external_id': 'ACC-9044-8753',
+        'type': 'affiliate',
+        'created_at': '2025-02-11T08:26:53.280197Z',
+        'updated_at': '2025-02-11T08:26:53.280202Z',
+        'deleted_at': None,
+        'created_by': {'id': 'FTKN-9219-4796', 'type': 'system', 'name': 'Johnson PLC'},
+        'updated_by': {'id': 'FTKN-9219-4796', 'type': 'system', 'name': 'Johnson PLC'},
+        'deleted_by': None,
+        'entitlements_stats': None,
+        'status': 'active'
+    }
+
+
     """
     await validate_account_type_and_required_conditions(account_repo, data)
     return await persist_data_and_format_response(account_repo, data)

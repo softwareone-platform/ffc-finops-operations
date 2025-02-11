@@ -130,6 +130,10 @@ async def get_authentication_context(
 async def check_operations_account(
     context: Annotated[AuthenticationContext, Depends(get_authentication_context)],
 ):  # noqa: E501
+    """
+    This function ensures that the account type is of type OPERATIONS
+
+    """
     if context.account.type != AccountType.OPERATIONS:
         # This API can only be consumed in the context of an Operations Account
         raise HTTPException(
