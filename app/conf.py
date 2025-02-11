@@ -1,4 +1,5 @@
 import pathlib
+import sys
 
 from pydantic import PostgresDsn, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -33,6 +34,14 @@ class Settings(BaseSettings):
 
     debug: bool = False
 
+    def get_db_name(self) -> str:
+        db = self.postgres_db
+
+        if "pytest" in sys.modules:
+            db = f"{db}_test"
+
+        return db
+
     @computed_field
     def postgres_async_url(self) -> PostgresDsn:
         return PostgresDsn.build(
@@ -41,7 +50,7 @@ class Settings(BaseSettings):
             password=self.postgres_password,
             host=self.postgres_host,
             port=self.postgres_port,
-            path=self.postgres_db,
+            path=self.get_db_name(),
         )
 
     @computed_field
@@ -52,5 +61,5 @@ class Settings(BaseSettings):
             password=self.postgres_password,
             host=self.postgres_host,
             port=self.postgres_port,
-            path=self.postgres_db,
+            path=self.get_db_name(),
         )
