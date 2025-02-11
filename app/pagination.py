@@ -15,7 +15,9 @@ async def paginate[M: Base, S: BaseSchema](
     extra_conditions: list[ColumnExpressionArgument] | None = None,
 ) -> AbstractPage[S]:
     params: LimitOffsetParams = resolve_params()
-    total = await handler.count(extra_conditions=extra_conditions)
+    extra_conditions = extra_conditions or []
+
+    total = await handler.count(*extra_conditions)
     items = await handler.fetch_page(
         limit=params.limit,
         offset=params.offset,

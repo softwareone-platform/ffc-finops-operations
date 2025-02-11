@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi_pagination.limit_offset import LimitOffsetPage
 from sqlalchemy import ColumnExpressionArgument
 
-from app.auth.context import auth_context
 from app.db.handlers import NotFoundError
 from app.db.models import System
 from app.dependencies import CurrentAuthContext, SystemId, SystemRepository
@@ -12,17 +11,28 @@ from app.enums import AccountType
 from app.pagination import paginate
 from app.schemas import SystemCreate, SystemRead, SystemUpdate, from_orm
 
-router = APIRouter()
+# ============
+# Dependancies
+# ============
 
 
-async def fetch_system_or_404(id: SystemId, system_repo: SystemRepository) -> System:
-    extra_conditions: list[ColumnExpressionArgument] = []
+async def common_extra_conditions(auth_ctx: CurrentAuthContext) -> list[ColumnExpressionArgument]:
+    conditions: list[ColumnExpressionArgument] = []
 
-    auth_account = auth_context.get().account
+    if auth_ctx.account.type == AccountType.AFFILIATE:
+        conditions.append(System.owner == auth_ctx.account)
 
-    if auth_account.type == AccountType.AFFILIATE:
-        extra_conditions.append(System.owner == auth_account)
+    return conditions
 
+
+CommonConditions = Annotated[list[ColumnExpressionArgument], Depends(common_extra_conditions)]
+
+
+async def fetch_system_or_404(
+    id: SystemId,
+    system_repo: SystemRepository,
+    extra_conditions: CommonConditions,
+) -> System:
     try:
         return await system_repo.get(id=id, extra_conditions=extra_conditions)
     except NotFoundError as e:
@@ -32,14 +42,24 @@ async def fetch_system_or_404(id: SystemId, system_repo: SystemRepository) -> Sy
         ) from e
 
 
+# ======
+# Routes
+# ======
+
+
+router = APIRouter()
+
+
 @router.get("", response_model=LimitOffsetPage[SystemRead])
-async def get_systems(system_repo: SystemRepository, auth_ctx: CurrentAuthContext):
+async def get_systems(
+    system_repo: SystemRepository,
+    auth_ctx: CurrentAuthContext,
+    extra_conditions: CommonConditions,
+):
     return await paginate(
         system_repo,
         SystemRead,
-        extra_conditions=[
-            System.owner_id == auth_ctx.account.id,
-        ],
+        extra_conditions=extra_conditions,
     )
 
 
