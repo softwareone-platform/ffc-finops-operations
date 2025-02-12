@@ -2,7 +2,6 @@ import logging
 
 import fastapi_pagination
 import svcs
-import uvicorn
 from fastapi import Depends, FastAPI
 
 from app import settings
