@@ -1,5 +1,4 @@
 import pathlib
-import sys
 
 from pydantic import PostgresDsn, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -9,9 +8,10 @@ PROJECT_ROOT = pathlib.Path(__file__).parent.parent
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=PROJECT_ROOT / ".env",
+        env_file=(PROJECT_ROOT / ".env", PROJECT_ROOT / ".env.test"),
         env_file_encoding="utf-8",
         env_prefix="ffc_operations_",
+        extra="ignore",
     )
 
     postgres_db: str
@@ -36,14 +36,6 @@ class Settings(BaseSettings):
 
     debug: bool = False
 
-    def get_db_name(self) -> str:
-        db = self.postgres_db
-
-        if "pytest" in sys.modules:
-            db = f"{db}_test"
-
-        return db
-
     @computed_field
     def postgres_async_url(self) -> PostgresDsn:
         return PostgresDsn.build(
@@ -52,7 +44,7 @@ class Settings(BaseSettings):
             password=self.postgres_password,
             host=self.postgres_host,
             port=self.postgres_port,
-            path=self.get_db_name(),
+            path=self.postgres_db,
         )
 
     @computed_field
@@ -63,5 +55,5 @@ class Settings(BaseSettings):
             password=self.postgres_password,
             host=self.postgres_host,
             port=self.postgres_port,
-            path=self.get_db_name(),
+            path=self.postgres_db,
         )

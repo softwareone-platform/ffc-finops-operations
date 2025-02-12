@@ -246,26 +246,26 @@ class OrganizationReference(IdSchema, OrganizationBase):
 class EntitlementBase(BaseSchema):
     name: Annotated[str | None, Field(max_length=255, examples=["Microsoft CSP"])]
     affiliate_external_id: Annotated[str, Field(max_length=255, examples=["SUB-9876-5534-9172"])]
-    operations_external_id: Annotated[
-        str | None, Field(max_length=255, examples=["ee7ebfaf-a222-4209-aecc-67861694a488"])
-    ] = None
     datasource_id: Annotated[
         str | None, Field(max_length=255, examples=["1098a2fa-07c0-4f40-96c7-3bf32a213e0e"])
     ]
 
 
 class EntitlementCreate(EntitlementBase):
-    pass
+    owner: IdSchema | None = None
 
 
 class EntitlementUpdate(BaseSchema):
     name: str | None = None
-    external_id: str | None = None
-    container_id: str | None = None
+    affiliate_external_id: str | None = None
+    datasource_id: str | None = None
 
 
 class EntitlementRead(IdSchema, CommonEventsSchema, EntitlementBase):
-    owner: AccountReference | None = None  # TODO make required
+    operations_external_id: Annotated[
+        str | None, Field(max_length=255, examples=["ee7ebfaf-a222-4209-aecc-67861694a488"])
+    ] = None
+    owner: AccountReference
     status: EntitlementStatus
     redeemed_at: datetime.datetime | None = None
     redeemed_by: OrganizationReference | None = None

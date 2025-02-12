@@ -147,18 +147,6 @@ def entitlement_factory(
 
 
 @pytest.fixture
-async def entitlement_aws(
-    entitlement_factory: ModelFactory[Entitlement], gcp_extension: System
-) -> Entitlement:
-    return await entitlement_factory(name="AWS", created_by=gcp_extension, updated_by=gcp_extension)
-
-
-@pytest.fixture
-async def entitlement_gcp(entitlement_factory: ModelFactory[Entitlement]) -> Entitlement:
-    return await entitlement_factory(name="GCP")
-
-
-@pytest.fixture
 def organization_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory[Organization]:
     async def _organization(
         name: str | None = None,
@@ -322,8 +310,33 @@ def system_jwt_token_factory(
 
 
 @pytest.fixture
-async def gcp_extension(system_factory: ModelFactory[System]) -> System:
-    return await system_factory(external_id="GCP")
+async def operations_account(account_factory: ModelFactory[Account]) -> Account:
+    return await account_factory(name="SoftwareOne", type=AccountType.OPERATIONS)
+
+
+@pytest.fixture
+async def affiliate_account(account_factory: ModelFactory[Account]) -> Account:
+    return await account_factory(name="Microsoft", type=AccountType.AFFILIATE)
+
+
+@pytest.fixture
+async def aws_account(account_factory: ModelFactory[Account]) -> Account:
+    return await account_factory(name="AWS", type=AccountType.AFFILIATE)
+
+
+@pytest.fixture
+async def gcp_account(account_factory: ModelFactory[Account]) -> Account:
+    return await account_factory(name="GCP", type=AccountType.AFFILIATE)
+
+
+@pytest.fixture
+async def gcp_extension(system_factory: ModelFactory[System], gcp_account: Account) -> System:
+    return await system_factory(external_id="GCP", owner=gcp_account)
+
+
+@pytest.fixture
+async def aws_extension(system_factory: ModelFactory[System], aws_account: Account) -> System:
+    return await system_factory(external_id="AWS", owner=aws_account)
 
 
 @pytest.fixture
@@ -332,18 +345,40 @@ def gcp_jwt_token(system_jwt_token_factory: Callable[[System], str], gcp_extensi
 
 
 @pytest.fixture
-async def operations_account(account_factory: ModelFactory[Account]) -> Account:
-    return await account_factory(type=AccountType.OPERATIONS)
-
-
-@pytest.fixture
-async def ffc_extension(system_factory: ModelFactory[System]) -> System:
-    return await system_factory(external_id="FFC")
+async def ffc_extension(
+    system_factory: ModelFactory[System], operations_account: Account
+) -> System:
+    return await system_factory(external_id="FFC", owner=operations_account)
 
 
 @pytest.fixture
 def ffc_jwt_token(system_jwt_token_factory: Callable[[System], str], ffc_extension: System) -> str:
     return system_jwt_token_factory(ffc_extension)
+
+
+@pytest.fixture
+async def entitlement_aws(
+    entitlement_factory: ModelFactory[Entitlement], aws_extension: System
+) -> Entitlement:
+    return await entitlement_factory(
+        name="AWS",
+        owner=aws_extension.owner,
+        created_by=aws_extension,
+        updated_by=aws_extension,
+    )
+
+
+@pytest.fixture
+async def entitlement_gcp(
+    entitlement_factory: ModelFactory[Entitlement],
+    gcp_extension: System,
+) -> Entitlement:
+    return await entitlement_factory(
+        name="GCP",
+        owner=gcp_extension.owner,
+        created_by=gcp_extension,
+        updated_by=gcp_extension,
+    )
 
 
 @pytest.fixture

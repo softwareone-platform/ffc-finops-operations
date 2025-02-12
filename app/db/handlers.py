@@ -177,7 +177,11 @@ class ModelHandler[M: BaseModel]:
 class EntitlementHandler(ModelHandler[Entitlement]):
     def __init__(self, session):
         super().__init__(session)
-        self.default_options = [joinedload(Entitlement.owner)]
+        self.default_options = [
+            joinedload(Entitlement.owner),
+            joinedload(Entitlement.created_by),
+            joinedload(Entitlement.updated_by),
+        ]
 
     async def terminate(self, entitlement: Entitlement) -> Entitlement:
         return await self.update(
