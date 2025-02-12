@@ -103,7 +103,7 @@ async def test_create_entitlement_with_incomplete_data(api_client: AsyncClient, 
         },
     )
 
-    assert response.status_code == 400
+    assert response.status_code == 422
     [detail] = response.json()["detail"]
 
     assert detail["type"] == "missing"

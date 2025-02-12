@@ -40,12 +40,6 @@ def get_account_handler(session: DBSession) -> AccountHandler:
     return AccountHandler(session)
 
 
-SystemRepository = Annotated[
-    handlers.SystemHandler, Depends(HandlerFactory(handlers.SystemHandler))
-]
-
-
-
 EntitlementId = Annotated[str, Path(pattern=models.Entitlement.build_id_regex())]
 OrganizationId = Annotated[str, Path(pattern=models.Organization.build_id_regex())]
 SystemId = Annotated[str, Path(pattern=models.System.build_id_regex())]
