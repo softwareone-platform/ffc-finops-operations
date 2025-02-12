@@ -4,10 +4,9 @@ from fastapi import Depends, Path
 
 from app.auth.auth import get_authentication_context
 from app.auth.context import AuthenticationContext
-from app.db import DBSession
-from app.db.handlers import AccountHandler, EntitlementHandler, OrganizationHandler
-from app.db.models import Account, Entitlement, Organization
 from app.db import DBSession, handlers, models
+from app.db.handlers import AccountHandler
+from app.db.models import Account
 
 
 class HandlerFactory:

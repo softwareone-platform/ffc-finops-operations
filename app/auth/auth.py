@@ -25,8 +25,6 @@ from app.enums import (
     UserStatus,
 )
 
-JWT_ALGORITHM = "HS256"
-
 
 class JWTCredentials(HTTPAuthorizationCredentials):
     claim: dict[str, Any]
@@ -65,7 +63,6 @@ async def get_authentication_context(
     account_handler = AccountHandler(db_session)
 
     actor_id = credentials.claim["sub"]
-    context = None
     try:
         if actor_id.startswith(System.PK_PREFIX):
             system = await system_handler.get(

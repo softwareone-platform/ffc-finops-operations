@@ -3,9 +3,7 @@ import logging
 import fastapi_pagination
 import svcs
 import uvicorn
-from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi import Depends, FastAPI
 
 from app import settings
 from app.api_clients import BaseAPIClient

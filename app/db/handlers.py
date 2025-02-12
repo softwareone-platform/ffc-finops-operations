@@ -168,22 +168,6 @@ class ModelHandler[M: BaseModel]:
         result = await self.session.execute(query)
         return result.scalars().one()
 
-    async def filter(self, *conditions: Any) -> Sequence[M]:
-        query = select(self.model_cls).where(*conditions)
-        if self.default_options:
-            query = query.options(*self.default_options)
-
-        results = await self.session.execute(query)
-        return results.scalars().all()
-
-    async def first(self, *conditions: Any) -> M | None:
-        query = select(self.model_cls).where(*conditions)
-        if self.default_options:
-            query = query.options(*self.default_options)
-
-        result = await self.session.execute(query)
-        return result.scalars().first()
-
     async def _save_changes(self, obj: M):
         if self.commit:
             await self.session.commit()

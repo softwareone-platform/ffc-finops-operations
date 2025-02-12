@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Account, System
-from app.enums import AccountType, AccountStatus
+from app.enums import AccountStatus, AccountType
 from tests.types import JWTTokenFactory, ModelFactory
 
 # ====================
@@ -154,15 +154,16 @@ async def test_get_account_by_id(
     assert response.status_code == 200
     data = response.json()
     """
-     {'name': 'Microsoft', 
-     'external_id': 'cc2f4d07-f80a-45bc-9b3e-3473e23cec63', 
-     'type': 'affiliate', 
-     'created_at': '2025-02-12T10:53:14.752084Z', 
-     'updated_at': '2025-02-12T10:53:14.752087Z', 
-     'deleted_at': None, 'created_by': {'id': 'FTKN-3532-2325', 'type': 'system', 'name': 'James-Wolfe'},
-      'updated_by': {'id': 'FTKN-3532-2325', 'type': 'system', 'name': 'James-Wolfe'}, 
-      'deleted_by': None, 
-      'id': 'FACC-8751-0928', 
+     {'name': 'Microsoft',
+     'external_id': 'cc2f4d07-f80a-45bc-9b3e-3473e23cec63',
+     'type': 'affiliate',
+     'created_at': '2025-02-12T10:53:14.752084Z',
+     'updated_at': '2025-02-12T10:53:14.752087Z',
+     'deleted_at': None, 'created_by': {'id': 'FTKN-3532-2325', 'type': 'system',
+     'name': 'James-Wolfe'},
+      'updated_by': {'id': 'FTKN-3532-2325', 'type': 'system', 'name': 'James-Wolfe'},
+      'deleted_by': None,
+      'id': 'FACC-8751-0928',
       'entitlements_stats': None, 'status': 'active'
       }
 
@@ -237,7 +238,7 @@ async def test_get_all_account_multiple_pages(
     gcp_account: Account,
     ffc_jwt_token: str,
 ):
-    for index in range(10):
+    for _ in range(10):
         await account_factory(
             name="SWO",
             type=AccountType.OPERATIONS,
