@@ -35,8 +35,11 @@ SystemRepository = Annotated[
     handlers.SystemHandler, Depends(HandlerFactory(handlers.SystemHandler))
 ]
 
+
 def get_account_handler(session: DBSession) -> AccountHandler:
     return AccountHandler(session)
+
+
 SystemRepository = Annotated[
     handlers.SystemHandler, Depends(HandlerFactory(handlers.SystemHandler))
 ]

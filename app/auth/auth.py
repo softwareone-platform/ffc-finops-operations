@@ -28,7 +28,6 @@ from app.enums import (
 JWT_ALGORITHM = "HS256"
 
 
-
 class JWTCredentials(HTTPAuthorizationCredentials):
     claim: dict[str, Any]
 

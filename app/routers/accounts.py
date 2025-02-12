@@ -58,9 +58,9 @@ async def validate_account_type_and_required_conditions(account_repo, data):
         )
 
 
-async def fetch_account_or_404(account_id: AccountId, account_repo: AccountRepository) -> Account:
+async def fetch_account_or_404(id: AccountId, account_repo: AccountRepository) -> Account:
     try:
-        return await account_repo.get(id=account_id)
+        return await account_repo.get(id=id)
     except NotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

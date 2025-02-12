@@ -172,7 +172,7 @@ async def test_create_organization_with_incomplete_data(
         headers={"Authorization": f"Bearer {ffc_jwt_token}"},
     )
 
-    assert response.status_code == 422
+    assert response.status_code == 400
     [detail] = response.json()["detail"]
 
     assert detail["type"] == "missing"

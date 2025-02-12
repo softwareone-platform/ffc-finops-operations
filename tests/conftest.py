@@ -103,14 +103,16 @@ async def account_factory(faker: Faker, db_session: AsyncSession) -> ModelFactor
         type: str | None = None,
         external_id: str | None = None,
         status: AccountStatus | None = None,
-        external_id: str | None = None
+        created_by: Actor | None = None,
+        updated_by: Actor | None = None,
     ) -> Account:
         account = Account(
             type=type or AccountType.AFFILIATE,
             name=name or "AWS",
             external_id=external_id or str(faker.uuid4()),
             status=status or AccountStatus.ACTIVE,
-            external_id=external_id or str(faker.uuid4()),
+            created_by=created_by,
+            updated_by=updated_by,
         )
         db_session.add(account)
         await db_session.commit()
@@ -346,7 +348,19 @@ async def aws_extension(system_factory: ModelFactory[System], aws_account: Accou
 
 @pytest.fixture
 async def operations_account(account_factory: ModelFactory[Account]) -> Account:
-    return await account_factory(type=AccountType.OPERATIONS)
+    return await account_factory(name="SoftwareOne", type=AccountType.OPERATIONS)
+
+
+@pytest.fixture
+async def affiliate_account(
+    account_factory: ModelFactory[Account], ffc_extension: System
+) -> Account:  # noqa: E501
+    return await account_factory(
+        name="Microsoft",
+        type=AccountType.AFFILIATE,
+        created_by=ffc_extension,  # noqa: E501
+        updated_by=ffc_extension,
+    )
 
 
 @pytest.fixture
