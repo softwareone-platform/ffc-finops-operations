@@ -36,7 +36,7 @@ def command(ctx: typer.Context):
             name="SoftwareOne",
             type=AccountType.OPERATIONS,
             status=AccountStatus.ACTIVE,
-            external_id=str(uuid4())
+            external_id=str(uuid4()),
         )
         session.add(account)
         session.commit()

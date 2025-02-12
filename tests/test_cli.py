@@ -68,7 +68,12 @@ async def test_create_op_account(db_session: AsyncSession):
 async def test_create_op_account_exist(db_session: AsyncSession):
     account_handler = AccountHandler(db_session)
     account = await account_handler.create(
-        Account(name="SWO", type=AccountType.OPERATIONS, status=AccountStatus.ACTIVE, external_id=str(uuid4()))
+        Account(
+            name="SWO",
+            type=AccountType.OPERATIONS,
+            status=AccountStatus.ACTIVE,
+            external_id=str(uuid4()),
+        )
     )
     loop = asyncio.get_event_loop()
     runner = CliRunner()

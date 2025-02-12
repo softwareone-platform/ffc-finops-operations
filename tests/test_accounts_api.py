@@ -217,9 +217,7 @@ async def test_get_all_accounts(api_client: AsyncClient, ffc_jwt_token: str):
 
 
 async def test_get_all_accounts_single_page(
-    operations_account,
-    api_client: AsyncClient,
-    ffc_jwt_token: str
+    operations_account, api_client: AsyncClient, ffc_jwt_token: str
 ):
     response = await api_client.get(
         "/accounts",
