@@ -134,5 +134,5 @@ async def check_operations_account(
         # This API can only be consumed in the context of an Operations Account
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not Allowed",
+            detail="You’ve found the door, but you don’t have the key.",
         )

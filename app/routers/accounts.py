@@ -47,11 +47,11 @@ async def validate_account_type_and_required_conditions(account_repo, data):
     if data.type != AccountType.AFFILIATE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="An Account with external ID " f"`{data.external_id}` already exists.",
+            detail="You cannot create an Account of type Operations.",
         )
     if await account_repo.first(
         Account.external_id == data.external_id, Account.status != AccountStatus.DELETED
-    ):  # noqa: E501
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="An Account with external ID " f"`{data.external_id}` already exists.",
@@ -77,13 +77,7 @@ async def fetch_account_or_404(id: AccountId, account_repo: AccountRepository) -
 async def create_account(data: AccountCreate, account_repo: AccountRepository):
     """
     This Endpoint creates an Affiliate Account.
-    The incoming data looks like
-     {
-          "name": "Microsoft",
-          "external_id": "ACC-9044-8753", # this has to be unique in the DB
-          "description": "string",
-          "type": "affiliate"
-    }
+
     There are 3 conditions to check before proceeding with the operation of creation for an account.
     1. The Account type must be OPERATIONS, otherwise a 403 error will be returned
     2. Only Accounts classified as of type “Affiliate” can be created.
@@ -94,29 +88,17 @@ async def create_account(data: AccountCreate, account_repo: AccountRepository):
     Raises:
         - HTTPException with status 403 if the check (1) fails
         - HTTPException with status 400 if the checks (2) or (3) fail.
-    Return: A dict like the following one
-    {
-        'id': 'FACC-1369-9180',
-        'name': 'Microsoft',
-        'external_id': 'ACC-9044-8753',
-        'type': 'affiliate',
-        'created_at': '2025-02-11T08:26:53.280197Z',
-        'updated_at': '2025-02-11T08:26:53.280202Z',
-        'deleted_at': None,
-        'created_by': {'id': 'FTKN-9219-4796', 'type': 'system', 'name': 'Johnson PLC'},
-        'updated_by': {'id': 'FTKN-9219-4796', 'type': 'system', 'name': 'Johnson PLC'},
-        'deleted_by': None,
-        'entitlements_stats': None,
-        'status': 'active'
-    }
-
 
     """
     await validate_account_type_and_required_conditions(account_repo, data)
     return await persist_data_and_format_response(account_repo, data)
 
 
-@router.get("/{id}", response_model=AccountRead)
+@router.get(
+    "/{id}",
+    response_model=AccountRead,
+    dependencies=[Depends(check_operations_account)],
+)
 async def get_account_by_id(
     account: Annotated[Account, Depends(fetch_account_or_404)],
 ):

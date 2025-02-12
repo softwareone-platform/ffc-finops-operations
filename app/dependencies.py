@@ -5,7 +5,6 @@ from fastapi import Depends, Path
 from app.auth.auth import get_authentication_context
 from app.auth.context import AuthenticationContext
 from app.db import DBSession, handlers, models
-from app.db.handlers import AccountHandler
 from app.db.models import Account
 
 
@@ -33,10 +32,6 @@ AccountUserRepository = Annotated[
 SystemRepository = Annotated[
     handlers.SystemHandler, Depends(HandlerFactory(handlers.SystemHandler))
 ]
-
-
-def get_account_handler(session: DBSession) -> AccountHandler:
-    return AccountHandler(session)
 
 
 EntitlementId = Annotated[str, Path(pattern=models.Entitlement.build_id_regex())]
