@@ -317,16 +317,6 @@ def system_jwt_token_factory(
 
 
 @pytest.fixture
-async def operations_account(account_factory: ModelFactory[Account]) -> Account:
-    return await account_factory(name="SoftwareOne", type=AccountType.OPERATIONS)
-
-
-@pytest.fixture
-async def affiliate_account(account_factory: ModelFactory[Account]) -> Account:
-    return await account_factory(name="Microsoft", type=AccountType.AFFILIATE)
-
-
-@pytest.fixture
 async def aws_account(account_factory: ModelFactory[Account]) -> Account:
     return await account_factory(name="AWS", type=AccountType.AFFILIATE)
 
@@ -344,6 +334,23 @@ async def gcp_extension(system_factory: ModelFactory[System], gcp_account: Accou
 @pytest.fixture
 async def aws_extension(system_factory: ModelFactory[System], aws_account: Account) -> System:
     return await system_factory(external_id="AWS", owner=aws_account)
+
+
+@pytest.fixture
+async def operations_account(account_factory: ModelFactory[Account]) -> Account:
+    return await account_factory(name="SoftwareOne", type=AccountType.OPERATIONS)
+
+
+@pytest.fixture
+async def affiliate_account(
+    account_factory: ModelFactory[Account], ffc_extension: System
+) -> Account:  # noqa: E501
+    return await account_factory(
+        name="Microsoft",
+        type=AccountType.AFFILIATE,
+        created_by=ffc_extension,  # noqa: E501
+        updated_by=ffc_extension,
+    )
 
 
 @pytest.fixture

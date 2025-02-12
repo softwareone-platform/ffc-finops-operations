@@ -166,7 +166,6 @@ async def test_get_account_by_id(
       'id': 'FACC-8751-0928',
       'entitlements_stats': None, 'status': 'active'
       }
-
     """
     assert data["id"] == affiliate_account.id
     assert data["name"] == affiliate_account.name
