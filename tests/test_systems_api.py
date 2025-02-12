@@ -2,7 +2,9 @@ from collections.abc import Callable
 from datetime import datetime
 
 import pytest
+from fastapi import status
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Account, System
 from app.enums import AccountType, SystemStatus
@@ -286,3 +288,68 @@ async def test_get_systems_with_operations_api(
 
     assert data["total"] == 2
     assert {system["id"] for system in data["items"]} == {operations_system.id, affiliate_system.id}
+
+
+# ==============
+# Disable system
+# ==============
+
+
+@pytest.mark.parametrize(
+    (
+        "initial_status",
+        "expected_status_code",
+        "expected_new_status",
+    ),
+    [
+        pytest.param(
+            SystemStatus.ACTIVE,
+            status.HTTP_200_OK,
+            SystemStatus.DISABLED,
+            id="disable_active",
+        ),
+        pytest.param(
+            SystemStatus.DISABLED,
+            status.HTTP_400_BAD_REQUEST,
+            SystemStatus.DISABLED,
+            id="disable_disabled_fail",
+        ),
+        pytest.param(
+            SystemStatus.DELETED,
+            status.HTTP_400_BAD_REQUEST,
+            SystemStatus.DELETED,
+            id="disable_deleted_fail",
+        ),
+    ],
+)
+async def test_disable_system(
+    initial_status: SystemStatus,
+    expected_status_code: int,
+    expected_new_status: SystemStatus,
+    account_factory: ModelFactory[Account],
+    system_factory: ModelFactory[System],
+    system_jwt_token_factory: Callable[[System], str],
+    ffc_extension: System,
+    api_client: AsyncClient,
+    db_session: AsyncSession,
+):
+    system = await system_factory(status=initial_status)
+
+    response = await api_client.post(
+        f"/systems/{system.id}/disable",
+        headers={"Authorization": f"Bearer {system_jwt_token_factory(ffc_extension)}"},
+    )
+
+    assert response.status_code == expected_status_code
+
+    if response.is_error:
+        expected_error_msg = (
+            f"System's status is '{initial_status._value_}'; only active systems can be disabled"
+        )
+        assert response.json()["detail"] == expected_error_msg
+    else:
+        data = response.json()
+        assert data["status"] == expected_new_status._value_
+
+    await db_session.refresh(system)
+    assert system.status == expected_new_status

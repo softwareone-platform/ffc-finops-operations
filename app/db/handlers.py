@@ -118,8 +118,11 @@ class ModelHandler[M: BaseModel]:
         obj = await self.create(self.model_cls(**params))
         return obj, True
 
-    async def update(self, id: str, data: dict[str, Any]) -> M:
-        obj = await self.get(id)
+    async def update(self, id_or_obj: str | M, data: dict[str, Any]) -> M:
+        if isinstance(id_or_obj, str):
+            obj = await self.get(id_or_obj)
+        else:
+            obj = id_or_obj
 
         for key, value in data.items():
             setattr(obj, key, value)
