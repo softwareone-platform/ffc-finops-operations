@@ -73,7 +73,9 @@ def test_system_read_from_orm(gcp_extension: System):
     assert system_read.description == system.description
     assert system_read.created_at == system.created_at
     assert system_read.updated_at == system.updated_at
+    assert system_read.created_by is not None
     assert system_read.created_by.id == gcp_extension.id
+    assert system_read.updated_by is not None
     assert system_read.updated_by.id == gcp_extension.id
     assert system_read.owner.id == system.owner.id
 
@@ -94,13 +96,14 @@ def test_entitlement_create_to_orm():
     assert entitlement.datasource_id == data["datasource_id"]
 
 
-def test_entitlement_read_from_orm(gcp_extension: System):
+def test_entitlement_read_from_orm(gcp_extension: System, affiliate_account: Account):
     entitlement = Entitlement(
         id="FENT-1234-5678-9012",
         name="AWS",
         affiliate_external_id="ACC-123",
         datasource_id="container-123",
         status=EntitlementStatus.ACTIVE,
+        owner=affiliate_account,
     )
     # Set timestamps and audit fields after creation
     entitlement.created_at = datetime.now(UTC)
@@ -117,9 +120,11 @@ def test_entitlement_read_from_orm(gcp_extension: System):
     assert entitlement_read.status == entitlement.status
     assert entitlement_read.created_at == entitlement.created_at
     assert entitlement_read.updated_at == entitlement.updated_at
+    assert entitlement_read.created_by is not None
     assert entitlement_read.created_by.id == gcp_extension.id
     assert entitlement_read.created_by.type == gcp_extension.type
     assert entitlement_read.created_by.name == gcp_extension.name
+    assert entitlement_read.updated_by is not None
     assert entitlement_read.updated_by.id == gcp_extension.id
     assert entitlement_read.updated_by.type == gcp_extension.type
     assert entitlement_read.updated_by.name == gcp_extension.name
@@ -180,9 +185,11 @@ def test_organization_read_from_orm(ffc_extension: System):
     assert org_read.status == organization.status
     assert org_read.created_at == organization.created_at
     assert org_read.updated_at == organization.updated_at
+    assert org_read.created_by is not None
     assert org_read.created_by.id == ffc_extension.id
     assert org_read.created_by.type == ffc_extension.type
     assert org_read.created_by.name == ffc_extension.name
+    assert org_read.updated_by is not None
     assert org_read.updated_by.id == ffc_extension.id
     assert org_read.updated_by.type == ffc_extension.type
     assert org_read.updated_by.name == ffc_extension.name

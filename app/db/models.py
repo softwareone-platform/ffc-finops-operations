@@ -141,6 +141,7 @@ class System(Actor, AuditableMixin):
     __mapper_args__ = {
         "polymorphic_identity": ActorType.SYSTEM.value,
         "inherit_condition": id == Actor.id,
+        "polymorphic_load": "inline",
     }
 
 

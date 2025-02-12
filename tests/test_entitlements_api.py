@@ -1,11 +1,12 @@
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Entitlement, System
-from app.enums import EntitlementStatus
+from app.db.models import Account, Entitlement, System
+from app.enums import AccountStatus, EntitlementStatus
 from tests.types import JWTTokenFactory, ModelFactory
 
 # ====================
@@ -109,6 +110,118 @@ async def test_create_entitlement_with_incomplete_data(api_client: AsyncClient, 
     assert detail["loc"] == ["body", "datasource_id"]
 
 
+async def test_create_entitlement_by_affiliate_with_owner(
+    api_client: AsyncClient,
+    gcp_jwt_token: str,
+):
+    response = await api_client.post(
+        "/entitlements",
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+        json={
+            "name": "AWS",
+            "affiliate_external_id": "EXTERNAL_ID_987123",
+            "datasource_id": "ds-id",
+            "owner": {"id": "FACC-1234"},
+        },
+    )
+
+    assert response.status_code == 400
+    error_msg = response.json()["detail"]
+
+    assert error_msg == "Affiliate accounts cannot provide an owner for an Entitlement."
+
+
+async def test_create_entitlement_by_operations_with_owner(
+    api_client: AsyncClient,
+    ffc_jwt_token: str,
+    affiliate_account: Account,
+):
+    response = await api_client.post(
+        "/entitlements",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+        json={
+            "name": "AWS",
+            "affiliate_external_id": "EXTERNAL_ID_987123",
+            "datasource_id": "ds-id",
+            "owner": {"id": affiliate_account.id},
+        },
+    )
+
+    assert response.status_code == 201
+    entitlement = response.json()
+    assert entitlement["owner"]["id"] == affiliate_account.id
+
+
+async def test_create_entitlement_by_operations_without_owner(
+    api_client: AsyncClient,
+    ffc_jwt_token: str,
+):
+    response = await api_client.post(
+        "/entitlements",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+        json={
+            "name": "AWS",
+            "affiliate_external_id": "EXTERNAL_ID_987123",
+            "datasource_id": "ds-id",
+        },
+    )
+
+    assert response.status_code == 400
+    error = response.json()["detail"]
+    assert error == "Operations accounts must provide an owner for an Entitlement."
+
+
+@pytest.mark.parametrize(
+    "account_status",
+    [AccountStatus.DELETED, AccountStatus.DISABLED],
+)
+async def test_create_entitlement_by_operations_with_not_active_owner(
+    api_client: AsyncClient,
+    ffc_jwt_token: str,
+    account_factory: ModelFactory[Account],
+    account_status: AccountStatus,
+):
+    affiliate = await account_factory(
+        status=account_status,
+    )
+    response = await api_client.post(
+        "/entitlements",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+        json={
+            "name": "AWS",
+            "affiliate_external_id": "EXTERNAL_ID_987123",
+            "datasource_id": "ds-id",
+            "owner": {"id": affiliate.id},
+        },
+    )
+
+    assert response.status_code == 400
+    error = response.json()["detail"]
+    assert error == f"No Active Affiliate Account has been found with ID {affiliate.id}."
+
+
+async def test_create_entitlement_by_operations_with_owner_not_affiliate(
+    api_client: AsyncClient,
+    ffc_jwt_token: str,
+    account_factory: ModelFactory[Account],
+    operations_account: Account,
+):
+    response = await api_client.post(
+        "/entitlements",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+        json={
+            "name": "AWS",
+            "affiliate_external_id": "EXTERNAL_ID_987123",
+            "datasource_id": "ds-id",
+            "owner": {"id": operations_account.id},
+        },
+    )
+
+    assert response.status_code == 400
+    error = response.json()["detail"]
+    assert error == (f"No Active Affiliate Account has been found with ID {operations_account.id}.")
+
+
 # ================
 # Get Entitlements
 # ================
@@ -136,13 +249,16 @@ async def test_get_all_entitlements_single_page(
     assert response.status_code == 200
     data = response.json()
 
-    assert data["total"] == 2
+    assert data["total"] == 1
     assert len(data["items"]) == data["total"]
+    assert data["items"][0]["id"] == entitlement_gcp.id
 
 
 async def test_get_all_entitlements_multiple_pages(
     entitlement_factory: ModelFactory[Entitlement],
     api_client: AsyncClient,
+    gcp_extension: System,
+    gcp_account: Account,
     gcp_jwt_token: str,
 ):
     for index in range(10):
@@ -150,6 +266,7 @@ async def test_get_all_entitlements_multiple_pages(
             name="AWS",
             affiliate_external_id=f"EXTERNAL_ID_{index}",
             datasource_id=f"CONTAINER_ID_{index}",
+            owner=gcp_account,
         )
 
     first_page_response = await api_client.get(
@@ -202,23 +319,52 @@ async def test_get_all_entitlements_multiple_pages(
 
 
 async def test_get_entitlement_by_id(
-    entitlement_aws: Entitlement,
+    entitlement_gcp: Entitlement,
     api_client: AsyncClient,
     gcp_jwt_token: str,
     gcp_extension: System,
 ):
     response = await api_client.get(
-        f"/entitlements/{entitlement_aws.id}",
+        f"/entitlements/{entitlement_gcp.id}",
         headers={"Authorization": f"Bearer {gcp_jwt_token}"},
     )
 
     assert response.status_code == 200
     data = response.json()
 
-    assert data["id"] == str(entitlement_aws.id)
-    assert data["name"] == entitlement_aws.name
-    assert data["affiliate_external_id"] == entitlement_aws.affiliate_external_id
-    assert data["datasource_id"] == entitlement_aws.datasource_id
+    assert data["id"] == str(entitlement_gcp.id)
+    assert data["name"] == entitlement_gcp.name
+    assert data["affiliate_external_id"] == entitlement_gcp.affiliate_external_id
+    assert data["datasource_id"] == entitlement_gcp.datasource_id
+    assert data["status"] == "new"
+    assert data["created_at"] is not None
+    assert data["created_by"]["id"] == str(gcp_extension.id)
+    assert data["created_by"]["type"] == gcp_extension.type
+    assert data["created_by"]["name"] == gcp_extension.name
+    assert data["updated_at"] is not None
+    assert data["updated_by"]["id"] == str(gcp_extension.id)
+    assert data["updated_by"]["type"] == gcp_extension.type
+    assert data["updated_by"]["name"] == gcp_extension.name
+
+
+async def test_get_entitlement_by_id_operations(
+    entitlement_gcp: Entitlement,
+    api_client: AsyncClient,
+    ffc_jwt_token: str,
+    gcp_extension: System,
+):
+    response = await api_client.get(
+        f"/entitlements/{entitlement_gcp.id}",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["id"] == str(entitlement_gcp.id)
+    assert data["name"] == entitlement_gcp.name
+    assert data["affiliate_external_id"] == entitlement_gcp.affiliate_external_id
+    assert data["datasource_id"] == entitlement_gcp.datasource_id
     assert data["status"] == "new"
     assert data["created_at"] is not None
     assert data["created_by"]["id"] == str(gcp_extension.id)
@@ -260,25 +406,25 @@ async def test_get_invalid_id_format(api_client: AsyncClient, gcp_jwt_token: str
 
 
 async def test_terminate_entitlement_success(
-    entitlement_aws: Entitlement,
+    entitlement_gcp: Entitlement,
     api_client: AsyncClient,
     gcp_jwt_token: str,
     gcp_extension: System,
     db_session: AsyncSession,
 ):
-    assert entitlement_aws.terminated_at is None
-    assert entitlement_aws.terminated_by is None
-    assert entitlement_aws.status == EntitlementStatus.NEW
+    assert entitlement_gcp.terminated_at is None
+    assert entitlement_gcp.terminated_by is None
+    assert entitlement_gcp.status == EntitlementStatus.NEW
 
-    entitlement_aws.status = EntitlementStatus.ACTIVE
+    entitlement_gcp.status = EntitlementStatus.ACTIVE
 
-    db_session.add(entitlement_aws)
+    db_session.add(entitlement_gcp)
     await db_session.commit()
-    await db_session.refresh(entitlement_aws)
+    await db_session.refresh(entitlement_gcp)
 
     request_start_dt = datetime.now(UTC)
     response = await api_client.post(
-        f"/entitlements/{entitlement_aws.id}/terminate",
+        f"/entitlements/{entitlement_gcp.id}/terminate",
         headers={"Authorization": f"Bearer {gcp_jwt_token}"},
     )
     request_end_dt = datetime.now(UTC)
@@ -286,27 +432,26 @@ async def test_terminate_entitlement_success(
     assert response.status_code == 200
     data = response.json()
 
-    assert data["id"] == str(entitlement_aws.id)
+    assert data["id"] == str(entitlement_gcp.id)
     assert data["status"] == "terminated"
 
-    await db_session.refresh(entitlement_aws)
+    await db_session.refresh(entitlement_gcp)
 
-    assert entitlement_aws.status == EntitlementStatus.TERMINATED
-    assert entitlement_aws.terminated_at is not None
-    assert request_start_dt < entitlement_aws.terminated_at < request_end_dt
-    assert entitlement_aws.terminated_by_id == gcp_extension.id
+    assert entitlement_gcp.status == EntitlementStatus.TERMINATED
+    assert entitlement_gcp.terminated_at is not None
+    assert request_start_dt < entitlement_gcp.terminated_at < request_end_dt
+    assert entitlement_gcp.terminated_by_id == gcp_extension.id
 
 
 async def test_terminate_new_entitlement(
-    entitlement_aws: Entitlement,
+    entitlement_gcp: Entitlement,
     api_client: AsyncClient,
     gcp_jwt_token: str,
-    gcp_extension: System,
 ):
-    assert entitlement_aws.status == EntitlementStatus.NEW
+    assert entitlement_gcp.status == EntitlementStatus.NEW
 
     response = await api_client.post(
-        f"/entitlements/{entitlement_aws.id}/terminate",
+        f"/entitlements/{entitlement_gcp.id}/terminate",
         headers={"Authorization": f"Bearer {gcp_jwt_token}"},
     )
 
@@ -317,26 +462,25 @@ async def test_terminate_new_entitlement(
 
 
 async def test_terminate_already_terminated_entitlement(
-    entitlement_aws: Entitlement,
+    entitlement_gcp: Entitlement,
     api_client: AsyncClient,
     gcp_jwt_token: str,
-    gcp_extension: System,
     db_session: AsyncSession,
 ):
-    entitlement_aws.status = EntitlementStatus.TERMINATED
+    entitlement_gcp.status = EntitlementStatus.TERMINATED
 
-    db_session.add(entitlement_aws)
+    db_session.add(entitlement_gcp)
     await db_session.commit()
 
     response = await api_client.post(
-        f"/entitlements/{entitlement_aws.id}/terminate",
+        f"/entitlements/{entitlement_gcp.id}/terminate",
         headers={"Authorization": f"Bearer {gcp_jwt_token}"},
     )
 
     assert response.status_code == 400
     error_msg = response.json()["detail"]
 
-    assert error_msg == "Entitlement is already terminated"
+    assert error_msg == "Entitlement is already terminated."
 
 
 async def test_terminate_non_existant_entitlement(
