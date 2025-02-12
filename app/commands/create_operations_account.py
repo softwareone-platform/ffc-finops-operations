@@ -1,5 +1,3 @@
-from uuid import uuid4
-
 import typer
 from rich import print
 from sqlalchemy import create_engine, select
@@ -9,7 +7,10 @@ from app.db.models import Account
 from app.enums import AccountStatus, AccountType
 
 
-def command(ctx: typer.Context):
+def command(
+    ctx: typer.Context,
+    external_id: str = typer.Argument(..., help="Operation Account external ID"),
+):
     """
     Create the SoftwareOne Operations Account.
     """
@@ -21,7 +22,8 @@ def command(ctx: typer.Context):
     SessionMaker = sessionmaker(bind=db_engine)
     with SessionMaker() as session:
         query = select(Account).where(
-            Account.type == AccountType.OPERATIONS, Account.status != AccountStatus.DELETED
+            Account.type == AccountType.OPERATIONS,
+            Account.status != AccountStatus.DELETED,
         )
         result = session.execute(query)
         instance = result.scalar_one_or_none()
@@ -36,7 +38,7 @@ def command(ctx: typer.Context):
             name="SoftwareOne",
             type=AccountType.OPERATIONS,
             status=AccountStatus.ACTIVE,
-            external_id=str(uuid4()),
+            external_id=external_id,
         )
         session.add(account)
         session.commit()
