@@ -1,10 +1,12 @@
 from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Account, System
+from app.enums import AccountType, AccountStatus
 from tests.types import JWTTokenFactory, ModelFactory
 
 # ====================
@@ -151,7 +153,6 @@ async def test_get_account_by_id(
 
     assert response.status_code == 200
     data = response.json()
-    print("--- DATA-- :\n", data)
     """
      {'name': 'Microsoft', 
      'external_id': 'cc2f4d07-f80a-45bc-9b3e-3473e23cec63', 
@@ -229,3 +230,60 @@ async def test_get_all_accounts_single_page(
     data = response.json()
     assert data["total"] == 1
     assert len(data["items"]) == data["total"]
+
+
+async def test_get_all_account_multiple_pages(
+    account_factory: ModelFactory[Account],
+    api_client: AsyncClient,
+    gcp_extension: System,
+    gcp_account: Account,
+    ffc_jwt_token: str,
+):
+    for index in range(10):
+        await account_factory(
+            name="SWO",
+            type=AccountType.OPERATIONS,
+            status=AccountStatus.ACTIVE,
+            external_id=str(uuid4()),
+        )
+
+    first_page_response = await api_client.get(
+        "/accounts",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+        params={"limit": 5},
+    )
+    first_page_data = first_page_response.json()
+    assert first_page_response.status_code == 200
+    assert first_page_data["total"] == 12
+    assert len(first_page_data["items"]) == 5
+    assert first_page_data["limit"] == 5
+    assert first_page_data["offset"] == 0
+
+    second_page_response = await api_client.get(
+        "/accounts",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+        params={"limit": 3, "offset": 5},
+    )
+    second_page_data = second_page_response.json()
+
+    assert second_page_response.status_code == 200
+    assert second_page_data["total"] == 12
+    assert len(second_page_data["items"]) == 3
+    assert second_page_data["limit"] == 3
+    assert second_page_data["offset"] == 5
+
+    third_page_response = await api_client.get(
+        "/accounts",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+        params={"offset": 8},
+    )
+    third_page_data = third_page_response.json()
+
+    assert third_page_response.status_code == 200
+    assert third_page_data["total"] == 12
+    assert len(third_page_data["items"]) == 4
+    assert third_page_data["limit"] > 2
+    assert third_page_data["offset"] == 8
+
+    all_items = first_page_data["items"] + second_page_data["items"] + third_page_data["items"]
+    assert len(all_items) == 12
