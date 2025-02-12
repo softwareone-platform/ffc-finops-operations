@@ -234,9 +234,7 @@ class Entitlement(Base, HumanReadablePKMixin, AuditableMixin):
     operations_external_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     affiliate_external_id: Mapped[str] = mapped_column(String(255), nullable=False)
     datasource_id: Mapped[str] = mapped_column(String(255), nullable=False)
-    owner_id: Mapped[str | None] = mapped_column(
-        ForeignKey("accounts.id"), nullable=True
-    )  # TODO make required
+    owner_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), nullable=False)
     owner: Mapped[Account] = relationship(foreign_keys=[owner_id])
     status: Mapped[EntitlementStatus] = mapped_column(
         Enum(EntitlementStatus, values_callable=lambda obj: [e.value for e in obj]),
