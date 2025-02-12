@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 import typer
 from rich import print
 from sqlalchemy import create_engine, select
@@ -34,6 +36,7 @@ def command(ctx: typer.Context):
             name="SoftwareOne",
             type=AccountType.OPERATIONS,
             status=AccountStatus.ACTIVE,
+            external_id=str(uuid4()),
         )
         session.add(account)
         session.commit()

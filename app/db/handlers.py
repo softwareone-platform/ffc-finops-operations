@@ -46,6 +46,9 @@ class ModelHandler[M: BaseModel]:
 
     @classmethod
     def _get_generic_cls_args(cls):
+        """
+        Retrieves the generic model class arg dynamically
+        """
         return next(
             base_cls.__args__
             for base_cls in cls.__orig_bases__

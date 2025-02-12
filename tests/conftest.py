@@ -101,12 +101,18 @@ def account_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory[Acco
     async def _account(
         name: str | None = None,
         type: str | None = None,
+        external_id: str | None = None,
         status: AccountStatus | None = None,
+        created_by: Actor | None = None,
+        updated_by: Actor | None = None,
     ) -> Account:
         account = Account(
             type=type or AccountType.AFFILIATE,
             name=name or "AWS",
+            external_id=external_id or str(faker.uuid4()),
             status=status or AccountStatus.ACTIVE,
+            created_by=created_by,
+            updated_by=updated_by,
         )
         db_session.add(account)
         await db_session.commit()
@@ -183,6 +189,7 @@ def system_factory(
         owner: Account | None = None,
         status: SystemStatus = SystemStatus.ACTIVE,
     ) -> System:
+        owner = owner or await account_factory()
         system = System(
             name=name or faker.company(),
             external_id=external_id or str(uuid.uuid4()),
@@ -310,16 +317,6 @@ def system_jwt_token_factory(
 
 
 @pytest.fixture
-async def operations_account(account_factory: ModelFactory[Account]) -> Account:
-    return await account_factory(name="SoftwareOne", type=AccountType.OPERATIONS)
-
-
-@pytest.fixture
-async def affiliate_account(account_factory: ModelFactory[Account]) -> Account:
-    return await account_factory(name="Microsoft", type=AccountType.AFFILIATE)
-
-
-@pytest.fixture
 async def aws_account(account_factory: ModelFactory[Account]) -> Account:
     return await account_factory(name="AWS", type=AccountType.AFFILIATE)
 
@@ -337,6 +334,23 @@ async def gcp_extension(system_factory: ModelFactory[System], gcp_account: Accou
 @pytest.fixture
 async def aws_extension(system_factory: ModelFactory[System], aws_account: Account) -> System:
     return await system_factory(external_id="AWS", owner=aws_account)
+
+
+@pytest.fixture
+async def operations_account(account_factory: ModelFactory[Account]) -> Account:
+    return await account_factory(name="SoftwareOne", type=AccountType.OPERATIONS)
+
+
+@pytest.fixture
+async def affiliate_account(
+    account_factory: ModelFactory[Account], ffc_extension: System
+) -> Account:  # noqa: E501
+    return await account_factory(
+        name="Microsoft",
+        type=AccountType.AFFILIATE,
+        created_by=ffc_extension,  # noqa: E501
+        updated_by=ffc_extension,
+    )
 
 
 @pytest.fixture

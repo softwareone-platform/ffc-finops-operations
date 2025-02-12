@@ -1,7 +1,7 @@
 from typing import Annotated, Any
 
 import jwt
-from fastapi import Depends, Request
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app import settings
@@ -16,7 +16,14 @@ from app.db.handlers import (
     UserHandler,
 )
 from app.db.models import Account, AccountUser, System, User
-from app.enums import AccountStatus, AccountUserStatus, ActorType, SystemStatus, UserStatus
+from app.enums import (
+    AccountStatus,
+    AccountType,
+    AccountUserStatus,
+    ActorType,
+    SystemStatus,
+    UserStatus,
+)
 
 
 class JWTCredentials(HTTPAuthorizationCredentials):
@@ -56,7 +63,6 @@ async def get_authentication_context(
     account_handler = AccountHandler(db_session)
 
     actor_id = credentials.claim["sub"]
-    context = None
     try:
         if actor_id.startswith(System.PK_PREFIX):
             system = await system_handler.get(
@@ -115,3 +121,18 @@ async def get_authentication_context(
         yield context
     finally:
         auth_context.reset(reset_token)
+
+
+async def check_operations_account(
+    context: Annotated[AuthenticationContext, Depends(get_authentication_context)],
+):  # noqa: E501
+    """
+    This function ensures that the account type is of type OPERATIONS
+
+    """
+    if context.account.type != AccountType.OPERATIONS:
+        # This API can only be consumed in the context of an Operations Account
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You’ve found the door, but you don’t have the key.",
+        )

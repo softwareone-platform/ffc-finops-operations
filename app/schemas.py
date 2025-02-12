@@ -26,10 +26,17 @@ def from_orm[M: Base, S: BaseModel](cls: type[S], db_model: M) -> S:
 
 
 def to_orm[M: Base, S: BaseModel](schema: S, model_cls: type[M]) -> M:
+    """
+    Converts a Pydantic schema instance to an ORM model instance.
+
+    This function ensures that only fields present in the ORM model are
+    passed to it,preventing errors caused by extra fields.
+    """
+    # extract data from the schema. This will return a dict
     schema_data = schema.model_dump(exclude_unset=True)
-
+    # filter out all the fields that are not in the ORM model
     dbmodel_fields = {key: value for key, value in schema_data.items() if hasattr(model_cls, key)}
-
+    # create an instance of the ORM model
     return model_cls(**dbmodel_fields)
 
 
@@ -70,24 +77,36 @@ class AccountEntitlementsStats(BaseSchema):
 
 
 class AccountBase(BaseSchema):
-    name: Annotated[str, Field(max_length=255, examples=["Microsoft"])]
-    external_id: Annotated[str, Field(max_length=255, examples=["ACC-9044-8753"])]
-    description: Annotated[str | None, Field(max_length=2000)] = None
-    type: AccountType = AccountType.AFFILIATE
+    name: Annotated[
+        str, Field(max_length=255, examples=["Microsoft"], description="The name of the account")
+    ]  # noqa: E501
+    external_id: Annotated[
+        str,
+        Field(
+            max_length=255,
+            examples=["ACC-9044-8753"],
+            description="An external identifier for the account",
+        ),
+    ]  # noqa: E501
+    type: AccountType = AccountType.AFFILIATE  # The type of the account
 
 
 class AccountCreate(AccountBase):
-    pass
+    name: Annotated[str, Field(max_length=255, examples=["Microsoft"])] = Field(
+        ..., description="The name of the account"
+    )
+    external_id: Annotated[str, Field(max_length=255, examples=["ACC-9044-8753"])] = Field(
+        ..., description="An external identifier for the account"
+    )
 
 
 class AccountUpdate(BaseSchema):
     name: Annotated[str | None, Field(max_length=255, examples=["Microsoft"])] = None
     external_id: Annotated[str | None, Field(max_length=255, examples=["ACC-9044-8753"])] = None
-    description: Annotated[str | None, Field(max_length=2000)] = None
 
 
 class AccountRead(IdSchema, CommonEventsSchema, AccountBase):
-    entitlements_stats: AccountEntitlementsStats
+    entitlements_stats: AccountEntitlementsStats | None = None
     status: AccountStatus
 
 

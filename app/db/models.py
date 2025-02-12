@@ -112,6 +112,7 @@ class Account(Base, HumanReadablePKMixin, AuditableMixin):
         default=AccountStatus.ACTIVE,
         server_default=AccountStatus.ACTIVE.value,
     )
+    external_id: Mapped[str] = mapped_column(String(255), nullable=False)
     users: Mapped[list["AccountUser"]] = relationship(back_populates="account")
 
 

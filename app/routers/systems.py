@@ -12,7 +12,7 @@ from app.pagination import paginate
 from app.schemas import SystemCreate, SystemRead, SystemUpdate, from_orm
 
 # ============
-# Dependancies
+# Dependencies
 # ============
 
 
