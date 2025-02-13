@@ -2,15 +2,20 @@ from collections.abc import Callable
 from contextlib import AbstractContextManager, asynccontextmanager
 
 import pytest
-from fastapi import HTTPException
+from fastapi import HTTPException, status
 from pytest_mock import MockerFixture
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import settings
-from app.auth.auth import JWTBearer, JWTCredentials, get_authentication_context
+from app.auth.auth import (
+    JWTBearer,
+    JWTCredentials,
+    check_operations_account,
+    get_authentication_context,
+)
 from app.auth.context import AuthenticationContext, auth_context
 from app.db.models import System, User
-from app.enums import AccountUserStatus, ActorType, SystemStatus, UserStatus
+from app.enums import AccountType, AccountUserStatus, ActorType, SystemStatus, UserStatus
 from tests.types import JWTTokenFactory, ModelFactory
 
 
@@ -229,3 +234,16 @@ async def test_get_authentication_context_user_account_does_not_exist(
 
     with pytest.raises(LookupError):
         auth_context.get()
+
+async def test_check_operations_account(
+        mocker
+):
+    context = mocker.Mock()
+    context.account.type = AccountType.AFFILIATE
+    with pytest.raises(HTTPException) as exc_info:
+        await check_operations_account(context)
+
+    assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
+    assert "You’ve found the door, but you don’t have the key." in str(
+        exc_info.value.detail
+    )
