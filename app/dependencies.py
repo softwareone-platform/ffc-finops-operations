@@ -5,7 +5,6 @@ from fastapi import Depends, Path
 from app.auth.auth import get_authentication_context
 from app.auth.context import AuthenticationContext
 from app.db import DBSession, handlers, models
-from app.db.models import Account
 
 
 class HandlerFactory:
@@ -37,5 +36,6 @@ SystemRepository = Annotated[
 EntitlementId = Annotated[str, Path(pattern=models.Entitlement.build_id_regex())]
 OrganizationId = Annotated[str, Path(pattern=models.Organization.build_id_regex())]
 SystemId = Annotated[str, Path(pattern=models.System.build_id_regex())]
-AccountId = Annotated[str, Path(pattern=Account.build_id_regex())]
+AccountId = Annotated[str, Path(pattern=models.Account.build_id_regex())]
+UserId = Annotated[str, Path(pattern=models.User.build_id_regex())]
 CurrentAuthContext = Annotated[AuthenticationContext, Depends(get_authentication_context)]

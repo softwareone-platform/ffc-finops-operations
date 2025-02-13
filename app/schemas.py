@@ -169,9 +169,8 @@ class UserReference(IdSchema, UserCreate):
 
 
 class UserAcceptInvitation(BaseSchema):
-    account: IdSchema
-    invitation_token: uuid.UUID
-    password: Annotated[str, Field(examples=["PKH7aqr_gwh5fgm!xdk"])]
+    invitation_token: str
+    password: Annotated[str | None, Field(examples=["PKH7aqr_gwh5fgm!xdk"], default=None)]
 
 
 class UserResetPassword(BaseSchema):

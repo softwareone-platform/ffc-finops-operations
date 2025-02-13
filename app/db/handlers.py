@@ -215,10 +215,21 @@ class AccountHandler(ModelHandler[Account]):
 
 
 class UserHandler(ModelHandler[User]):
-    pass
+    def __init__(self, session):
+        super().__init__(session)
+        self.default_options = [
+            joinedload(User.last_used_account),
+        ]
 
 
 class AccountUserHandler(ModelHandler[AccountUser]):
+    def __init__(self, session):
+        super().__init__(session)
+        self.default_options = [
+            joinedload(AccountUser.account),
+            joinedload(AccountUser.user),
+        ]
+
     async def get_account_user(
         self,
         account_id: str,
