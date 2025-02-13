@@ -79,7 +79,7 @@ class AccountEntitlementsStats(BaseSchema):
 class AccountBase(BaseSchema):
     name: Annotated[
         str, Field(max_length=255, examples=["Microsoft"], description="The name of the account")
-    ]  # noqa: E501
+    ]
     external_id: Annotated[
         str,
         Field(
@@ -87,20 +87,13 @@ class AccountBase(BaseSchema):
             examples=["ACC-9044-8753"],
             description="An external identifier for the account",
         ),
-    ]  # noqa: E501
-    type: AccountType = AccountType.AFFILIATE  # The type of the account
+    ]
 
 
 class AccountCreate(AccountBase):
-    name: Annotated[str, Field(max_length=255, examples=["Microsoft"])] = Field(
-        ..., description="The name of the account"
-    )
-    external_id: Annotated[str, Field(max_length=255, examples=["ACC-9044-8753"])] = Field(
-        ..., description="An external identifier for the account"
-    )
+    type: AccountType
 
-
-class AccountUpdate(BaseSchema):
+class AccountUpdate(AccountBase):
     name: Annotated[str | None, Field(max_length=255, examples=["Microsoft"])] = None
     external_id: Annotated[str | None, Field(max_length=255, examples=["ACC-9044-8753"])] = None
 
@@ -108,6 +101,8 @@ class AccountUpdate(BaseSchema):
 class AccountRead(IdSchema, CommonEventsSchema, AccountBase):
     entitlements_stats: AccountEntitlementsStats | None = None
     status: AccountStatus
+    type: AccountType
+
 
 
 class AccountReference(IdSchema):

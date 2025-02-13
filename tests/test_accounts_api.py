@@ -9,6 +9,7 @@ from pytest_mock import MockerFixture
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.context import AuthenticationContext
 from app.db.models import Account, System
 from app.dependencies import AccountRepository
 from app.enums import AccountStatus, AccountType
@@ -134,12 +135,7 @@ async def test_create_accounts_incomplete_body(
         headers={"Authorization": f"Bearer {ffc_jwt_token}"},
         json={"name": "Microsoft", "external_id": "ACC-9044-8753"},
     )
-    assert response.status_code == 201
-    data = response.json()
-    assert data["id"] is not None
-    assert data["name"] == "Microsoft"
-    assert data["external_id"] == "ACC-9044-8753"
-    assert data["type"] == "affiliate"
+    assert response.status_code == 422
 
 
 # ====================
@@ -319,3 +315,129 @@ async def test_validate_account_type_and_required_conditions_account_deleted(
     assert "An Account with external ID `ACC-9044-8753` already exists." in str(
         exc_info.value.detail
     )
+
+
+#=================
+# UPDATE Accounts
+#=================
+
+
+async def test_can_update_accounts(
+    api_client: AsyncClient,
+    ffc_jwt_token: str,
+    ffc_extension: System,
+    account_factory: ModelFactory[Account],
+    db_session: AsyncSession,
+):
+
+    account = await account_factory(
+        status=AccountStatus.ACTIVE,
+        type=AccountType.AFFILIATE,
+        name="Microsoft",
+        external_id="ACC-9044-8753"
+    )
+    print("Account id:", account.id)
+    response = await api_client.put(
+        f"/accounts/{account.id}",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+        json={"name": "AWS"},
+    )
+    data = response.json()
+    print("RESPONSE TEST:",data)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] is not None
+    assert data["name"] == "AWS"
+    assert data["external_id"] == "ACC-9044-8753"
+    assert data["type"] == "affiliate"
+    assert data["status"] == "active"
+    assert data["created_at"] is not None
+    assert data["updated_at"] is not None
+    assert data["updated_by"]["id"] == str(ffc_extension.id)
+    assert data["updated_by"]["type"] == ffc_extension.type
+    assert data["updated_by"]["name"] == ffc_extension.name
+
+    result = await db_session.execute(select(Account).where(Account.id == data["id"]))
+    assert result.one_or_none() is not None
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "account_status",
+    [
+        AccountStatus.DELETED,
+        AccountStatus.DISABLED
+    ]
+)
+async def test_cannot_update_if_status_is_not_active(
+    api_client: AsyncClient,
+    ffc_jwt_token: str,
+    ffc_extension: System,
+    account_factory: ModelFactory[Account],
+    db_session: AsyncSession,
+    account_status:AccountStatus
+):
+
+    account = await account_factory(
+        status=account_status,
+        type=AccountType.AFFILIATE,
+        name="Microsoft",
+        external_id="ACC-9044-8753"
+    )
+    response = await api_client.put(
+        f"/accounts/{account.id}",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+        json={"name": "AWS"},
+    )
+    assert response.status_code == 400
+
+
+async def test_cannot_update_accounts(
+    api_client: AsyncClient,
+    ffc_jwt_token: str,
+    ffc_extension: System,
+    account_factory: ModelFactory[Account],
+    db_session: AsyncSession,
+):
+
+    account = await account_factory(
+        status=AccountStatus.ACTIVE,
+        type=AccountType.AFFILIATE,
+        name="Microsoft",
+        external_id="ACC-9044-8753"
+    )
+    print("Account id:", account.id)
+    response = await api_client.put(
+        f"/accounts/{account.id}",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+        json={"status": AccountStatus.DISABLED},
+    )
+    data = response.json()
+    assert response.status_code == 400
+    assert data.get("detail") == "You can't update whatever you want."
+
+
+
+
+async def test_cannot_update_accounts_if_not_operation(
+    api_client: AsyncClient,
+    ffc_jwt_token: str,
+    ffc_extension: System,
+    account_factory: ModelFactory[Account],
+    db_session: AsyncSession,
+):
+    account = await account_factory(
+        status=AccountStatus.ACTIVE,
+        type=AccountType.AFFILIATE,
+        name="Microsoft",
+        external_id="ACC-9044-8753"
+    )
+    print("Account id:", account.id)
+    response = await api_client.put(
+        f"/accounts/{account.id}",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+        json={"status": AccountStatus.DISABLED},
+    )
+    data = response.json()
+    assert response.status_code == 400
+    assert data.get("detail") == "You can't update whatever you want."
+

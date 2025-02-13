@@ -6,7 +6,7 @@ from fastapi_pagination.limit_offset import LimitOffsetPage
 from app.auth.auth import check_operations_account
 from app.db.handlers import NotFoundError
 from app.db.models import Account
-from app.dependencies import AccountId, AccountRepository
+from app.dependencies import AccountId, AccountRepository, CurrentAuthContext, UserId
 from app.enums import AccountStatus, AccountType
 from app.pagination import paginate
 from app.schemas import (
@@ -34,6 +34,45 @@ async def persist_data_and_format_response(account_repo, data):
     db_account = await account_repo.create(account)
     return from_orm(AccountRead, db_account)
 
+
+async def update_data_and_format_response(id,account_repo, data):
+    """
+    It updates the given data to the Account model and return back
+    the Pydantic schema
+
+    account_repo: an ORM model instance of AccountRepository
+    data: the data to persist
+    Return: AccountUpdate Pydantic Model
+    """
+    print("data:", type(data))
+    to_update = data.model_dump(exclude_none=True)
+    print("to_update:",to_update)
+    if not to_update:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You can't update whatever you want.",
+        )
+    db_account = await account_repo.update(id=id, data=data.model_dump(exclude_none=True))
+    print("db_account", db_account.name)
+    from_orm_ =  from_orm(AccountRead, db_account)
+    print("from orm",from_orm_)
+    return from_orm_
+
+
+async def validate_required_conditions_before_update(account:Account):
+    """
+
+    """
+    if account.type != AccountType.AFFILIATE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot update an Account of type Operations.",
+        )
+    if account.status == AccountStatus.DELETED or account.status == AccountStatus.DISABLED:
+        raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="You cannot update an Account Deleted.",
+            )
 
 async def validate_account_type_and_required_conditions(
     account_repo: AccountRepository, data: AccountCreate
@@ -116,16 +155,38 @@ async def get_accounts(account_repo: AccountRepository):
     return await paginate(account_repo, AccountRead)
 
 
-@router.put("/{id}", response_model=AccountRead)
-async def update_account(id: str, data: AccountUpdate):
-    pass
+@router.put("/{id}", response_model=AccountRead,
+            dependencies=[Depends(check_operations_account)],
+)
+async def update_account(data: AccountUpdate, account_repo: AccountRepository,
+                         account: Annotated[Account, Depends(fetch_account_or_404)],
+):
+    """
+
+    """
+    await validate_required_conditions_before_update(account=account)
+    return await update_data_and_format_response(account.id, account_repo, data)
+
 
 
 @router.get("/{id}/users", response_model=LimitOffsetPage[AccountUserRead])
-async def list_account_users(id: str):
+async def list_account_users(account: Annotated[Account, Depends(fetch_account_or_404)],
+                             auth_context: CurrentAuthContext):
+    """
+    if auth_context.account.type == AFFILIATE && auth_context.account != account
+        403
+    """
     pass
 
 
 @router.delete("/{id}/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def remove_user_from_account(id: str, user_id: str):
+async def remove_user_from_account(account: Annotated[Account, Depends(fetch_account_or_404)],
+                                   user_id: UserId):
+    """
+    if auth_context.account.type == AFFILIATE && auth_context.account != account
+        403
+    user account != DELETED
+    set account user status to DELETE
+    set deleted_at to now()
+    """
     pass

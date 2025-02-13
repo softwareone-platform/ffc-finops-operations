@@ -348,7 +348,7 @@ async def affiliate_account(
     return await account_factory(
         name="Microsoft",
         type=AccountType.AFFILIATE,
-        created_by=ffc_extension,  # noqa: E501
+        created_by=ffc_extension,
         updated_by=ffc_extension,
     )
 
