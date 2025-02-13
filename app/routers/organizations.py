@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi_pagination.limit_offset import LimitOffsetPage
 
 from app.api_clients import APIModifierClient, OptscaleAuthClient, OptscaleClient
+from app.auth.auth import check_operations_account
 from app.auth.context import auth_context
 from app.db.handlers import NotFoundError
 from app.db.models import Organization
@@ -15,7 +16,7 @@ from app.pagination import paginate
 from app.schemas import DatasourceRead, EmployeeRead, OrganizationCreate, OrganizationRead, from_orm
 from app.utils import wrap_http_error_in_502
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(check_operations_account)])
 
 
 @router.get("", response_model=LimitOffsetPage[OrganizationRead])

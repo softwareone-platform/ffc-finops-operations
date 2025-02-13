@@ -184,7 +184,7 @@ async def test_create_organization_with_existing_db_organization(
     httpx_mock: HTTPXMock,
     api_client: AsyncClient,
     organization_factory: ModelFactory[Organization],
-    gcp_jwt_token: str,
+    ffc_jwt_token: str,
 ):
     mocker.patch("app.api_clients.base.get_api_modifier_jwt_token", return_value="test_token")
 
@@ -198,7 +198,7 @@ async def test_create_organization_with_existing_db_organization(
 
     httpx_mock.add_response(
         method="POST",
-        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
         url="https://api-modifier.ffc.com/organizations",
         json={"id": "UUID-yyyy-yyyy-yyyy-yyyy"},
         match_headers={"Authorization": "Bearer test_token"},
@@ -207,7 +207,7 @@ async def test_create_organization_with_existing_db_organization(
     response = await api_client.post(
         "/organizations",
         json=payload,
-        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
     )
 
     assert response.status_code == 201
@@ -253,7 +253,7 @@ async def test_create_organization_with_existing_db_organization_name_mismatch(
 
 
 async def test_create_organization_already_created(
-    api_client: AsyncClient, organization_factory: ModelFactory[Organization], gcp_jwt_token: str
+    api_client: AsyncClient, organization_factory: ModelFactory[Organization], ffc_jwt_token: str
 ):
     payload = {
         "name": "My Organization",
@@ -270,7 +270,7 @@ async def test_create_organization_already_created(
     response = await api_client.post(
         "/organizations",
         json=payload,
-        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
     )
 
     assert response.status_code == 400
@@ -308,6 +308,26 @@ async def test_create_organization_api_modifier_error(
 
     detail = response.json()["detail"]
     assert detail == "Error creating organization in FinOps for Cloud: 500 - Internal Server Error."
+
+
+async def test_create_employee_affiliate_forbidden(
+    api_client: AsyncClient,
+    gcp_jwt_token: str,
+):
+    response = await api_client.post(
+        "/organizations",
+        json={
+            "name": "My Organization",
+            "affiliate_external_id": "ACC-1234-5678",
+            "user_id": "UUID-xxxx-xxxx-xxxx-xxxx",
+            "currency": "USD",
+        },
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+    )
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": "You've found the door, but you don't have the key.",
+    }
 
 
 # =====================

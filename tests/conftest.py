@@ -396,6 +396,12 @@ async def entitlement_gcp(
 
 
 @pytest.fixture
-def authenticated_client(api_client: AsyncClient, gcp_jwt_token: str) -> AsyncClient:
+def affiliate_client(api_client: AsyncClient, gcp_jwt_token: str) -> AsyncClient:
     api_client.headers["Authorization"] = f"Bearer {gcp_jwt_token}"
+    return api_client
+
+
+@pytest.fixture
+def operations_client(api_client: AsyncClient, ffc_jwt_token: str) -> AsyncClient:
+    api_client.headers["Authorization"] = f"Bearer {ffc_jwt_token}"
     return api_client
