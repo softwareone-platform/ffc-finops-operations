@@ -7,7 +7,7 @@ from sqlalchemy import ColumnExpressionArgument
 from app.db.handlers import NotFoundError
 from app.db.models import System
 from app.dependencies import CurrentAuthContext, SystemId, SystemRepository
-from app.enums import AccountType
+from app.enums import AccountType, SystemStatus
 from app.pagination import paginate
 from app.schemas import SystemCreate, SystemRead, SystemUpdate, from_orm
 
@@ -84,8 +84,28 @@ async def delete_system_by_id(id: SystemId):  # pragma: no cover
 
 
 @router.post("/{id}/disable", response_model=SystemRead)
-async def disable_system(id: SystemId):  # pragma: no cover
-    pass
+async def disable_system(
+    system: Annotated[System, Depends(fetch_system_or_404)],
+    system_repo: SystemRepository,
+    auth_ctx: CurrentAuthContext,
+):
+    if system == auth_ctx.system:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A system cannot disable itself.",
+        )
+
+    if system.status != SystemStatus.ACTIVE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"System's status is '{system.status._value_}'; "
+                "only active systems can be disabled."
+            ),
+        )
+
+    system = await system_repo.update(system, {"status": SystemStatus.DISABLED})
+    return from_orm(SystemRead, system)
 
 
 @router.post("/{id}/enable", response_model=SystemRead)
