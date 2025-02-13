@@ -92,7 +92,7 @@ async def disable_system(
     if system == auth_ctx.system:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A system cannot disable itself",
+            detail="A system cannot disable itself.",
         )
 
     if system.status != SystemStatus.ACTIVE:
@@ -100,7 +100,7 @@ async def disable_system(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
                 f"System's status is '{system.status._value_}'; "
-                "only active systems can be disabled"
+                "only active systems can be disabled."
             ),
         )
 

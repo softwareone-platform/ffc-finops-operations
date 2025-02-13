@@ -344,7 +344,7 @@ async def test_disable_system(
 
     if response.is_error:
         expected_error_msg = (
-            f"System's status is '{initial_status._value_}'; only active systems can be disabled"
+            f"System's status is '{initial_status._value_}'; only active systems can be disabled."
         )
         assert response.json()["detail"] == expected_error_msg
     else:
@@ -369,7 +369,7 @@ async def test_system_cannot_disable_itself(
     )
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert response.json()["detail"] == "A system cannot disable itself"
+    assert response.json()["detail"] == "A system cannot disable itself."
 
     # Verify the system's status hasn't changed
     await db_session.refresh(system)
