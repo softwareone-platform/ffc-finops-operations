@@ -5,6 +5,7 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException, status
 from httpx import AsyncClient
+from pytest_mock import MockerFixture
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -304,8 +305,7 @@ async def test_validate_account_type_and_required_conditions_account_type_operat
 
 
 async def test_validate_account_type_and_required_conditions_account_deleted(
-    mocker,
-    account_factory: ModelFactory[Account],
+    mocker: MockerFixture,
 ):
     account_repo = mocker.Mock()
     account_repo.first = AsyncMock(return_value=True)
