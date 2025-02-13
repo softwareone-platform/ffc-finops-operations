@@ -293,27 +293,24 @@ async def test_get_all_account_multiple_pages(
     assert len(all_items) == 12
 
 
-async def test_validate_account_type_and_required_conditions_account_type_operations(
-):
+async def test_validate_account_type_and_required_conditions_account_type_operations():
     account_repo = AccountRepository
 
-    data = AccountCreate(name="Microsoft",
-                         external_id=str(uuid4()),
-                         type=AccountType.OPERATIONS)
+    data = AccountCreate(name="Microsoft", external_id=str(uuid4()), type=AccountType.OPERATIONS)
     with pytest.raises(HTTPException) as exc_info:
-        await validate_account_type_and_required_conditions(account_repo,data)
+        await validate_account_type_and_required_conditions(account_repo, data)
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == "You cannot create an Account of type Operations."
 
+
 async def test_validate_account_type_and_required_conditions_account_deleted(
-    mocker, account_factory: ModelFactory[Account],
+    mocker,
+    account_factory: ModelFactory[Account],
 ):
     account_repo = mocker.Mock()
     account_repo.first = AsyncMock(return_value=True)
 
-    data = AccountCreate(name="Microsoft",
-                         external_id="ACC-9044-8753",
-                         type=AccountType.AFFILIATE)
+    data = AccountCreate(name="Microsoft", external_id="ACC-9044-8753", type=AccountType.AFFILIATE)
 
     with pytest.raises(HTTPException) as exc_info:
         await validate_account_type_and_required_conditions(account_repo, data)

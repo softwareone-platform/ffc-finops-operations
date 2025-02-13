@@ -235,15 +235,12 @@ async def test_get_authentication_context_user_account_does_not_exist(
     with pytest.raises(LookupError):
         auth_context.get()
 
-async def test_check_operations_account(
-        mocker
-):
+
+async def test_check_operations_account(mocker):
     context = mocker.Mock()
     context.account.type = AccountType.AFFILIATE
     with pytest.raises(HTTPException) as exc_info:
         await check_operations_account(context)
 
     assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
-    assert "You’ve found the door, but you don’t have the key." in str(
-        exc_info.value.detail
-    )
+    assert "You’ve found the door, but you don’t have the key." in str(exc_info.value.detail)
