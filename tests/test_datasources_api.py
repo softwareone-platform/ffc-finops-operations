@@ -135,7 +135,7 @@ async def test_get_datasources_for_organization_success(
     organization_factory: ModelFactory[Organization],
     mocker: MockerFixture,
     httpx_mock: HTTPXMock,
-    authenticated_client: AsyncClient,
+    operations_client: AsyncClient,
 ):
     org = await organization_factory(
         operations_external_id=str(uuid.uuid4()),
@@ -152,7 +152,7 @@ async def test_get_datasources_for_organization_success(
         },
     )
 
-    response = await authenticated_client.get(
+    response = await operations_client.get(
         f"/organizations/{org.id}/datasources",
     )
 
@@ -178,10 +178,10 @@ async def test_get_datasources_for_organization_success(
 
 
 async def test_get_datasources_for_missing_organization(
-    authenticated_client: AsyncClient,
+    operations_client: AsyncClient,
 ):
     org_id = "FORG-1234-5678-9012"
-    response = await authenticated_client.get(
+    response = await operations_client.get(
         f"/organizations/{org_id}/datasources",
     )
 
@@ -191,7 +191,7 @@ async def test_get_datasources_for_missing_organization(
 
 async def test_get_datasources_for_organization_with_no_datasources(
     organization_factory: ModelFactory[Organization],
-    authenticated_client: AsyncClient,
+    operations_client: AsyncClient,
     httpx_mock: HTTPXMock,
 ):
     org = await organization_factory(
@@ -205,7 +205,7 @@ async def test_get_datasources_for_organization_with_no_datasources(
         json={"cloud_accounts": []},
     )
 
-    response = await authenticated_client.get(
+    response = await operations_client.get(
         f"/organizations/{org.id}/datasources",
     )
 
@@ -215,14 +215,14 @@ async def test_get_datasources_for_organization_with_no_datasources(
 
 async def test_get_datasources_for_organization_with_no_organization_id(
     organization_factory: ModelFactory[Organization],
-    authenticated_client: AsyncClient,
+    operations_client: AsyncClient,
     httpx_mock: HTTPXMock,
 ):
     org = await organization_factory(
         operations_external_id=None,
     )
 
-    response = await authenticated_client.get(
+    response = await operations_client.get(
         f"/organizations/{org.id}/datasources",
     )
 
@@ -234,7 +234,7 @@ async def test_get_datasources_for_organization_with_no_organization_id(
 
 async def test_get_datasources_for_organization_with_optscale_error(
     organization_factory: ModelFactory[Organization],
-    authenticated_client: AsyncClient,
+    operations_client: AsyncClient,
     httpx_mock: HTTPXMock,
 ):
     org = await organization_factory(
@@ -248,7 +248,7 @@ async def test_get_datasources_for_organization_with_optscale_error(
         status_code=500,
     )
 
-    response = await authenticated_client.get(
+    response = await operations_client.get(
         f"/organizations/{org.id}/datasources",
     )
 
@@ -265,7 +265,7 @@ async def test_get_datasource_by_id_success(
     organization_factory: ModelFactory[Organization],
     mocker: MockerFixture,
     httpx_mock: HTTPXMock,
-    authenticated_client: AsyncClient,
+    operations_client: AsyncClient,
 ):
     org = await organization_factory(
         operations_external_id=str(uuid.uuid4()),
@@ -280,7 +280,7 @@ async def test_get_datasource_by_id_success(
         json=datasource_data,
     )
 
-    response = await authenticated_client.get(
+    response = await operations_client.get(
         f"/organizations/{org.id}/datasources/{datasource_data['id']}",
     )
 
@@ -296,10 +296,10 @@ async def test_get_datasource_by_id_success(
 
 
 async def test_get_datasource_by_id_for_missing_organization(
-    authenticated_client: AsyncClient,
+    operations_client: AsyncClient,
 ):
     org_id = "FORG-1234-5678-9012"
-    response = await authenticated_client.get(
+    response = await operations_client.get(
         f"/organizations/{org_id}/datasources/{uuid.uuid4()}",
     )
 
@@ -309,7 +309,7 @@ async def test_get_datasource_by_id_for_missing_organization(
 
 async def test_get_datasource_by_id_for_missing_datasource(
     organization_factory: ModelFactory[Organization],
-    authenticated_client: AsyncClient,
+    operations_client: AsyncClient,
     httpx_mock: HTTPXMock,
 ):
     org = await organization_factory(
@@ -324,7 +324,7 @@ async def test_get_datasource_by_id_for_missing_datasource(
         status_code=404,
     )
 
-    response = await authenticated_client.get(
+    response = await operations_client.get(
         f"/organizations/{org.id}/datasources/{datasource_id}",
     )
 
@@ -334,13 +334,13 @@ async def test_get_datasource_by_id_for_missing_datasource(
 
 async def test_get_datasource_by_id_for_organization_with_no_organization_id(
     organization_factory: ModelFactory[Organization],
-    authenticated_client: AsyncClient,
+    operations_client: AsyncClient,
 ):
     org = await organization_factory(
         operations_external_id=None,
     )
 
-    response = await authenticated_client.get(
+    response = await operations_client.get(
         f"/organizations/{org.id}/datasources/{uuid.uuid4()}",
     )
 

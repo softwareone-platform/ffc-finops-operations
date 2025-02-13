@@ -244,14 +244,14 @@ async def test_get_authentication_context_user_account_does_not_exist(
             AccountType.AFFILIATE,
             True,
             status.HTTP_403_FORBIDDEN,
-            "You’ve found the door, but you don’t have the key.",
-        ),  # noqa: E501
+            "You've found the door, but you don't have the key.",
+        ),
         (AccountType.OPERATIONS, False, None, None),
     ],
 )
 async def test_check_operations_account(
     mocker: MockerFixture,
-    account_type: str,
+    account_type: AccountType,
     should_raise_exception: bool,
     expected_status: int,
     expected_detail: str,
