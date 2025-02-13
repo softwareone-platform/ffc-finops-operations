@@ -450,7 +450,7 @@ async def test_system_cannot_enable_itself(
     system = await system_factory(status=SystemStatus.DISABLED)
 
     response = await api_client.post(
-        f"/systems/{system.id}/disable",
+        f"/systems/{system.id}/enable",
         headers={"Authorization": f"Bearer {system_jwt_token_factory(system)}"},
     )
 
