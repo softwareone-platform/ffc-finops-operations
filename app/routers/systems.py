@@ -87,7 +87,14 @@ async def delete_system_by_id(id: SystemId):  # pragma: no cover
 async def disable_system(
     system: Annotated[System, Depends(fetch_system_or_404)],
     system_repo: SystemRepository,
+    auth_ctx: CurrentAuthContext,
 ):
+    if system == auth_ctx.system:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A system cannot disable itself",
+        )
+
     if system.status != SystemStatus.ACTIVE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

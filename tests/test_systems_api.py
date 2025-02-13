@@ -353,3 +353,24 @@ async def test_disable_system(
 
     await db_session.refresh(system)
     assert system.status == expected_new_status
+
+
+async def test_system_cannot_disable_itself(
+    system_factory: ModelFactory[System],
+    system_jwt_token_factory: Callable[[System], str],
+    api_client: AsyncClient,
+    db_session: AsyncSession,
+):
+    system = await system_factory(status=SystemStatus.ACTIVE)
+
+    response = await api_client.post(
+        f"/systems/{system.id}/disable",
+        headers={"Authorization": f"Bearer {system_jwt_token_factory(system)}"},
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.json()["detail"] == "A system cannot disable itself"
+
+    # Verify the system's status hasn't changed
+    await db_session.refresh(system)
+    assert system.status == SystemStatus.ACTIVE
