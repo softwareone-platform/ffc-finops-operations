@@ -1,6 +1,15 @@
-from fastapi import APIRouter, status
+import secrets
+from datetime import UTC, datetime, timedelta
+
+from fastapi import APIRouter, HTTPException, status
 from fastapi_pagination.limit_offset import LimitOffsetPage
 
+from app import settings
+from app.db.db import DBSession, get_tx_db_session
+from app.db.handlers import AccountHandler, AccountUserHandler, NotFoundError, UserHandler
+from app.db.models import Account, AccountUser, User
+from app.dependencies import CurrentAuthContext
+from app.enums import AccountStatus, AccountType, AccountUserStatus, UserStatus
 from app.schemas import (
     AccountUserCreate,
     AccountUserRead,
@@ -8,6 +17,7 @@ from app.schemas import (
     UserRead,
     UserResetPassword,
     UserUpdate,
+    from_orm,
 )
 
 router = APIRouter()
@@ -18,9 +28,93 @@ async def get_users():
     pass
 
 
-@router.post("", response_model=AccountUserRead)
-async def invite_user(data: AccountUserCreate):
-    pass
+@router.post(
+    "",
+    response_model=AccountUserRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def invite_user(
+    auth_context: CurrentAuthContext,
+    db_session: DBSession,
+    data: AccountUserCreate,
+):
+    user_handler = UserHandler(db_session)
+    account_handler = AccountHandler(db_session)
+    accountuser_handler = AccountUserHandler(db_session)
+    account = None
+
+    if auth_context.account.type == AccountType.AFFILIATE:
+        if data.account:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Affiliate accounts can only invite users to the same Account.",
+            )
+        account = auth_context.account
+    else:
+        if not data.account:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Operations accounts must provide an account to invite a User.",
+            )
+        try:
+            account = await account_handler.get(
+                data.account.id,
+                [Account.status == AccountStatus.ACTIVE],
+            )
+        except NotFoundError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"No Active Account has been found with ID {data.account.id}.",
+            )
+
+    user = await user_handler.first(
+        User.email == data.user.email,
+        User.status != UserStatus.DELETED,
+    )
+    if not user:
+        user = User(
+            email=data.user.email,
+            name=data.user.name,
+            status=UserStatus.DRAFT,
+        )
+
+    if user.status == UserStatus.DISABLED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(f"The user {user.email} cannot be invited " "because it is disabled."),
+        )
+    if user.id:
+        account_user = await accountuser_handler.get_account_user(
+            account_id=account.id,
+            user_id=user.id,
+            extra_conditions=[AccountUser.status != AccountUserStatus.DELETED],
+        )
+        if account_user:
+            msg = (
+                "already belong"
+                if account_user.status == AccountUserStatus.ACTIVE
+                else "has already been invited"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"The user {user.email} {msg} to the account: {account.id}.",
+            )
+    account_user = AccountUser(
+        user=user,
+        account=account,
+        status=AccountUserStatus.INVITED,
+        invitation_token=secrets.token_urlsafe(settings.invitation_token_length),
+        invitation_token_expires_at=datetime.now(UTC)
+        + timedelta(days=settings.invitation_token_expires_days),
+    )
+    db_session.expunge_all()
+    async with get_tx_db_session() as tx_session:
+        if not user.id:
+            user_handler = UserHandler(tx_session)
+            user = await user_handler.create(user)
+        accountuser_handler = AccountUserHandler(tx_session)
+        account_user = await accountuser_handler.create(account_user)
+        return from_orm(AccountUserRead, account_user)
 
 
 @router.put("/{id}", response_model=UserRead)
