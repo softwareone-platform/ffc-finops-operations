@@ -109,5 +109,21 @@ async def disable_system(
 
 
 @router.post("/{id}/enable", response_model=SystemRead)
-async def enable_system(id: SystemId):  # pragma: no cover
-    pass
+async def enable_system(
+    system: Annotated[System, Depends(fetch_system_or_404)],
+    system_repo: SystemRepository,
+):
+    # no need to check for a system re-enabling itself as such a request
+    # will fail earlier anyway during the authorization phase
+
+    if system.status != SystemStatus.DISABLED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"System's status is '{system.status._value_}'; "
+                "only disabled systems can be enabled."
+            ),
+        )
+
+    system = await system_repo.update(system, {"status": SystemStatus.ACTIVE})
+    return from_orm(SystemRead, system)
