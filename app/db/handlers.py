@@ -216,8 +216,6 @@ class UserHandler(ModelHandler[User]):
 
 
 class AccountUserHandler(ModelHandler[AccountUser]):
-    pass
-
     async def get_account_user(
         self,
         account_id: str,

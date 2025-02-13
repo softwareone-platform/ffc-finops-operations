@@ -8,7 +8,7 @@ PROJECT_ROOT = pathlib.Path(__file__).parent.parent
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=(PROJECT_ROOT / ".env", PROJECT_ROOT / ".env.test"),
+        env_file=PROJECT_ROOT / ".env",
         env_file_encoding="utf-8",
         env_prefix="ffc_operations_",
         extra="ignore",

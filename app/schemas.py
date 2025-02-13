@@ -189,8 +189,8 @@ class AccountUserBase(BaseSchema):
 
 
 class AccountUserCreate(BaseSchema):
-    account: IdSchema
-    user: IdSchema
+    account: IdSchema | None = None
+    user: UserCreate
 
 
 class AccountUserRead(IdSchema, CommonEventsSchema, AccountUserBase):
