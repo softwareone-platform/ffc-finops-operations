@@ -35,7 +35,7 @@ async def persist_data_and_format_response(account_repo, data):
     return from_orm(AccountRead, db_account)
 
 
-async def validate_account_type_and_required_conditions(account_repo, data):
+async def validate_account_type_and_required_conditions(account_repo:AccountRepository, data:AccountCreate):
     """
     This function performs the following required checks before
     proceeding to create an Account:

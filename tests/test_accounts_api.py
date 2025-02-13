@@ -1,12 +1,18 @@
 from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
+import pytest
+from fastapi import HTTPException, status
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Account, System
+from app.dependencies import AccountRepository
 from app.enums import AccountStatus, AccountType
+from app.routers.accounts import validate_account_type_and_required_conditions
+from app.schemas import AccountCreate
 from tests.types import JWTTokenFactory, ModelFactory
 
 # ====================
@@ -285,3 +291,34 @@ async def test_get_all_account_multiple_pages(
 
     all_items = first_page_data["items"] + second_page_data["items"] + third_page_data["items"]
     assert len(all_items) == 12
+
+
+async def test_validate_account_type_and_required_conditions_account_type_operations(
+):
+    account_repo = AccountRepository
+
+    data = AccountCreate(name="Microsoft",
+                         external_id=str(uuid4()),
+                         type=AccountType.OPERATIONS)
+    with pytest.raises(HTTPException) as exc_info:
+        await validate_account_type_and_required_conditions(account_repo,data)
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "You cannot create an Account of type Operations."
+
+async def test_validate_account_type_and_required_conditions_account_deleted(
+    mocker, account_factory: ModelFactory[Account],
+):
+    account_repo = mocker.Mock()
+    account_repo.first = AsyncMock(return_value=True)
+
+    data = AccountCreate(name="Microsoft",
+                         external_id="ACC-9044-8753",
+                         type=AccountType.AFFILIATE)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await validate_account_type_and_required_conditions(account_repo, data)
+
+    assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
+    assert "An Account with external ID `ACC-9044-8753` already exists." in str(
+        exc_info.value.detail
+    )
