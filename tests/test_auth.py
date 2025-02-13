@@ -238,7 +238,7 @@ async def test_get_authentication_context_user_account_does_not_exist(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "account_type, should_raise_exception, expected_status, expected_detail",
+    ("account_type", "should_raise_exception", "expected_status", "expected_detail"),
     [
         (
             AccountType.AFFILIATE,
