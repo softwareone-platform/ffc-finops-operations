@@ -2,15 +2,20 @@ from collections.abc import Callable
 from contextlib import AbstractContextManager, asynccontextmanager
 
 import pytest
-from fastapi import HTTPException
+from fastapi import HTTPException, status
 from pytest_mock import MockerFixture
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import settings
-from app.auth.auth import JWTBearer, JWTCredentials, get_authentication_context
+from app.auth.auth import (
+    JWTBearer,
+    JWTCredentials,
+    check_operations_account,
+    get_authentication_context,
+)
 from app.auth.context import AuthenticationContext, auth_context
 from app.db.models import System, User
-from app.enums import AccountUserStatus, ActorType, SystemStatus, UserStatus
+from app.enums import AccountType, AccountUserStatus, ActorType, SystemStatus, UserStatus
 from tests.types import JWTTokenFactory, ModelFactory
 
 
@@ -229,3 +234,36 @@ async def test_get_authentication_context_user_account_does_not_exist(
 
     with pytest.raises(LookupError):
         auth_context.get()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("account_type", "should_raise_exception", "expected_status", "expected_detail"),
+    [
+        (
+            AccountType.AFFILIATE,
+            True,
+            status.HTTP_403_FORBIDDEN,
+            "You’ve found the door, but you don’t have the key.",
+        ),  # noqa: E501
+        (AccountType.OPERATIONS, False, None, None),
+    ],
+)
+async def test_check_operations_account(
+    mocker: MockerFixture,
+    account_type: str,
+    should_raise_exception: bool,
+    expected_status: int,
+    expected_detail: str,
+):
+    context = mocker.Mock()
+    context.account.type = account_type
+    if should_raise_exception:
+        with pytest.raises(HTTPException) as exc_info:
+            await check_operations_account(context)
+
+        assert exc_info.value.status_code == expected_status
+        assert expected_detail in str(exc_info.value.detail)
+    else:
+        result = await check_operations_account(context)
+        assert result is None
