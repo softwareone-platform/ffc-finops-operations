@@ -89,12 +89,9 @@ app.include_router(
     dependencies=[Depends(get_authentication_context)],
     tags=["Portal Administration"],
 )
-
-
 app.include_router(
     users.router,
     prefix="/users",
-    dependencies=[Depends(get_authentication_context)],
     tags=["Portal Settings"],
 )
 app.include_router(
