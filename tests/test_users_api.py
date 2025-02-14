@@ -607,13 +607,26 @@ async def test_accept_invitation_draft_user_no_password(
 
 
 @pytest.mark.parametrize(
-    "weak_passwd",
+    ("weak_passwd", "expected_msg"),
     [
-        "short",
-        "longbutwithoutreqsym",
-        "LONGBUTWITHOUTREQSYM",
-        "01234585858585",
-        "@@@!!%$%!$!%!/((%))",
+        ("Sh0r!", "Must be at least 8 characters long"),
+        ("l0ngbutw!thoutreqsym", "Must contain at least one uppercase letter (A-Z)"),
+        ("L0NGBUTWITHOUTREQ$YM", "Must contain at least one lowercase letter (a-z)"),
+        (
+            "01234585858585",
+            (
+                "Must contain at least one uppercase letter (A-Z), Must contain at "
+                "least one lowercase letter (a-z), Must contain at least one special "
+                "character (e.g., !@#$%^&*)"
+            ),
+        ),
+        (
+            "@@@!!%$%!$!%!/((%))",
+            (
+                "Must contain at least one uppercase letter (A-Z), Must contain at "
+                "least one lowercase letter (a-z), Must contain at least one number (0-9)"
+            ),
+        ),
     ],
 )
 async def test_accept_invitation_draft_user_weak_password(
@@ -622,6 +635,7 @@ async def test_accept_invitation_draft_user_weak_password(
     operations_account: Account,
     api_client: AsyncClient,
     weak_passwd: str,
+    expected_msg: str,
 ):
     user = await user_factory(
         name="Test Invited User",
@@ -641,14 +655,11 @@ async def test_accept_invitation_draft_user_weak_password(
             "password": weak_passwd,
         },
     )
-    assert response.status_code == 400
-    assert response.json()["detail"] == (
-        "Password must be at least 8 characters long, "
-        "contain at least one uppercase letter (A-Z), "
-        "one lowercase letter (a-z), "
-        "one number (0-9), "
-        "and one special character (e.g., !@#$%^&*)."
-    )
+    assert response.status_code == 422
+    [detail] = response.json()["detail"]
+    assert detail["loc"] == ["body", "password"]
+    assert detail["type"] == "value_error"
+    assert detail["msg"] == f"Value error, {expected_msg}."
 
 
 async def test_accept_invitation_active_user_with_password(

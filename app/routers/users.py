@@ -252,17 +252,6 @@ async def accept_user_invitation(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Password is required for Draft users.",
             )
-        if not PWD_COMPLEXITY_REGEX.match(data.password):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=(
-                    "Password must be at least 8 characters long, "
-                    "contain at least one uppercase letter (A-Z), "
-                    "one lowercase letter (a-z), "
-                    "one number (0-9), "
-                    "and one special character (e.g., !@#$%^&*)."
-                ),
-            )
     else:
         if data.password:
             raise HTTPException(
@@ -275,7 +264,7 @@ async def accept_user_invitation(
             user = await user_handler.update(
                 user.id,
                 {
-                    "password": pbkdf2_sha256.hash(data.password),  # type: ignore
+                    "password": pbkdf2_sha256.hash(data.password.get_secret_value()),  # type: ignore
                     "status": UserStatus.ACTIVE,
                     "last_used_account_id": account_user.account.id,
                 },
