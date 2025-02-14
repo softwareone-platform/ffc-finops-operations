@@ -17,7 +17,7 @@ from app.pagination import paginate
 from app.schemas import EntitlementCreate, EntitlementRead, EntitlementRedeem, from_orm, to_orm
 
 # ============
-# Dependancies
+# Dependencies
 # ============
 
 

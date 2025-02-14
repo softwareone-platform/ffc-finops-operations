@@ -6,7 +6,7 @@ from fastapi_pagination.limit_offset import LimitOffsetPage
 from app.auth.auth import check_operations_account
 from app.db.handlers import NotFoundError
 from app.db.models import Account
-from app.dependencies import AccountId, AccountRepository
+from app.dependencies import AccountId, AccountRepository, CurrentAuthContext, UserId
 from app.enums import AccountStatus, AccountType
 from app.pagination import paginate
 from app.schemas import (
@@ -33,6 +33,48 @@ async def persist_data_and_format_response(account_repo, data):
     account = to_orm(data, Account)
     db_account = await account_repo.create(account)
     return from_orm(AccountRead, db_account)
+
+
+async def update_data_and_format_response(
+    id: str, account_repo: AccountRepository, data: AccountUpdate
+):
+    """
+    It updates the given data to the Account model and return back
+    the Pydantic schema
+
+    account_repo: an ORM model instance of AccountRepository
+    data: the data to update
+    Return: AccountUpdate Pydantic Model
+    """
+    to_update = data.model_dump(exclude_none=True)
+    if not to_update:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You can't update whatever you want.",
+        )
+    db_account = await account_repo.update(id, data=to_update)
+    return from_orm(AccountRead, db_account)
+
+
+async def validate_required_conditions_before_update(account: Account):
+    """
+    This function performs the following required checks before
+    proceeding to update an Account:
+    1. Only Accounts classified as of type “Affiliate” can be updated.
+    2. The account status cannot be DELETED
+
+    A HTTPException with status 400 will be raised if at least one condition is not met.
+    """
+    if account.type != AccountType.AFFILIATE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot update an Account of type Operations.",
+        )
+    if account.status == AccountStatus.DELETED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot update an Account Deleted.",
+        )
 
 
 async def validate_account_type_and_required_conditions(
@@ -116,16 +158,57 @@ async def get_accounts(account_repo: AccountRepository):
     return await paginate(account_repo, AccountRead)
 
 
-@router.put("/{id}", response_model=AccountRead)
-async def update_account(id: str, data: AccountUpdate):
-    pass
+@router.put(
+    "/{id}",
+    response_model=AccountRead,
+    dependencies=[Depends(check_operations_account)],
+)
+async def update_account(
+    data: AccountUpdate,
+    account_repo: AccountRepository,
+    account: Annotated[Account, Depends(fetch_account_or_404)],
+):
+    """
+    This Endpoint updates an Affiliate Account.
+
+    The following conditions must be verified before proceeding with the operation of updating
+    an account.
+    1. The Account type must be OPERATIONS, otherwise a 403 error will be returned
+    2. The Account status must be Active
+    3. Only Accounts classified as of type “Affiliate” can be updated.
+    4. Only the name and the external_id of the account can be modified.
+
+
+    Raises:
+        - HTTPException with status 403 if the check (1) fails
+        - HTTPException with status 400 if the checks (2), (4) or (3) fail.
+    """
+    await validate_required_conditions_before_update(account=account)
+    return await update_data_and_format_response(
+        id=account.id, account_repo=account_repo, data=data
+    )
 
 
 @router.get("/{id}/users", response_model=LimitOffsetPage[AccountUserRead])
-async def list_account_users(id: str):
+async def list_account_users(
+    account: Annotated[Account, Depends(fetch_account_or_404)], auth_context: CurrentAuthContext
+):
+    """
+    if auth_context.account.type == AFFILIATE && auth_context.account != account
+        403
+    """
     pass
 
 
 @router.delete("/{id}/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def remove_user_from_account(id: str, user_id: str):
+async def remove_user_from_account(
+    account: Annotated[Account, Depends(fetch_account_or_404)], user_id: UserId
+):
+    """
+    if auth_context.account.type == AFFILIATE && auth_context.account != account
+        403
+    user account != DELETED
+    set account user status to DELETE
+    set deleted_at to now()
+    """
     pass
