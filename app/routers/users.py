@@ -6,9 +6,9 @@ from datetime import UTC, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi_pagination.limit_offset import LimitOffsetPage
 
-from app import settings
 from app.auth.auth import check_operations_account, get_authentication_context
-from app.db.db import DBSession, get_tx_db_session
+from app.conf import AppSettings
+from app.db import DBEngine, DBSession, get_tx_db_session
 from app.db.handlers import AccountHandler, AccountUserHandler, NotFoundError, UserHandler
 from app.db.models import Account, AccountUser, User
 from app.dependencies import CurrentAuthContext, UserId
@@ -53,6 +53,8 @@ async def get_users():  # pragma: no cover
 )
 async def invite_user(
     auth_context: CurrentAuthContext,
+    settings: AppSettings,
+    db_engine: DBEngine,
     db_session: DBSession,
     data: AccountUserCreate,
 ):
@@ -126,7 +128,7 @@ async def invite_user(
         + timedelta(days=settings.invitation_token_expires_days),
     )
     db_session.expunge_all()
-    async with get_tx_db_session() as tx_session:
+    async with get_tx_db_session(db_engine) as tx_session:
         if not user.id:
             user_handler = UserHandler(tx_session)
             user = await user_handler.create(user)
@@ -205,6 +207,7 @@ async def accept_user_invitation(
     id: UserId,
     data: UserAcceptInvitation,
     db_session: DBSession,
+    db_engine: DBEngine,
 ):
     user_handler = UserHandler(db_session)
     accountuser_handler = AccountUserHandler(db_session)
@@ -269,7 +272,7 @@ async def accept_user_invitation(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="A password cannot be provided for an Active User.",
             )
-    async with get_tx_db_session() as tx_session:
+    async with get_tx_db_session(db_engine) as tx_session:
         if user.status == UserStatus.DRAFT:
             user_handler = UserHandler(tx_session)
             user = await user_handler.update(

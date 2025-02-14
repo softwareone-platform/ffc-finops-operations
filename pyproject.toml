@@ -124,7 +124,8 @@ concurrency = ["thread", "greenlet"]
 show_missing = true
 exclude_lines = [
     "pragma: no cover",
-    "pragma: no branch"
+    "pragma: no branch",
+    "NotImplementedError",
 ]
 
 [tool.mypy]

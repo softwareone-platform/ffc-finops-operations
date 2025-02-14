@@ -7,8 +7,8 @@ from freezegun import freeze_time
 from sqlalchemy.ext.asyncio import AsyncSession
 from typer.testing import CliRunner
 
-from app import settings
 from app.cli import app
+from app.conf import Settings
 from app.db.handlers import AccountUserHandler, UserHandler
 from app.db.models import Account, AccountUser, User
 from app.enums import AccountStatus, AccountUserStatus, UserStatus
@@ -16,7 +16,11 @@ from tests.types import ModelFactory
 
 
 @freeze_time("2025-03-07T10:00:00Z")
-async def test_invite_user(db_session: AsyncSession, operations_account: Account):
+async def test_invite_user(
+    test_settings: Settings,
+    db_session: AsyncSession,
+    operations_account: Account,
+):
     loop = asyncio.get_event_loop()
     runner = CliRunner()
     result = await loop.run_in_executor(
@@ -42,12 +46,13 @@ async def test_invite_user(db_session: AsyncSession, operations_account: Account
     assert account_user.status == AccountUserStatus.INVITED
     assert account_user.invitation_token is not None
     assert account_user.invitation_token_expires_at == (
-        datetime.now(UTC) + timedelta(days=settings.invitation_token_expires_days)
+        datetime.now(UTC) + timedelta(days=test_settings.invitation_token_expires_days)
     )
 
 
 @freeze_time("2025-03-07T10:00:00Z")
 async def test_invite_user_already_invited(
+    test_settings: Settings,
     db_session: AsyncSession,
     operations_account: Account,
     user_factory: ModelFactory[User],
@@ -93,7 +98,7 @@ async def test_invite_user_already_invited(
     assert db_account_user.invitation_token != account_user.invitation_token
     assert db_account_user.invitation_token_expires_at != account_user.invitation_token_expires_at
     assert db_account_user.invitation_token_expires_at == (
-        datetime.now(UTC) + timedelta(days=settings.invitation_token_expires_days)
+        datetime.now(UTC) + timedelta(days=test_settings.invitation_token_expires_days)
     )
 
 
@@ -128,7 +133,7 @@ async def test_invite_user_user_disabled(
 
 @freeze_time("2025-03-07T10:00:00Z")
 async def test_invite_user_non_default_account(
-    db_session: AsyncSession, account_factory: ModelFactory[Account]
+    test_settings: Settings, db_session: AsyncSession, account_factory: ModelFactory[Account]
 ):
     account = await account_factory()
     loop = asyncio.get_event_loop()
@@ -156,7 +161,7 @@ async def test_invite_user_non_default_account(
     assert account_user.status == AccountUserStatus.INVITED
     assert account_user.invitation_token is not None
     assert account_user.invitation_token_expires_at == (
-        datetime.now(UTC) + timedelta(days=settings.invitation_token_expires_days)
+        datetime.now(UTC) + timedelta(days=test_settings.invitation_token_expires_days)
     )
 
 
@@ -165,7 +170,6 @@ async def test_invite_user_non_default_account(
     [AccountStatus.DELETED, AccountStatus.DISABLED],
 )
 async def test_invite_user_non_default_account_not_active(
-    db_session: AsyncSession,
     account_factory: ModelFactory[Account],
     account_status: AccountStatus,
 ):

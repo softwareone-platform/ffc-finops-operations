@@ -2,7 +2,7 @@ import random
 import secrets
 import uuid
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.db import get_tx_db_session
 from app.db.handlers import AccountHandler, EntitlementHandler, SystemHandler
@@ -99,14 +99,14 @@ async def test_handler_insert_three_models(db_session: AsyncSession, capsql: SQL
 
 
 async def test_handler_insert_two_models_with_session_begin(
-    db_session: AsyncSession, capsql: SQLAlchemyCapturer
+    db_engine: AsyncEngine, db_session: AsyncSession, capsql: SQLAlchemyCapturer
 ):
     account_handler = AccountHandler(db_session)
     account = random_account()
     account = await account_handler.create(account)
     db_session.expunge_all()
     with capsql:
-        async with get_tx_db_session() as tx_session:
+        async with get_tx_db_session(db_engine) as tx_session:
             entitlements_handler = EntitlementHandler(tx_session)
             systems_handler = SystemHandler(tx_session)
             await entitlements_handler.create(random_entitlement(account.id))
@@ -126,6 +126,7 @@ async def test_handler_insert_two_models_with_session_begin(
 
 
 async def test_handler_insert_two_models_with_session_begin_rollback(
+    db_engine: AsyncEngine,
     db_session: AsyncSession,
     capsql: SQLAlchemyCapturer,
 ):
@@ -134,7 +135,7 @@ async def test_handler_insert_two_models_with_session_begin_rollback(
     account = await account_handler.create(account)
     with capsql:
         try:
-            async with get_tx_db_session() as tx_session:
+            async with get_tx_db_session(db_engine) as tx_session:
                 entitlements_handler = EntitlementHandler(tx_session)
                 systems_handler = SystemHandler(tx_session)
                 await entitlements_handler.create(random_entitlement(account.id))
@@ -157,6 +158,7 @@ async def test_handler_insert_two_models_with_session_begin_rollback(
 
 
 async def test_handler_insert_two_models_with_session_begin_multiple_transactions(
+    db_engine: AsyncEngine,
     db_session: AsyncSession,
     capsql: SQLAlchemyCapturer,
 ):
@@ -166,7 +168,7 @@ async def test_handler_insert_two_models_with_session_begin_multiple_transaction
     db_session.expunge_all()
     statements = []
     with capsql:
-        async with get_tx_db_session() as tx_session:
+        async with get_tx_db_session(db_engine) as tx_session:
             entitlements_handler = EntitlementHandler(tx_session)
             systems_handler = SystemHandler(tx_session)
             await entitlements_handler.create(random_entitlement(account.id))
@@ -175,7 +177,7 @@ async def test_handler_insert_two_models_with_session_begin_multiple_transaction
     statements.extend(capsql.statements)
 
     with capsql:
-        async with get_tx_db_session() as tx_session:
+        async with get_tx_db_session(db_engine) as tx_session:
             entitlements_handler = EntitlementHandler(tx_session)
             systems_handler = SystemHandler(tx_session)
             await entitlements_handler.create(random_entitlement(account.id))

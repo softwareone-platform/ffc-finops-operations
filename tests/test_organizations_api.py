@@ -113,7 +113,7 @@ async def test_can_create_organizations(
     ffc_jwt_token: str,
     ffc_extension: System,
 ):
-    mocker.patch("app.api_clients.base.get_api_modifier_jwt_token", return_value="test_token")
+    mocker.patch("app.api_clients.api_modifier.jwt.encode", return_value="test_token")
 
     httpx_mock.add_response(
         method="POST",
@@ -186,7 +186,7 @@ async def test_create_organization_with_existing_db_organization(
     organization_factory: ModelFactory[Organization],
     ffc_jwt_token: str,
 ):
-    mocker.patch("app.api_clients.base.get_api_modifier_jwt_token", return_value="test_token")
+    mocker.patch("app.api_clients.api_modifier.jwt.encode", return_value="test_token")
 
     existing_org = await organization_factory(affiliate_external_id="ACC-1234-5678")
     payload = {
@@ -227,7 +227,7 @@ async def test_create_organization_with_existing_db_organization_name_mismatch(
     organization_factory: ModelFactory[Organization],
     ffc_jwt_token: str,
 ):
-    mocker.patch("app.api_clients.base.get_api_modifier_jwt_token", return_value="test_token")
+    mocker.patch("app.api_clients.api_modifier.jwt.encode", return_value="test_token")
 
     existing_org = await organization_factory(affiliate_external_id="ACC-1234-5678")
     payload = {
@@ -284,8 +284,6 @@ async def test_create_organization_api_modifier_error(
     api_client: AsyncClient,
     ffc_jwt_token: str,
 ):
-    mocker.patch("app.api_clients.base.get_api_modifier_jwt_token", return_value="test_token")
-
     httpx_mock.add_response(
         method="POST",
         url="https://api-modifier.ffc.com/organizations",

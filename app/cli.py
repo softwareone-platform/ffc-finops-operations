@@ -23,6 +23,6 @@ for name, module in inspect.getmembers(commands):
 def main(
     ctx: typer.Context,
 ):
-    from app import settings
+    from app.conf import get_settings
 
-    ctx.obj = settings
+    ctx.obj = get_settings()

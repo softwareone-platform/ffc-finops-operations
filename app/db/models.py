@@ -6,7 +6,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, mapped_column
 from sqlalchemy_utils import StringEncryptedType
 from sqlalchemy_utils.types.encrypted.encrypted_type import FernetEngine
 
-from app import settings
+from app.conf import get_settings
 from app.db.human_readable_pk import HumanReadablePKMixin
 from app.enums import (
     AccountStatus,
@@ -127,7 +127,9 @@ class System(Actor, AuditableMixin):
     description: Mapped[str | None] = mapped_column(Text(), nullable=True)
     external_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True, unique=True)
     jwt_secret: Mapped[str] = mapped_column(
-        StringEncryptedType(String(255), settings.secrets_encryption_key, FernetEngine),
+        StringEncryptedType(
+            String(255), lambda: get_settings().secrets_encryption_key, FernetEngine
+        ),
         nullable=False,
     )
     owner_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"))

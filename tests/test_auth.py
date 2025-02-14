@@ -6,7 +6,6 @@ from fastapi import HTTPException, status
 from pytest_mock import MockerFixture
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import settings
 from app.auth.auth import (
     JWTBearer,
     JWTCredentials,
@@ -14,6 +13,7 @@ from app.auth.auth import (
     get_authentication_context,
 )
 from app.auth.context import AuthenticationContext, auth_context
+from app.conf import Settings
 from app.db.models import System, User
 from app.enums import AccountType, AccountUserStatus, ActorType, SystemStatus, UserStatus
 from tests.types import JWTTokenFactory, ModelFactory
@@ -55,6 +55,7 @@ async def test_get_authentication_context_system(
     gcp_extension: System,
     db_session: AsyncSession,
     assert_num_queries: Callable[[int], AbstractContextManager[None]],
+    test_settings: Settings,
 ):
     bearer = JWTBearer()
     request = mocker.Mock()
@@ -66,7 +67,7 @@ async def test_get_authentication_context_system(
 
     with assert_num_queries(1):
         async with asynccontextmanager(get_authentication_context)(
-            db_session, credentials
+            test_settings, db_session, credentials
         ) as context:
             assert isinstance(context, AuthenticationContext)
             assert context.actor_type == ActorType.SYSTEM
@@ -90,6 +91,7 @@ async def test_get_authentication_context_system_not_active(
     jwt_token_factory: JWTTokenFactory,
     db_session: AsyncSession,
     system_status: SystemStatus,
+    test_settings: Settings,
 ):
     system = await system_factory(
         status=system_status,
@@ -102,7 +104,9 @@ async def test_get_authentication_context_system_not_active(
     credentials = await bearer(request)
 
     with pytest.raises(HTTPException) as exc_info:
-        async with asynccontextmanager(get_authentication_context)(db_session, credentials):
+        async with asynccontextmanager(get_authentication_context)(
+            test_settings, db_session, credentials
+        ):
             pass
 
     assert exc_info.value.status_code == 401
@@ -118,9 +122,10 @@ async def test_get_authentication_context_user(
     jwt_token_factory: JWTTokenFactory,
     db_session: AsyncSession,
     assert_num_queries: Callable[[int], AbstractContextManager[None]],
+    test_settings: Settings,
 ):
     user = await user_factory()
-    jwt_token = jwt_token_factory(user.id, settings.auth_access_jwt_secret)
+    jwt_token = jwt_token_factory(user.id, test_settings.auth_access_jwt_secret)
     bearer = JWTBearer()
     request = mocker.Mock()
     request.headers = {"Authorization": f"Bearer {jwt_token}"}
@@ -131,7 +136,7 @@ async def test_get_authentication_context_user(
 
     with assert_num_queries(3):
         async with asynccontextmanager(get_authentication_context)(
-            db_session, credentials
+            test_settings, db_session, credentials
         ) as context:
             assert isinstance(context, AuthenticationContext)
             assert context.actor_type == ActorType.USER
@@ -155,9 +160,10 @@ async def test_get_authentication_context_user_invalid_status(
     jwt_token_factory: JWTTokenFactory,
     db_session: AsyncSession,
     user_status: UserStatus,
+    test_settings: Settings,
 ):
     user = await user_factory(status=user_status)
-    jwt_token = jwt_token_factory(user.id, settings.auth_access_jwt_secret)
+    jwt_token = jwt_token_factory(user.id, test_settings.auth_access_jwt_secret)
 
     bearer = JWTBearer()
     request = mocker.Mock()
@@ -165,7 +171,9 @@ async def test_get_authentication_context_user_invalid_status(
     credentials = await bearer(request)
 
     with pytest.raises(HTTPException) as exc_info:
-        async with asynccontextmanager(get_authentication_context)(db_session, credentials):
+        async with asynccontextmanager(get_authentication_context)(
+            test_settings, db_session, credentials
+        ):
             pass
 
     assert exc_info.value.status_code == 401
@@ -189,9 +197,10 @@ async def test_get_authentication_context_user_invalid_accountuser_status(
     jwt_token_factory: JWTTokenFactory,
     db_session: AsyncSession,
     accountuser_status: AccountUserStatus,
+    test_settings: Settings,
 ):
     user = await user_factory(accountuser_status=accountuser_status)
-    jwt_token = jwt_token_factory(user.id, settings.auth_access_jwt_secret)
+    jwt_token = jwt_token_factory(user.id, test_settings.auth_access_jwt_secret)
 
     bearer = JWTBearer()
     request = mocker.Mock()
@@ -199,7 +208,9 @@ async def test_get_authentication_context_user_invalid_accountuser_status(
     credentials = await bearer(request)
 
     with pytest.raises(HTTPException) as exc_info:
-        async with asynccontextmanager(get_authentication_context)(db_session, credentials):
+        async with asynccontextmanager(get_authentication_context)(
+            test_settings, db_session, credentials
+        ):
             pass
 
     assert exc_info.value.status_code == 401
@@ -214,10 +225,11 @@ async def test_get_authentication_context_user_account_does_not_exist(
     user_factory: ModelFactory[User],
     jwt_token_factory: JWTTokenFactory,
     db_session: AsyncSession,
+    test_settings: Settings,
 ):
     user = await user_factory()
     jwt_token = jwt_token_factory(
-        user.id, settings.auth_access_jwt_secret, account_id="FACC-0000-0000"
+        user.id, test_settings.auth_access_jwt_secret, account_id="FACC-0000-0000"
     )
 
     bearer = JWTBearer()
@@ -226,7 +238,9 @@ async def test_get_authentication_context_user_account_does_not_exist(
     credentials = await bearer(request)
 
     with pytest.raises(HTTPException) as exc_info:
-        async with asynccontextmanager(get_authentication_context)(db_session, credentials):
+        async with asynccontextmanager(get_authentication_context)(
+            test_settings, db_session, credentials
+        ):
             pass
 
     assert exc_info.value.status_code == 401

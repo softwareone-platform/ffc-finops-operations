@@ -1,15 +1,13 @@
-import abc
-import inspect
 import json
 import logging
-from collections.abc import Generator
+from abc import ABC, abstractmethod
+from functools import cached_property
 from types import TracebackType
 from typing import ClassVar, Self
 
 import httpx
 
-from app import settings
-from app.utils import get_api_modifier_jwt_token
+from app.conf import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -27,49 +25,28 @@ class APIClientError(Exception):
         super().__init__(f"{self.client_name} API client error: {message}")
 
 
-class APIModifierJWTTokenAuth(httpx.Auth):
-    def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response, None]:
-        # NOTE: Needs to be re-generated for each request as it exipres after a certain time
-        jwt_token = get_api_modifier_jwt_token()
-
-        request.headers["Authorization"] = f"Bearer {jwt_token}"
-
-        yield request
-
-
-class OptscaleClusterSecretAuth(httpx.Auth):
-    def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response, None]:
-        request.headers["Secret"] = settings.opt_cluster_secret
-
-        yield request
-
-
 HEADERS_TO_REDACT_IN_LOGS = {"authorization", "secret"}
 
 
-class BaseAPIClient(abc.ABC):
-    base_url: ClassVar[str]
-    default_auth: ClassVar[httpx.Auth | None] = None
+class BaseAPIClient(ABC):
+    def __init__(self, settings: Settings):
+        self.settings = settings
 
-    _clients_by_name: ClassVar[dict[str, type[Self]]] = {}
+    @property
+    @abstractmethod
+    def base_url(self):
+        raise NotImplementedError("base_url property must be implemented in subclasses")
 
-    def __init_subclass__(cls):
-        super().__init_subclass__()
+    @property
+    @abstractmethod
+    def auth(self):
+        raise NotImplementedError("base_url property must be implemented in subclasses")
 
-        if inspect.isabstract(cls):  # pragma: no cover
-            return
-
-        client_name = cls.__module__.split(".")[-1]
-        cls._clients_by_name[client_name] = cls
-
-    @classmethod
-    def get_clients_by_name(cls) -> dict[str, type[Self]]:
-        return cls._clients_by_name
-
-    def __init__(self):
-        self.httpx_client = httpx.AsyncClient(
+    @cached_property
+    def httpx_client(self) -> httpx.AsyncClient:
+        return httpx.AsyncClient(
             base_url=self.base_url,
-            auth=self.default_auth,
+            auth=self.auth,
             event_hooks={"request": [self._log_request], "response": [self._log_response]},
         )
 

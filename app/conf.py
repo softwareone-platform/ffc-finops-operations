@@ -1,5 +1,8 @@
 import pathlib
+from functools import lru_cache
+from typing import Annotated
 
+from fastapi import Depends
 from pydantic import PostgresDsn, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -57,3 +60,11 @@ class Settings(BaseSettings):
             port=self.postgres_port,
             path=self.postgres_db,
         )
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
+
+
+AppSettings = Annotated[Settings, Depends(get_settings)]

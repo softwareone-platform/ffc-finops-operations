@@ -11,7 +11,7 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy.orm.interfaces import ORMOption
 
 from app.auth.context import auth_context
-from app.db.db import AsyncTxSession
+from app.db.base import AsyncTxSession
 from app.db.models import (
     Account,
     AccountUser,

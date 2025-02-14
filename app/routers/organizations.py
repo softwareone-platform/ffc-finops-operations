@@ -1,7 +1,6 @@
 from typing import Annotated
 from uuid import UUID
 
-import svcs
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi_pagination.limit_offset import LimitOffsetPage
 
@@ -28,10 +27,8 @@ async def get_organizations(organization_repo: OrganizationRepository):
 async def create_organization(
     data: OrganizationCreate,
     organization_repo: OrganizationRepository,
-    services: svcs.fastapi.DepContainer,
+    api_modifier_client: APIModifierClient,
 ):
-    api_modifier_client = await services.aget(APIModifierClient)
-
     db_organization: Organization | None = None
     defaults = data.model_dump(exclude_unset=True, exclude={"user_id"})
     defaults["created_by"] = auth_context.get().get_actor()
@@ -97,7 +94,7 @@ async def get_organization_by_id(
 @router.get("/{organization_id}/datasources", response_model=list[DatasourceRead])
 async def get_datasources_by_organization_id(
     organization: Annotated[Organization, Depends(fetch_organization_or_404)],
-    services: svcs.fastapi.DepContainer,
+    optscale_client: OptscaleClient,
 ):
     if organization.operations_external_id is None:
         raise HTTPException(
@@ -107,8 +104,6 @@ async def get_datasources_by_organization_id(
                 "FinOps for Cloud organization."
             ),
         )
-
-    optscale_client = await services.aget(OptscaleClient)
 
     async with wrap_http_error_in_502(
         f"Error fetching datasources for organization {organization.name}"
@@ -136,7 +131,7 @@ async def get_datasources_by_organization_id(
 async def get_datasource_by_id(
     organization: Annotated[Organization, Depends(fetch_organization_or_404)],
     datasource_id: UUID,
-    services: svcs.fastapi.DepContainer,
+    optscale_client: OptscaleClient,
 ):
     if organization.operations_external_id is None:
         raise HTTPException(
@@ -146,8 +141,6 @@ async def get_datasource_by_id(
                 "FinOps for Cloud organization."
             ),
         )
-
-    optscale_client = await services.aget(OptscaleClient)
 
     async with wrap_http_error_in_502(f"Error fetching cloud account with ID {datasource_id}"):
         response = await optscale_client.fetch_datasource_by_id(datasource_id)
@@ -167,7 +160,7 @@ async def get_datasource_by_id(
 @router.get("/{organization_id}/employees", response_model=list[EmployeeRead])
 async def get_employees_by_organization_id(
     organization: Annotated[Organization, Depends(fetch_organization_or_404)],
-    services: svcs.fastapi.DepContainer,
+    optscale_client: OptscaleClient,
 ):
     if organization.operations_external_id is None:
         raise HTTPException(
@@ -177,8 +170,6 @@ async def get_employees_by_organization_id(
                 "FinOps for Cloud organization."
             ),
         )
-
-    optscale_client = await services.aget(OptscaleClient)
 
     async with wrap_http_error_in_502(
         f"Error fetching employees for organization {organization.name}"
@@ -209,11 +200,9 @@ async def get_employees_by_organization_id(
 async def make_organization_user_admin(
     organization: Annotated[Organization, Depends(fetch_organization_or_404)],
     user_id: UUID,
-    services: svcs.fastapi.DepContainer,
+    optscale_auth_client: OptscaleAuthClient,
+    optscale_client: OptscaleClient,
 ):
-    optscale_auth_client = await services.aget(OptscaleAuthClient)
-    optscale_client = await services.aget(OptscaleClient)
-
     async with wrap_http_error_in_502("Error making employee admin in FinOps for Cloud"):
         # check user exists in optscale
         response = await optscale_client.fetch_user_by_id(str(user_id))

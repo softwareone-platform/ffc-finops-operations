@@ -7,7 +7,7 @@ from pytest_mock import MockerFixture
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import settings
+from app.conf import Settings
 from app.db.models import Account, AccountUser, System, User
 from app.enums import AccountStatus, AccountUserStatus, UserStatus
 from app.hasher import pbkdf2_sha256
@@ -16,6 +16,7 @@ from tests.types import JWTTokenFactory, ModelFactory
 
 @freeze_time("2025-03-07T10:00:00Z")
 async def test_invite_user(
+    test_settings: Settings,
     mocker: MockerFixture,
     gcp_account: Account,
     gcp_extension: System,
@@ -60,7 +61,7 @@ async def test_invite_user(
     assert account_user.invitation_token == "invitation-token"
     assert account_user.invitation_token_expires_at is not None
     assert account_user.invitation_token_expires_at == datetime.now(UTC) + timedelta(
-        days=settings.invitation_token_expires_days,
+        days=test_settings.invitation_token_expires_days,
     )
 
 
