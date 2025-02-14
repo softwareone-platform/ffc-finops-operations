@@ -121,7 +121,7 @@ async def terminate_entitlement(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
                 f"Only active entitlements can be terminated,"
-                f" current status is {entitlement.status.value}"
+                f" current status is {entitlement.status.value}."
             ),
         )
 

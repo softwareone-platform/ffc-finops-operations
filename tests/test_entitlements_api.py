@@ -18,7 +18,7 @@ async def test_get_entitlements_without_token(api_client: AsyncClient):
     response = await api_client.get("/entitlements")
 
     assert response.status_code == 401
-    assert response.json()["detail"] == "Unauthorized"
+    assert response.json()["detail"] == "Unauthorized."
 
 
 async def test_get_entitlements_with_invalid_token(api_client: AsyncClient):
@@ -28,7 +28,7 @@ async def test_get_entitlements_with_invalid_token(api_client: AsyncClient):
     )
 
     assert response.status_code == 401
-    assert response.json()["detail"] == "Unauthorized"
+    assert response.json()["detail"] == "Unauthorized."
 
 
 async def test_get_entitlements_with_expired_token(
@@ -49,7 +49,7 @@ async def test_get_entitlements_with_expired_token(
     )
 
     assert response.status_code == 401
-    assert response.json()["detail"] == "Unauthorized"
+    assert response.json()["detail"] == "Unauthorized."
 
 
 # ====================
@@ -384,7 +384,7 @@ async def test_get_non_existant_entitlement(api_client: AsyncClient, gcp_jwt_tok
     )
 
     assert response.status_code == 404
-    assert response.json()["detail"] == f"Entitlement with ID `{id}` wasn't found"
+    assert response.json()["detail"] == f"Entitlement with ID `{id}` wasn't found."
 
 
 async def test_get_invalid_id_format(api_client: AsyncClient, gcp_jwt_token: str):
@@ -458,7 +458,7 @@ async def test_terminate_new_entitlement(
     assert response.status_code == 400
     error_msg = response.json()["detail"]
 
-    assert error_msg == "Only active entitlements can be terminated, current status is new"
+    assert error_msg == "Only active entitlements can be terminated, current status is new."
 
 
 async def test_terminate_already_terminated_entitlement(
@@ -498,4 +498,4 @@ async def test_terminate_non_existant_entitlement(
     assert response.status_code == 404
     error_msg = response.json()["detail"]
 
-    assert error_msg == f"Entitlement with ID `{entitlement_id}` wasn't found"
+    assert error_msg == f"Entitlement with ID `{entitlement_id}` wasn't found."

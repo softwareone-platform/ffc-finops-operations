@@ -25,7 +25,7 @@ async def test_get_entitlements_without_token(api_client: AsyncClient):
     response = await api_client.get("/accounts")
 
     assert response.status_code == 401
-    assert response.json()["detail"] == "Unauthorized"
+    assert response.json()["detail"] == "Unauthorized."
 
 
 async def test_get_entitlements_with_invalid_token(api_client: AsyncClient):
@@ -35,7 +35,7 @@ async def test_get_entitlements_with_invalid_token(api_client: AsyncClient):
     )
 
     assert response.status_code == 401
-    assert response.json()["detail"] == "Unauthorized"
+    assert response.json()["detail"] == "Unauthorized."
 
 
 async def test_get_entitlements_with_expired_token(
@@ -56,7 +56,7 @@ async def test_get_entitlements_with_expired_token(
     )
 
     assert response.status_code == 401
-    assert response.json()["detail"] == "Unauthorized"
+    assert response.json()["detail"] == "Unauthorized."
 
 
 # ====================
@@ -197,7 +197,7 @@ async def test_get_invalid_account(api_client: AsyncClient, ffc_jwt_token: str):
     )
 
     assert response.status_code == 404
-    assert response.json()["detail"] == f"Account with ID `{id}` wasn't found"
+    assert response.json()["detail"] == f"Account with ID `{id}` wasn't found."
 
 
 async def test_get_invalid_id_format(api_client: AsyncClient, ffc_jwt_token: str):

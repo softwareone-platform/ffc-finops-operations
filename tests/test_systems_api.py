@@ -52,7 +52,7 @@ async def test_get_system_by_id_no_auth(
     response = await api_client.get(f"/systems/{gcp_extension.id}")
 
     assert response.status_code == 401
-    assert response.json()["detail"] == "Unauthorized"
+    assert response.json()["detail"] == "Unauthorized."
 
 
 async def test_get_system_with_deleted_status(
@@ -113,7 +113,7 @@ async def test_get_system_by_id_auth_different_account(
     )
 
     assert response.status_code == 404
-    assert response.json()["detail"] == f"System with ID `{first_system.id}` wasn't found"
+    assert response.json()["detail"] == f"System with ID `{first_system.id}` wasn't found."
 
 
 async def test_get_non_existant_system(api_client: AsyncClient, gcp_jwt_token: str):
@@ -124,7 +124,7 @@ async def test_get_non_existant_system(api_client: AsyncClient, gcp_jwt_token: s
     )
 
     assert response.status_code == 404
-    assert response.json()["detail"] == f"System with ID `{id}` wasn't found"
+    assert response.json()["detail"] == f"System with ID `{id}` wasn't found."
 
 
 async def test_get_invalid_id_format(api_client: AsyncClient, gcp_jwt_token: str):
@@ -455,7 +455,7 @@ async def test_system_cannot_enable_itself(
     )
 
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
-    assert response.json()["detail"] == "Unauthorized"
+    assert response.json()["detail"] == "Unauthorized."
 
     await db_session.refresh(system)
     assert system.status == SystemStatus.DISABLED
