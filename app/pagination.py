@@ -2,6 +2,7 @@ from fastapi_pagination import create_page, resolve_params
 from fastapi_pagination.bases import AbstractPage
 from fastapi_pagination.limit_offset import LimitOffsetParams
 from sqlalchemy import ColumnExpressionArgument
+from sqlalchemy.orm.interfaces import ORMOption
 
 from app.db.handlers import ModelHandler
 from app.db.models import Base
@@ -19,9 +20,7 @@ async def paginate[M: Base, S: BaseSchema](
 
     total = await handler.count(*extra_conditions)
     items = await handler.fetch_page(
-        limit=params.limit,
-        offset=params.offset,
-        extra_conditions=extra_conditions,
+        limit=params.limit, offset=params.offset, extra_conditions=extra_conditions
     )
 
     return create_page(

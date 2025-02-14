@@ -2,11 +2,19 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi_pagination.limit_offset import LimitOffsetPage
+from sqlalchemy import select, exists
+from sqlalchemy.orm import joinedload
 
 from app.auth.auth import check_operations_account
 from app.db.handlers import NotFoundError
-from app.db.models import Account
-from app.dependencies import AccountId, AccountRepository, CurrentAuthContext, UserId
+from app.db.models import Account, User, AccountUser
+from app.dependencies import (
+    AccountId,
+    AccountRepository,
+    CurrentAuthContext,
+    UserId,
+    UserRepository,
+)
 from app.enums import AccountStatus, AccountType
 from app.pagination import paginate
 from app.schemas import (
@@ -14,6 +22,7 @@ from app.schemas import (
     AccountRead,
     AccountUpdate,
     AccountUserRead,
+    UserRead,
     from_orm,
     to_orm,
 )
@@ -189,15 +198,33 @@ async def update_account(
     )
 
 
-@router.get("/{id}/users", response_model=LimitOffsetPage[AccountUserRead])
+@router.get("/{id}/users", response_model=LimitOffsetPage[UserRead])
 async def list_account_users(
-    account: Annotated[Account, Depends(fetch_account_or_404)], auth_context: CurrentAuthContext
+    account: Annotated[Account, Depends(fetch_account_or_404)],
+    auth_context: CurrentAuthContext,
+    user_repo: UserRepository,
 ):
-    """
-    if auth_context.account.type == AFFILIATE && auth_context.account != account
-        403
-    """
-    pass
+    if auth_context.account.type == AccountType.AFFILIATE and auth_context.account != account:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cheating is bad. Don't do it.",
+        )
+
+    # This will run the following query
+    # stmt = (
+    #     select(User)
+    #     .join(AccountUser, User.id == AccountUser.user_id)
+    #     .where(AccountUser.account_id == account.id)
+    # )
+    response = await paginate(
+        user_repo,
+        UserRead,
+        extra_conditions=[
+            exists().where(AccountUser.account_id == account.id, User.id == AccountUser.user_id)
+        ],
+    )
+
+    return response
 
 
 @router.delete("/{id}/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)

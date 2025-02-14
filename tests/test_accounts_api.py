@@ -9,9 +9,9 @@ from pytest_mock import MockerFixture
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Account, System
+from app.db.models import Account, System, AccountUser, User
 from app.dependencies import AccountRepository
-from app.enums import AccountStatus, AccountType
+from app.enums import AccountStatus, AccountType, UserStatus
 from app.routers.accounts import (
     validate_account_type_and_required_conditions,
     validate_required_conditions_before_update,
@@ -477,3 +477,29 @@ async def test_can_only_updated_the_name_and_external_id(
     data = response.json()
     assert response.status_code == 400
     assert data.get("detail") == "You can't update whatever you want."
+
+
+# -------
+# List Account Users
+# -------
+
+
+async def test_can_list_account_users(
+    operations_client: AsyncClient,
+    operations_account: Account,
+    accountuser_factory: ModelFactory[AccountUser],
+    user_factory: ModelFactory[User],
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+    await accountuser_factory(
+        user_id=user.id, account_id=operations_account.id, status=AccountStatus.ACTIVE
+    )
+
+    response = await operations_client.get(f"/accounts/{operations_account.id}/users")
+    data = response.json()
+    print("Data---:", data)
+    assert response.status_code == 200
