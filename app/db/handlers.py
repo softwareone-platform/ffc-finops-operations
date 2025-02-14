@@ -74,7 +74,7 @@ class ModelHandler[M: BaseModel]:
             await self._save_changes(obj)
         except IntegrityError as e:
             raise ConstraintViolationError(
-                f"Failed to create {self.model_cls.__name__}: {e}"
+                f"Failed to create {self.model_cls.__name__}: {e}."
             ) from e
 
         return obj
@@ -93,7 +93,7 @@ class ModelHandler[M: BaseModel]:
         instance = result.scalar_one_or_none()
 
         if instance is None:
-            raise NotFoundError(f"{self.model_cls.__name__} with ID `{str(id)}` wasn't found")
+            raise NotFoundError(f"{self.model_cls.__name__} with ID `{str(id)}` wasn't found.")
 
         return instance
 

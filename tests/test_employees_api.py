@@ -288,7 +288,7 @@ async def test_get_employees_for_missing_organization(
     )
 
     assert response.status_code == 404
-    assert response.json() == {"detail": f"Organization with ID `{org_id}` wasn't found"}
+    assert response.json() == {"detail": f"Organization with ID `{org_id}` wasn't found."}
 
 
 async def test_get_employees_for_organization_with_no_employees(
@@ -330,7 +330,7 @@ async def test_get_employees_for_organization_with_no_organization_id(
 
     assert response.status_code == 400
     assert response.json() == {
-        "detail": f"Organization {org.name} has no associated FinOps for Cloud organization"
+        "detail": f"Organization {org.name} has no associated FinOps for Cloud organization."
     }
 
 

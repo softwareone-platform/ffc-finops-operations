@@ -372,7 +372,7 @@ async def test_get_non_existant_organization(api_client: AsyncClient, ffc_jwt_to
     )
 
     assert response.status_code == 404
-    assert response.json()["detail"] == f"Organization with ID `{id}` wasn't found"
+    assert response.json()["detail"] == f"Organization with ID `{id}` wasn't found."
 
 
 async def test_get_invalid_id_format(api_client: AsyncClient, ffc_jwt_token: str):

@@ -36,7 +36,7 @@ async def test_jwt_bearer_invalid_token(mocker: MockerFixture):
     with pytest.raises(HTTPException) as exc_info:
         await bearer(request)
     assert exc_info.value.status_code == 401
-    assert exc_info.value.detail == "Unauthorized"
+    assert exc_info.value.detail == "Unauthorized."
 
 
 async def test_jwt_bearer_no_token(mocker: MockerFixture):
@@ -46,7 +46,7 @@ async def test_jwt_bearer_no_token(mocker: MockerFixture):
     with pytest.raises(HTTPException) as exc_info:
         await bearer(request)
     assert exc_info.value.status_code == 401
-    assert exc_info.value.detail == "Unauthorized"
+    assert exc_info.value.detail == "Unauthorized."
 
 
 async def test_get_authentication_context_system(
@@ -106,7 +106,7 @@ async def test_get_authentication_context_system_not_active(
             pass
 
     assert exc_info.value.status_code == 401
-    assert exc_info.value.detail == "Unauthorized"
+    assert exc_info.value.detail == "Unauthorized."
 
     with pytest.raises(LookupError):
         auth_context.get()
@@ -169,7 +169,7 @@ async def test_get_authentication_context_user_invalid_status(
             pass
 
     assert exc_info.value.status_code == 401
-    assert exc_info.value.detail == "Unauthorized"
+    assert exc_info.value.detail == "Unauthorized."
 
     with pytest.raises(LookupError):
         auth_context.get()
@@ -203,7 +203,7 @@ async def test_get_authentication_context_user_invalid_accountuser_status(
             pass
 
     assert exc_info.value.status_code == 401
-    assert exc_info.value.detail == "Unauthorized"
+    assert exc_info.value.detail == "Unauthorized."
 
     with pytest.raises(LookupError):
         auth_context.get()
@@ -230,7 +230,7 @@ async def test_get_authentication_context_user_account_does_not_exist(
             pass
 
     assert exc_info.value.status_code == 401
-    assert exc_info.value.detail == "Unauthorized"
+    assert exc_info.value.detail == "Unauthorized."
 
     with pytest.raises(LookupError):
         auth_context.get()
