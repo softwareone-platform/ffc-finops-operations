@@ -52,7 +52,7 @@ async def update_data_and_format_response(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You can't update whatever you want.",
         )
-    db_account = await account_repo.update(id, data=data.model_dump(exclude_none=True))
+    db_account = await account_repo.update(id, data=to_update)
     return from_orm(AccountRead, db_account)
 
 
