@@ -3,6 +3,7 @@ from contextlib import suppress
 from datetime import UTC, datetime
 from typing import Any
 
+import sqlalchemy
 from sqlalchemy import ColumnExpressionArgument, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +19,7 @@ from app.db.models import (
     Entitlement,
     Organization,
     System,
+    TimestampMixin,
     User,
 )
 from app.db.models import Base as BaseModel
@@ -31,6 +33,10 @@ class DatabaseError(Exception):
 
 
 class NotFoundError(DatabaseError):
+    pass
+
+
+class CannotDeleteError(DatabaseError):
     pass
 
 
@@ -119,10 +125,7 @@ class ModelHandler[M: BaseModel]:
         return obj, True
 
     async def update(self, id_or_obj: str | M, data: dict[str, Any]) -> M:
-        if isinstance(id_or_obj, str):
-            obj = await self.get(id_or_obj)
-        else:
-            obj = id_or_obj
+        obj = await self._get_model_obj(id_or_obj)
 
         for key, value in data.items():
             setattr(obj, key, value)
@@ -133,6 +136,37 @@ class ModelHandler[M: BaseModel]:
 
         await self._save_changes(obj)
         return obj
+
+    async def soft_delete(self, id_or_obj: str | M) -> None:
+        obj = await self._get_model_obj(id_or_obj)
+
+        model_inspection = sqlalchemy.inspect(obj.__class__)
+        status_column = model_inspection.columns.get("status")
+
+        if status_column is None:
+            raise CannotDeleteError(f"{self.model_cls.__name__} does not have a status column.")
+
+        if not isinstance(status_column.type, sqlalchemy.Enum):
+            raise CannotDeleteError(f"{self.model_cls.__name__} status column is not an Enum.")
+
+        if "deleted" not in status_column.type.enums:
+            raise CannotDeleteError(
+                f"{self.model_cls.__name__} status column does not have a 'deleted' value."
+            )
+
+        if obj.status == "deleted":  # type: ignore[attr-defined]
+            raise CannotDeleteError(f"{self.model_cls.__name__} object is already deleted.")
+
+        column_updates = {"status": "deleted"}
+
+        if isinstance(obj, TimestampMixin):
+            column_updates["deleted_at"] = datetime.now(UTC)
+
+        if isinstance(obj, AuditableMixin):
+            with suppress(LookupError):
+                column_updates["deleted_by"] = auth_context.get().get_actor()
+
+        await self.update(obj, column_updates)
 
     async def fetch_page(
         self,
@@ -171,6 +205,12 @@ class ModelHandler[M: BaseModel]:
 
         result = await self.session.execute(query)
         return result.scalars().first()
+
+    async def _get_model_obj(self, id_or_obj: str | M) -> M:
+        if isinstance(id_or_obj, str):
+            return await self.get(id_or_obj)
+
+        return id_or_obj
 
     async def _save_changes(self, obj: M):
         if self.commit:
