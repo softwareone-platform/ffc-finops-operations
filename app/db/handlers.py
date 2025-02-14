@@ -125,10 +125,7 @@ class ModelHandler[M: BaseModel]:
         return obj, True
 
     async def update(self, id_or_obj: str | M, data: dict[str, Any]) -> M:
-        if isinstance(id_or_obj, str):
-            obj = await self.get(id_or_obj)
-        else:
-            obj = id_or_obj
+        obj = await self._get_model_obj(id_or_obj)
 
         for key, value in data.items():
             setattr(obj, key, value)
@@ -141,10 +138,7 @@ class ModelHandler[M: BaseModel]:
         return obj
 
     async def soft_delete(self, id_or_obj: str | M) -> None:
-        if isinstance(id_or_obj, str):
-            obj = await self.get(id_or_obj)
-        else:
-            obj = id_or_obj
+        obj = await self._get_model_obj(id_or_obj)
 
         model_inspection = sqlalchemy.inspect(obj.__class__)
         status_column = model_inspection.columns.get("status")
@@ -211,6 +205,12 @@ class ModelHandler[M: BaseModel]:
 
         result = await self.session.execute(query)
         return result.scalars().first()
+
+    async def _get_model_obj(self, id_or_obj: str | M) -> M:
+        if isinstance(id_or_obj, str):
+            return await self.get(id_or_obj)
+
+        return id_or_obj
 
     async def _save_changes(self, obj: M):
         if self.commit:

@@ -10,9 +10,11 @@ from app.db.handlers import (
 )
 from app.db.models import Base
 from tests.db.models import (
+    DeletableAuditModelForTests,
     DeletableModelForTests,
     DeletableModelStatus,
     ModelForTests,
+    NonDeletableModelWithEnumStatusForTests,
     ParentModelForTests,
 )
 
@@ -26,6 +28,16 @@ class ParentModelForTestsHandler(ModelHandler[ParentModelForTests]):
 
 
 class DeletableModelForTestsHandler(ModelHandler[DeletableModelForTests]):
+    pass
+
+
+class DeletableAuditModelForTestsHandler(ModelHandler[DeletableAuditModelForTests]):
+    pass
+
+
+class NonDeletableModelWithEnumStatusForTestsHandler(
+    ModelHandler[NonDeletableModelWithEnumStatusForTests]
+):
     pass
 
 
@@ -240,6 +252,13 @@ async def test_get_or_create_with_default_load_options(db_session: AsyncSession)
             id="deletable_soft_delete_deleted_fail",
         ),
         pytest.param(
+            DeletableAuditModelForTests,
+            DeletableAuditModelForTestsHandler,
+            DeletableModelStatus.ACTIVE,
+            None,
+            id="deletable_audit_soft_delete_active",
+        ),
+        pytest.param(
             ModelForTests,
             ModelForTestsHandler,
             "active",
@@ -252,6 +271,16 @@ async def test_get_or_create_with_default_load_options(db_session: AsyncSession)
             None,
             CannotDeleteError("ParentModelForTests does not have a status column"),
             id="no_status_soft_delete_fail",
+        ),
+        pytest.param(
+            NonDeletableModelWithEnumStatusForTests,
+            NonDeletableModelWithEnumStatusForTestsHandler,
+            "active",
+            CannotDeleteError(
+                "NonDeletableModelWithEnumStatusForTests "
+                "status column does not have a 'deleted' value"
+            ),
+            id="status_enum_no_delete_state_fail",
         ),
     ],
 )
