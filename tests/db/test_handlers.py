@@ -3,19 +3,34 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app.db.handlers import (
+    CannotDeleteError,
     ConstraintViolationError,
     ModelHandler,
     NotFoundError,
 )
-from tests.db.models import ModelForTests, ParentModelForTests
+from app.db.models import Base
+from tests.db.models import (
+    DeletableModelForTests,
+    DeletableModelStatus,
+    ModelForTests,
+    ParentModelForTests,
+)
 
 
-class Model4TestsHandler(ModelHandler[ModelForTests]):
+class ModelForTestsHandler(ModelHandler[ModelForTests]):
+    pass
+
+
+class ParentModelForTestsHandler(ModelHandler[ParentModelForTests]):
+    pass
+
+
+class DeletableModelForTestsHandler(ModelHandler[DeletableModelForTests]):
     pass
 
 
 async def test_create_success(db_session: AsyncSession):
-    handler = Model4TestsHandler(db_session)
+    handler = ModelForTestsHandler(db_session)
     test_obj = ModelForTests(name="Test Object")
 
     created_obj = await handler.create(test_obj)
@@ -26,7 +41,7 @@ async def test_create_success(db_session: AsyncSession):
 
 
 async def test_create_constraint_violation(db_session: AsyncSession):
-    handler = Model4TestsHandler(db_session)
+    handler = ModelForTestsHandler(db_session)
     obj1 = ModelForTests(name="Duplicate Name")
     await handler.create(obj1)
 
@@ -37,7 +52,7 @@ async def test_create_constraint_violation(db_session: AsyncSession):
 
 
 async def test_get_success(db_session: AsyncSession):
-    handler = Model4TestsHandler(db_session)
+    handler = ModelForTestsHandler(db_session)
     test_obj = ModelForTests(name="Get Test Object")
     await handler.create(test_obj)
 
@@ -47,14 +62,14 @@ async def test_get_success(db_session: AsyncSession):
 
 
 async def test_get_not_found(db_session: AsyncSession):
-    handler = Model4TestsHandler(db_session)
+    handler = ModelForTestsHandler(db_session)
 
     with pytest.raises(NotFoundError):
         await handler.get("not-found")
 
 
 async def test_update_success(db_session: AsyncSession):
-    handler = Model4TestsHandler(db_session)
+    handler = ModelForTestsHandler(db_session)
     test_obj = ModelForTests(name="Update Test Object")
     created_obj = await handler.create(test_obj)
 
@@ -63,7 +78,7 @@ async def test_update_success(db_session: AsyncSession):
 
 
 async def test_fetch_page(db_session: AsyncSession):
-    handler = Model4TestsHandler(db_session)
+    handler = ModelForTestsHandler(db_session)
 
     # Create multiple objects
     for i in range(5):
@@ -74,7 +89,7 @@ async def test_fetch_page(db_session: AsyncSession):
 
 
 async def test_count(db_session: AsyncSession):
-    handler = Model4TestsHandler(db_session)
+    handler = ModelForTestsHandler(db_session)
     for i in range(5):
         await handler.create(ModelForTests(name=f"Object {i}"))
     count = await handler.count()
@@ -82,7 +97,7 @@ async def test_count(db_session: AsyncSession):
 
 
 async def test_filter(db_session: AsyncSession):
-    handler = Model4TestsHandler(db_session)
+    handler = ModelForTestsHandler(db_session)
     for i in range(5):
         await handler.create(ModelForTests(name=f"Object {i}"))
     results = await handler.filter(ModelForTests.name.like("Object%"))
@@ -91,7 +106,7 @@ async def test_filter(db_session: AsyncSession):
 
 
 async def test_first(db_session: AsyncSession):
-    handler = Model4TestsHandler(db_session)
+    handler = ModelForTestsHandler(db_session)
     for i in range(5):
         await handler.create(ModelForTests(name=f"Object {i}"))
     first_result = await handler.first(ModelForTests.name.like("Object%"))
@@ -101,7 +116,7 @@ async def test_first(db_session: AsyncSession):
 
 
 async def test_fetch_page_extra_conditions(db_session: AsyncSession):
-    handler = Model4TestsHandler(db_session)
+    handler = ModelForTestsHandler(db_session)
     test_obj1 = ModelForTests(name="Condition Test 1", status="inactive")
     test_obj2 = ModelForTests(name="Condition Test 2", status="active")
 
@@ -115,7 +130,7 @@ async def test_fetch_page_extra_conditions(db_session: AsyncSession):
 
 
 async def test_get_extra_conditions(db_session: AsyncSession):
-    handler = Model4TestsHandler(db_session)
+    handler = ModelForTestsHandler(db_session)
     test_obj1 = ModelForTests(name="Condition Test 1", status="inactive")
     test_obj2 = ModelForTests(name="Condition Test 2", status="active")
 
@@ -131,7 +146,7 @@ async def test_get_default_options_with_joinedload(db_session: AsyncSession):
     parent_obj = ParentModelForTests(description="Parent Description")
     db_session.add(parent_obj)
     await db_session.commit()
-    handler = Model4TestsHandler(db_session)
+    handler = ModelForTestsHandler(db_session)
     handler.default_options = [joinedload(ModelForTests.parent)]
     test_obj = ModelForTests(name="With Related")
     test_obj.parent = parent_obj
@@ -143,7 +158,7 @@ async def test_get_default_options_with_joinedload(db_session: AsyncSession):
 
 
 async def test_count_with_extra_conditions(db_session: AsyncSession):
-    handler = Model4TestsHandler(db_session)
+    handler = ModelForTestsHandler(db_session)
 
     await handler.create(ModelForTests(name="Object 1", status="inactive"))
     await handler.create(ModelForTests(name="Object 2", status="active"))
@@ -153,7 +168,7 @@ async def test_count_with_extra_conditions(db_session: AsyncSession):
 
 
 async def test_filter_with_default_load_options(db_session: AsyncSession):
-    handler = Model4TestsHandler(db_session)
+    handler = ModelForTestsHandler(db_session)
     parent = ParentModelForTests(description="Parent Description")
     db_session.add(parent)
     await db_session.commit()
@@ -169,7 +184,7 @@ async def test_filter_with_default_load_options(db_session: AsyncSession):
 
 
 async def test_first_with_default_load_options(db_session: AsyncSession):
-    handler = Model4TestsHandler(db_session)
+    handler = ModelForTestsHandler(db_session)
     parent = ParentModelForTests(description="First Parent Description")
     db_session.add(parent)
     await db_session.commit()
@@ -185,7 +200,7 @@ async def test_first_with_default_load_options(db_session: AsyncSession):
 
 
 async def test_get_or_create_with_default_load_options(db_session: AsyncSession):
-    handler = Model4TestsHandler(db_session)
+    handler = ModelForTestsHandler(db_session)
     parent = ParentModelForTests(description="GetOrCreate Parent")
     db_session.add(parent)
     await db_session.commit()
@@ -205,3 +220,61 @@ async def test_get_or_create_with_default_load_options(db_session: AsyncSession)
     )
     assert created is False
     assert obj.parent.description == "GetOrCreate Parent"
+
+
+@pytest.mark.parametrize(
+    ("model_cls", "handler_cls", "initial_status", "exception"),
+    [
+        pytest.param(
+            DeletableModelForTests,
+            DeletableModelForTestsHandler,
+            DeletableModelStatus.ACTIVE,
+            None,
+            id="deletable_soft_delete_active",
+        ),
+        pytest.param(
+            DeletableModelForTests,
+            DeletableModelForTestsHandler,
+            DeletableModelStatus.DELETED,
+            CannotDeleteError("DeletableModelForTests object is already deleted"),
+            id="deletable_soft_delete_deleted_fail",
+        ),
+        pytest.param(
+            ModelForTests,
+            ModelForTestsHandler,
+            "active",
+            CannotDeleteError("ModelForTests status column is not an Enum"),
+            id="non_enum_status_soft_delete_fail",
+        ),
+        pytest.param(
+            ParentModelForTests,
+            ParentModelForTestsHandler,
+            None,
+            CannotDeleteError("ParentModelForTests does not have a status column"),
+            id="no_status_soft_delete_fail",
+        ),
+    ],
+)
+async def test_soft_delete(
+    db_session: AsyncSession,
+    model_cls: type[Base],
+    handler_cls: type[ModelHandler],
+    initial_status: DeletableModelStatus,
+    exception: Exception | None,
+):
+    handler = handler_cls(db_session)
+    model_fields = {"name": "Delete Test Object"}
+
+    if initial_status is not None:
+        model_fields["status"] = initial_status
+
+    test_obj = model_cls(**model_fields)
+    await handler.create(test_obj)
+
+    if exception is None:
+        await handler.soft_delete(test_obj)
+        await db_session.refresh(test_obj)
+        assert test_obj.status == DeletableModelStatus.DELETED  # type: ignore[attr-defined]
+    else:
+        with pytest.raises(exception.__class__, match=str(exception)):
+            await handler.soft_delete(test_obj)

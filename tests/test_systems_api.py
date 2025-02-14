@@ -459,3 +459,70 @@ async def test_system_cannot_enable_itself(
 
     await db_session.refresh(system)
     assert system.status == SystemStatus.DISABLED
+
+
+# =============
+# Delete system
+# =============
+
+
+@pytest.mark.parametrize(
+    ("initial_status", "expected_status_code"),
+    [
+        pytest.param(SystemStatus.DISABLED, status.HTTP_204_NO_CONTENT, id="delete_disabled"),
+        pytest.param(SystemStatus.ACTIVE, status.HTTP_204_NO_CONTENT, id="delete_active"),
+        pytest.param(SystemStatus.DELETED, status.HTTP_400_BAD_REQUEST, id="delete_deleted_fail"),
+    ],
+)
+async def test_delete_system(
+    initial_status: SystemStatus,
+    expected_status_code: int,
+    account_factory: ModelFactory[Account],
+    system_factory: ModelFactory[System],
+    system_jwt_token_factory: Callable[[System], str],
+    ffc_extension: System,
+    api_client: AsyncClient,
+    db_session: AsyncSession,
+):
+    system = await system_factory(status=initial_status)
+
+    response = await api_client.delete(
+        f"/systems/{system.id}",
+        headers={"Authorization": f"Bearer {system_jwt_token_factory(ffc_extension)}"},
+    )
+
+    assert response.status_code == expected_status_code
+    await db_session.refresh(system)
+
+    if response.is_error:
+        expected_error_msg = "System is already deleted."
+        assert response.json()["detail"] == expected_error_msg
+        assert system.deleted_at is None
+        assert system.deleted_by is None
+    else:
+        assert not response.content
+
+        assert system.status == SystemStatus.DELETED
+        assert system.deleted_at is not None
+        assert system.deleted_by is ffc_extension
+
+
+async def test_system_cannot_delete_itself(
+    system_factory: ModelFactory[System],
+    system_jwt_token_factory: Callable[[System], str],
+    api_client: AsyncClient,
+    db_session: AsyncSession,
+):
+    system = await system_factory(status=SystemStatus.ACTIVE)
+
+    response = await api_client.delete(
+        f"/systems/{system.id}",
+        headers={"Authorization": f"Bearer {system_jwt_token_factory(system)}"},
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.json()["detail"] == "A system cannot delete itself."
+
+    # Verify the system's status hasn't changed
+    await db_session.refresh(system)
+    assert system.status == SystemStatus.ACTIVE
