@@ -116,9 +116,9 @@ def command(
         session.refresh(account_user)
 
         print(f"""
-[{color}]User [bold]{user.name} ({user.email})[/bold] {action}[/{color}]
+[{color}]User [bold]{user.id} - {user.name} ({user.email})[/bold] {action}[/{color}]
 
-Account: [blue][bold]{account.id}[/bold] - {account.name} ({account.type})[/blue]
+Account: [blue][bold]{account.id}[/bold] - {account.name} ({account.type.value.title()})[/blue]
 Invitation token: [blue_violet][bold]{account_user.invitation_token}[/bold][/blue_violet]
 Expires at: [yellow3]{account_user.invitation_token_expires_at.strftime("%c")}[/yellow3]
 """)
