@@ -35,33 +35,36 @@ async def persist_data_and_format_response(account_repo, data):
     return from_orm(AccountRead, db_account)
 
 
-async def update_data_and_format_response(id,account_repo, data):
+async def update_data_and_format_response(
+    id: str, account_repo: AccountRepository, data: AccountUpdate
+):
     """
     It updates the given data to the Account model and return back
     the Pydantic schema
 
     account_repo: an ORM model instance of AccountRepository
-    data: the data to persist
+    data: the data to update
     Return: AccountUpdate Pydantic Model
     """
-    print("data:", type(data))
     to_update = data.model_dump(exclude_none=True)
-    print("to_update:",to_update)
     if not to_update:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You can't update whatever you want.",
         )
-    db_account = await account_repo.update(id=id, data=data.model_dump(exclude_none=True))
-    print("db_account", db_account.name)
-    from_orm_ =  from_orm(AccountRead, db_account)
-    print("from orm",from_orm_)
+    db_account = await account_repo.update(id, data=data.model_dump(exclude_none=True))
+    from_orm_ = from_orm(AccountRead, db_account)
     return from_orm_
 
 
-async def validate_required_conditions_before_update(account:Account):
+async def validate_required_conditions_before_update(account: Account):
     """
+    This function performs the following required checks before
+    proceeding to update an Account:
+    1. Only Accounts classified as of type “Affiliate” can be updated.
+    2. The account status must be ACTIVE.
 
+    A HTTPException with status 400 will be raised if at least one condition is not met.
     """
     if account.type != AccountType.AFFILIATE:
         raise HTTPException(
@@ -70,9 +73,10 @@ async def validate_required_conditions_before_update(account:Account):
         )
     if account.status == AccountStatus.DELETED or account.status == AccountStatus.DISABLED:
         raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="You cannot update an Account Deleted.",
-            )
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot update an Account Deleted.",
+        )
+
 
 async def validate_account_type_and_required_conditions(
     account_repo: AccountRepository, data: AccountCreate
@@ -155,23 +159,42 @@ async def get_accounts(account_repo: AccountRepository):
     return await paginate(account_repo, AccountRead)
 
 
-@router.put("/{id}", response_model=AccountRead,
-            dependencies=[Depends(check_operations_account)],
+@router.put(
+    "/{id}",
+    response_model=AccountRead,
+    dependencies=[Depends(check_operations_account)],
 )
-async def update_account(data: AccountUpdate, account_repo: AccountRepository,
-                         account: Annotated[Account, Depends(fetch_account_or_404)],
+async def update_account(
+    data: AccountUpdate,
+    account_repo: AccountRepository,
+    account: Annotated[Account, Depends(fetch_account_or_404)],
 ):
     """
+    This Endpoint updates an Affiliate Account.
 
+    The following conditions must be verified before proceeding with the operation of updating
+    an account.
+    1. The Account type must be OPERATIONS, otherwise a 403 error will be returned
+    2. The Account status must be Active
+    3. Only Accounts classified as of type “Affiliate” can be updated.
+    4. Only the name and the external_id of the account can be modified.
+
+    The newly created account's status will be assigned as ACTIVE
+
+    Raises:
+        - HTTPException with status 403 if the check (1) or (3)fails
+        - HTTPException with status 400 if the checks (2) or (4) fail.
     """
     await validate_required_conditions_before_update(account=account)
-    return await update_data_and_format_response(account.id, account_repo, data)
-
+    return await update_data_and_format_response(
+        id=account.id, account_repo=account_repo, data=data
+    )
 
 
 @router.get("/{id}/users", response_model=LimitOffsetPage[AccountUserRead])
-async def list_account_users(account: Annotated[Account, Depends(fetch_account_or_404)],
-                             auth_context: CurrentAuthContext):
+async def list_account_users(
+    account: Annotated[Account, Depends(fetch_account_or_404)], auth_context: CurrentAuthContext
+):
     """
     if auth_context.account.type == AFFILIATE && auth_context.account != account
         403
@@ -180,8 +203,9 @@ async def list_account_users(account: Annotated[Account, Depends(fetch_account_o
 
 
 @router.delete("/{id}/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def remove_user_from_account(account: Annotated[Account, Depends(fetch_account_or_404)],
-                                   user_id: UserId):
+async def remove_user_from_account(
+    account: Annotated[Account, Depends(fetch_account_or_404)], user_id: UserId
+):
     """
     if auth_context.account.type == AFFILIATE && auth_context.account != account
         403

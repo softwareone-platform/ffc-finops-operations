@@ -344,7 +344,7 @@ async def operations_account(account_factory: ModelFactory[Account]) -> Account:
 @pytest.fixture
 async def affiliate_account(
     account_factory: ModelFactory[Account], ffc_extension: System
-) -> Account:  # noqa: E501
+) -> Account:
     return await account_factory(
         name="Microsoft",
         type=AccountType.AFFILIATE,

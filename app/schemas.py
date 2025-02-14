@@ -93,6 +93,7 @@ class AccountBase(BaseSchema):
 class AccountCreate(AccountBase):
     type: AccountType
 
+
 class AccountUpdate(AccountBase):
     name: Annotated[str | None, Field(max_length=255, examples=["Microsoft"])] = None
     external_id: Annotated[str | None, Field(max_length=255, examples=["ACC-9044-8753"])] = None
@@ -102,7 +103,6 @@ class AccountRead(IdSchema, CommonEventsSchema, AccountBase):
     entitlements_stats: AccountEntitlementsStats | None = None
     status: AccountStatus
     type: AccountType
-
 
 
 class AccountReference(IdSchema):
