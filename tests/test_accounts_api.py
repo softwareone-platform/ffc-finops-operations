@@ -414,16 +414,13 @@ async def test_can_update_accounts_external_id(
     assert result.one_or_none() is not None
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("account_status", [AccountStatus.DELETED, AccountStatus.DISABLED])
 async def test_cannot_update_if_status_is_not_active(
     api_client: AsyncClient,
     ffc_jwt_token: str,
     account_factory: ModelFactory[Account],
-    account_status: AccountStatus,
 ):
     account = await account_factory(
-        status=account_status,
+        status=AccountStatus.DELETED,
         type=AccountType.AFFILIATE,
         name="Microsoft",
         external_id="ACC-9044-8753",

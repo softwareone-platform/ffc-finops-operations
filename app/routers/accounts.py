@@ -53,8 +53,7 @@ async def update_data_and_format_response(
             detail="You can't update whatever you want.",
         )
     db_account = await account_repo.update(id, data=data.model_dump(exclude_none=True))
-    from_orm_ = from_orm(AccountRead, db_account)
-    return from_orm_
+    return from_orm(AccountRead, db_account)
 
 
 async def validate_required_conditions_before_update(account: Account):
@@ -62,7 +61,7 @@ async def validate_required_conditions_before_update(account: Account):
     This function performs the following required checks before
     proceeding to update an Account:
     1. Only Accounts classified as of type “Affiliate” can be updated.
-    2. The account status must be ACTIVE.
+    2. The account status cannot be DELETED
 
     A HTTPException with status 400 will be raised if at least one condition is not met.
     """
@@ -71,7 +70,7 @@ async def validate_required_conditions_before_update(account: Account):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You cannot update an Account of type Operations.",
         )
-    if account.status == AccountStatus.DELETED or account.status == AccountStatus.DISABLED:
+    if account.status == AccountStatus.DELETED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You cannot update an Account Deleted.",
@@ -179,11 +178,10 @@ async def update_account(
     3. Only Accounts classified as of type “Affiliate” can be updated.
     4. Only the name and the external_id of the account can be modified.
 
-    The newly created account's status will be assigned as ACTIVE
 
     Raises:
-        - HTTPException with status 403 if the check (1) or (3)fails
-        - HTTPException with status 400 if the checks (2) or (4) fail.
+        - HTTPException with status 403 if the check (1) fails
+        - HTTPException with status 400 if the checks (2), (4) or (3) fail.
     """
     await validate_required_conditions_before_update(account=account)
     return await update_data_and_format_response(
