@@ -16,7 +16,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app import settings
 from app.db import db_engine
 from app.db.models import Account, AccountUser, Actor, Base, Entitlement, Organization, System, User
-from app.enums import AccountStatus, AccountType, AccountUserStatus, SystemStatus, UserStatus
+from app.enums import (
+    AccountStatus,
+    AccountType,
+    AccountUserStatus,
+    OrganizationStatus,
+    SystemStatus,
+    UserStatus,
+)
 from app.hasher import pbkdf2_sha256
 from tests.db.models import ModelForTests, ParentModelForTests  # noqa: F401
 from tests.types import ModelFactory
@@ -161,6 +168,7 @@ def organization_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory
         operations_external_id: str | None = None,
         created_by: Actor | None = None,
         updated_by: Actor | None = None,
+        status: OrganizationStatus = OrganizationStatus.ACTIVE,
     ) -> Organization:
         organization = Organization(
             name=name or faker.company(),
@@ -169,6 +177,7 @@ def organization_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory
             operations_external_id=operations_external_id,
             created_by=created_by,
             updated_by=updated_by,
+            status=status,
         )
         db_session.add(organization)
         await db_session.commit()
@@ -405,3 +414,12 @@ def affiliate_client(api_client: AsyncClient, gcp_jwt_token: str) -> AsyncClient
 def operations_client(api_client: AsyncClient, ffc_jwt_token: str) -> AsyncClient:
     api_client.headers["Authorization"] = f"Bearer {ffc_jwt_token}"
     return api_client
+
+
+@pytest.fixture
+async def apple_inc_organization(organization_factory: ModelFactory[Organization]) -> Organization:
+    return await organization_factory(
+        name="Apple Inc.",
+        currency="USD",
+        operations_external_id=str(uuid.uuid4()),
+    )
