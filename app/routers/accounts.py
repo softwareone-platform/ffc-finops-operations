@@ -10,11 +10,12 @@ from app.db.models import Account, AccountUser, User
 from app.dependencies import (
     AccountId,
     AccountRepository,
+    AccountUserRepository,
     CurrentAuthContext,
     UserId,
     UserRepository,
 )
-from app.enums import AccountStatus, AccountType
+from app.enums import AccountStatus, AccountType, AccountUserStatus
 from app.pagination import paginate
 from app.schemas import (
     AccountCreate,
@@ -234,7 +235,11 @@ async def list_account_users(
 
 @router.delete("/{id}/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_user_from_account(
-    account: Annotated[Account, Depends(fetch_account_or_404)], user_id: UserId
+    account: Annotated[Account, Depends(fetch_account_or_404)],
+    user_id: UserId,
+    auth_context: CurrentAuthContext,
+    user_repo: UserRepository,
+    accountuser_repo: AccountUserRepository,
 ):
     """
     if auth_context.account.type == AFFILIATE && auth_context.account != account
@@ -243,4 +248,19 @@ async def remove_user_from_account(
     set account user status to DELETE
     set deleted_at to now()
     """
-    pass
+    if auth_context.account.type == AccountType.AFFILIATE and auth_context.account != account:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Account with ID `{account.id}` wasn't found.",
+        )
+    result = await accountuser_repo.get_account_user(
+        account_id=account.id,
+        user_id=user_id,
+        extra_conditions=AccountUser.status != AccountUserStatus.DELETED,
+    )
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"The User `{user_id}` does snot belong to the Account with ID `{account.id}`.",
+        )
+    # soft delete di result and return 204
