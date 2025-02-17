@@ -30,7 +30,6 @@ def test_actor_read_from_orm():
 
 def test_system_create_to_orm():
     data = {
-        "id": "FTKN-1234-5678",
         "name": "Test System",
         "external_id": "test-system",
         "jwt_secret": "secret",
