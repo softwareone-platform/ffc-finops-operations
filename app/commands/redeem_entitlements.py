@@ -4,6 +4,7 @@ import httpx
 import typer
 from rich.console import Console
 from sqlalchemy import create_engine, select
+from sqlalchemy.exc import DatabaseError
 from sqlalchemy.orm import sessionmaker
 
 from app.db.models import Entitlement, Organization
@@ -90,25 +91,29 @@ def command(
                             f"{datasource["type"]}, skip it[/orange3]"
                         )
                         continue
+                try:
+                    query = select(Entitlement).where(
+                        Entitlement.datasource_id == datasource_id,
+                        Entitlement.status == EntitlementStatus.NEW,
+                    )
+                    instance = session.scalar(query)
+                    if instance:
+                        instance.status = EntitlementStatus.ACTIVE
+                        instance.redeemed_at = datetime.now(UTC)
+                        instance.redeemed_by = organization
+                        instance.operations_external_id = datasource["id"]
+                        session.add(instance)
+                        session.commit()
+                        console.print(
+                            f"\t\t[green]Entitlement {instance.id} for datasource {datasource_id} "
+                            "has been redeemed successfully![/green]"
+                        )
+                    else:
+                        console.print(
+                            "\t\t[magenta]No Entitlement in NEW status has been found for "
+                            f"datasource {datasource_id}[/magenta]"
+                        )
 
-                query = session.query(Entitlement).where(
-                    Entitlement.datasource_id == datasource_id,
-                    Entitlement.status == EntitlementStatus.NEW,
-                )
-                instance = query.scalar()
-                if instance:
-                    instance.status = EntitlementStatus.ACTIVE
-                    instance.redeemed_at = datetime.now(UTC)
-                    instance.redeemed_by = organization
-                    instance.operations_external_id = datasource["id"]
-                    session.add(instance)
-                    session.commit()
-                    console.print(
-                        f"\t\t[green]Entitlement {instance.id} for datasource {datasource_id} "
-                        "has been redeemed successfully![/green]"
-                    )
-                else:
-                    console.print(
-                        "\t\t[magenta]No Entitlement in NEW status has been found for "
-                        f"datasource {datasource_id}[/magenta]"
-                    )
+                except DatabaseError as e:  # pragma: no cover
+                    console.print(f"[red]An error with the database occurred: {e}[/red]")
+                    continue
