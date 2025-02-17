@@ -9,29 +9,37 @@ from pytest_mock import MockerFixture
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Account, System, AccountUser, User
+from app.db.handlers import NotFoundError
+from app.db.models import Account, AccountUser, System, User
 from app.dependencies import AccountRepository
 from app.enums import AccountStatus, AccountType, UserStatus
 from app.routers.accounts import (
+    fetch_account_or_404,
     validate_account_type_and_required_conditions,
     validate_required_conditions_before_update,
 )
 from app.schemas import AccountCreate
 from tests.types import JWTTokenFactory, ModelFactory
 
+
+@pytest.fixture
+def mock_account_repo():
+    return AsyncMock(spec=AccountRepository)
+
+
 # ====================
 # Authentication Tests
 # ====================
 
 
-async def test_get_entitlements_without_token(api_client: AsyncClient):
+async def test_get_accounts_without_token(api_client: AsyncClient):
     response = await api_client.get("/accounts")
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Unauthorized."
 
 
-async def test_get_entitlements_with_invalid_token(api_client: AsyncClient):
+async def test_get_account_with_invalid_token(api_client: AsyncClient):
     response = await api_client.get(
         "/accounts",
         headers={"Authorization": "Bearer invalid.token.here"},
@@ -41,7 +49,7 @@ async def test_get_entitlements_with_invalid_token(api_client: AsyncClient):
     assert response.json()["detail"] == "Unauthorized."
 
 
-async def test_get_entitlements_with_expired_token(
+async def test_get_accounts_with_expired_token(
     api_client: AsyncClient,
     jwt_token_factory: JWTTokenFactory,
     gcp_extension: System,
@@ -68,14 +76,12 @@ async def test_get_entitlements_with_expired_token(
 
 
 async def test_can_create_accounts(
-    api_client: AsyncClient,
-    ffc_jwt_token: str,
+    operations_client: AsyncClient,
     ffc_extension: System,
     db_session: AsyncSession,
 ):
-    response = await api_client.post(
+    response = await operations_client.post(
         "/accounts",
-        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
         json={"name": "Microsoft", "external_id": "ACC-9044-8753", "type": "affiliate"},
     )
     assert response.status_code == 201
@@ -99,42 +105,37 @@ async def test_can_create_accounts(
 
 
 async def test_create_accounts_type_not_affiliate(
-    api_client: AsyncClient,
+    operations_client: AsyncClient,
     ffc_jwt_token: str,
     ffc_extension: System,
     db_session: AsyncSession,
 ):
-    response = await api_client.post(
+    response = await operations_client.post(
         "/accounts",
-        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
         json={"name": "Microsoft", "external_id": "ACC-9044-8753", "type": "operations"},
     )
     assert response.status_code == 400
 
-    response = await api_client.post(
+    response = await operations_client.post(
         "/accounts",
-        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
         json={"external_id": "ACC-9044-8753", "type": "affiliate"},
     )
     assert response.status_code == 422
 
-    response = await api_client.post(
+    response = await operations_client.post(
         "/accounts",
-        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
         json={"name": "Microsoft", "type": "affiliate"},
     )
     assert response.status_code == 422
 
 
 async def test_create_accounts_incomplete_body(
-    api_client: AsyncClient,
-    ffc_jwt_token: str,
+    operations_client: AsyncClient,
     ffc_extension: System,
     db_session: AsyncSession,
 ):
-    response = await api_client.post(
+    response = await operations_client.post(
         "/accounts",
-        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
         json={"name": "Microsoft", "external_id": "ACC-9044-8753"},
     )
     assert response.status_code == 422
@@ -159,13 +160,11 @@ async def test_cannot_create_accounts_if_context_is_not_operations_account(
 
 async def test_get_account_by_id(
     affiliate_account: Account,
-    api_client: AsyncClient,
-    ffc_jwt_token: str,
+    operations_client: AsyncClient,
     ffc_extension: System,
 ):
-    response = await api_client.get(
+    response = await operations_client.get(
         f"/accounts/{affiliate_account.id}",
-        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
     )
 
     assert response.status_code == 200
@@ -199,21 +198,17 @@ async def test_get_account_by_id(
     assert data["updated_by"]["name"] == ffc_extension.name
 
 
-async def test_get_invalid_account(api_client: AsyncClient, ffc_jwt_token: str):
+async def test_get_invalid_account(operations_client: AsyncClient, ffc_jwt_token: str):
     id = "FACC-1369-9180"
-    response = await api_client.get(
-        f"/accounts/{id}",
-        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
-    )
+    response = await operations_client.get(f"/accounts/{id}")
 
     assert response.status_code == 404
     assert response.json()["detail"] == f"Account with ID `{id}` wasn't found."
 
 
-async def test_get_invalid_id_format(api_client: AsyncClient, ffc_jwt_token: str):
-    response = await api_client.get(
+async def test_get_invalid_id_format(operations_client: AsyncClient, ffc_jwt_token: str):
+    response = await operations_client.get(
         "/accounts/this-is-not-a-valid-uuid",
-        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
     )
 
     assert response.status_code == 422
@@ -223,8 +218,8 @@ async def test_get_invalid_id_format(api_client: AsyncClient, ffc_jwt_token: str
     assert detail["type"] == "string_pattern_mismatch"
 
 
-async def test_get_all_accounts(api_client: AsyncClient, ffc_jwt_token: str):
-    response = await api_client.get(
+async def test_get_all_accounts(operations_client: AsyncClient, ffc_jwt_token: str):
+    response = await operations_client.get(
         "/accounts",
         headers={"Authorization": f"Bearer {ffc_jwt_token}"},
     )
@@ -249,12 +244,9 @@ async def test_get_all_accounts_single_page(
 
 async def test_get_all_account_multiple_pages(
     account_factory: ModelFactory[Account],
-    api_client: AsyncClient,
-    gcp_extension: System,
-    gcp_account: Account,
-    ffc_jwt_token: str,
+    operations_client: AsyncClient,
 ):
-    for _ in range(10):
+    for _ in range(11):
         await account_factory(
             name="SWO",
             type=AccountType.OPERATIONS,
@@ -262,9 +254,8 @@ async def test_get_all_account_multiple_pages(
             external_id=str(uuid4()),
         )
 
-    first_page_response = await api_client.get(
+    first_page_response = await operations_client.get(
         "/accounts",
-        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
         params={"limit": 5},
     )
     first_page_data = first_page_response.json()
@@ -274,9 +265,8 @@ async def test_get_all_account_multiple_pages(
     assert first_page_data["limit"] == 5
     assert first_page_data["offset"] == 0
 
-    second_page_response = await api_client.get(
+    second_page_response = await operations_client.get(
         "/accounts",
-        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
         params={"limit": 3, "offset": 5},
     )
     second_page_data = second_page_response.json()
@@ -287,9 +277,8 @@ async def test_get_all_account_multiple_pages(
     assert second_page_data["limit"] == 3
     assert second_page_data["offset"] == 5
 
-    third_page_response = await api_client.get(
+    third_page_response = await operations_client.get(
         "/accounts",
-        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
         params={"offset": 8},
     )
     third_page_data = third_page_response.json()
@@ -501,5 +490,110 @@ async def test_can_list_account_users(
 
     response = await operations_client.get(f"/accounts/{operations_account.id}/users")
     data = response.json()
-    print("Data---:", data)
     assert response.status_code == 200
+    assert isinstance(data.get("items"), list)
+
+
+async def test_list_not_existing_account_id(
+    affiliate_account: Account,
+    operations_client: AsyncClient,
+):
+    response = await operations_client.get(
+        f"/accounts/{affiliate_account.id}/users",
+    )
+    assert response.status_code == 200
+
+
+async def test_cannot_access_not_existing_account_id_with_operations_account_context(
+    operations_client: AsyncClient,
+):
+    response = await operations_client.get(
+        f"/accounts/FACC-8751-0928/users",
+    )
+    assert response.status_code == 404
+    data = response.json()
+    assert data.get("detail") == "Account with ID `FACC-8751-0928` wasn't found."
+
+
+async def test_cannot_cheat_account_type_and_context(
+    affiliate_client: AsyncClient, operations_account: Account
+):
+    response = await affiliate_client.get(
+        f"/accounts/{operations_account.id}/users",
+    )
+    assert response.status_code == 400
+    data = response.json()
+    assert data.get("detail") == "Cheating is bad. Don't do it."
+
+
+async def test_fetch_account_or_404_account_not_found(mock_account_repo: AsyncMock):
+    mock_account_repo.get.side_effect = NotFoundError("Account not found")
+
+    with pytest.raises(HTTPException) as exc_info:
+        await fetch_account_or_404("invalid_account_id", mock_account_repo)
+
+    assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
+    assert str(exc_info.value.detail) == "Account not found"
+    mock_account_repo.get.assert_awaited_once_with(id="invalid_account_id")
+
+
+async def test_get_all_list_account_users_multiple_pages(
+    operations_client: AsyncClient,
+    operations_account: Account,
+    accountuser_factory: ModelFactory[AccountUser],
+    user_factory: ModelFactory[User],
+    db_session: AsyncSession,
+):
+    users_ids = []
+    for index in range(30):
+        user = await user_factory(
+            name=f"Peter Parker_{index}",
+            email=f"peter.parker_{index}@spiderman.com",
+            status=UserStatus.ACTIVE,
+        )
+        users_ids.append(user.id)
+
+    for user_id in users_ids:
+        await accountuser_factory(
+            user_id=user_id, account_id=operations_account.id, status=AccountStatus.ACTIVE
+        )
+
+    first_page_response = await operations_client.get(
+        f"/accounts/{operations_account.id}/users",
+        params={"limit": 5},
+    )
+    first_page_data = first_page_response.json()
+    result = await db_session.execute(select(Account).where(Account.id == operations_account.id))
+    assert result.one_or_none() is not None
+    assert first_page_response.status_code == 200
+    assert first_page_data["total"] == 30
+    assert len(first_page_data["items"]) == 5
+    assert first_page_data["limit"] == 5
+    assert first_page_data["offset"] == 0
+    #
+    second_page_response = await operations_client.get(
+        f"/accounts/{operations_account.id}/users",
+        params={"limit": 3, "offset": 5},
+    )
+    second_page_data = second_page_response.json()
+
+    assert second_page_response.status_code == 200
+    assert second_page_data["total"] == 30
+    assert len(second_page_data["items"]) == 3
+    assert second_page_data["limit"] == 3
+    assert second_page_data["offset"] == 5
+
+    third_page_response = await operations_client.get(
+        f"/accounts/{operations_account.id}/users",
+        params={"offset": 8},
+    )
+    third_page_data = third_page_response.json()
+
+    assert third_page_response.status_code == 200
+    assert third_page_data["total"] == 30
+    assert len(third_page_data["items"]) == 22
+    assert third_page_data["limit"] > 2
+    assert third_page_data["offset"] == 8
+
+    all_items = first_page_data["items"] + second_page_data["items"] + third_page_data["items"]
+    assert len(all_items) == 30
