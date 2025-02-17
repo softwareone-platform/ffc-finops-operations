@@ -207,7 +207,7 @@ async def list_account_users(
     This Endpoint lists all the users bound to a given account id.
     The output is paginated by default.
     Raises:
-        - HTTPException with status 400 if the given account is different from the context account
+        - HTTPException with status 404 if the given account is different from the context account
         - HTTPException 404 if the provided account's id doesn't exist.
     Returns a list of accounts if any.
     """
@@ -238,29 +238,28 @@ async def remove_user_from_account(
     account: Annotated[Account, Depends(fetch_account_or_404)],
     user_id: UserId,
     auth_context: CurrentAuthContext,
-    user_repo: UserRepository,
     accountuser_repo: AccountUserRepository,
 ):
     """
-    if auth_context.account.type == AFFILIATE && auth_context.account != account
-        403
-    user account != DELETED
-    set account user status to DELETE
-    set deleted_at to now()
+    This Endpoint removes a user from the giver account
+    Raises:
+        - HTTPException with status 404 if the given account is different from the context account
+        - HTTPException 400 if the query doesn't return a valid account's user object
+
     """
     if auth_context.account.type == AccountType.AFFILIATE and auth_context.account != account:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Account with ID `{account.id}` wasn't found.",
         )
-    result = await accountuser_repo.get_account_user(
+    account_user = await accountuser_repo.get_account_user(
         account_id=account.id,
         user_id=user_id,
-        extra_conditions=AccountUser.status != AccountUserStatus.DELETED,
+        extra_conditions=[AccountUser.status != AccountUserStatus.DELETED],
     )
-    if result is None:
+    if account_user is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"The User `{user_id}` does snot belong to the Account with ID `{account.id}`.",
+            detail=f"The User `{user_id}` does not belong to the Account with ID `{account.id}`.",
         )
-    # soft delete di result and return 204
+    await accountuser_repo.soft_delete(id_or_obj=account_user)
