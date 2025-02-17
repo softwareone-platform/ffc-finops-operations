@@ -80,7 +80,7 @@ async def test_invite_user_already_invited(
         shlex.split('invite-user test@example.com "Test User"'),
     )
     assert result.exit_code == 0
-    assert "invitation token regenerated successfully" in result.stdout
+    assert "invitation token regenerated successfully" in result.stdout.replace("\n", "")
 
     db_session.expunge_all()
 
