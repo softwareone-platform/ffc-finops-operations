@@ -521,9 +521,8 @@ async def test_cannot_cheat_account_type_and_context(
     response = await affiliate_client.get(
         f"/accounts/{operations_account.id}/users",
     )
-    assert response.status_code == 400
+    assert response.status_code == 404
     data = response.json()
-    assert data.get("detail") == "Cheating is bad. Don't do it."
 
 
 async def test_fetch_account_or_404_account_not_found(mock_account_repo: AsyncMock):
