@@ -622,3 +622,77 @@ async def test_get_all_list_account_users_multiple_pages(
 
     all_items = first_page_data["items"] + second_page_data["items"] + third_page_data["items"]
     assert len(all_items) == 30
+
+
+# -------
+# Remove User From Account
+# -------
+
+
+async def test_can_remove_user_from_account(
+    operations_client: AsyncClient,
+    operations_account: Account,
+    accountuser_factory: ModelFactory[AccountUser],
+    user_factory: ModelFactory[User],
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+    await accountuser_factory(
+        user_id=user.id, account_id=operations_account.id, status=AccountStatus.ACTIVE
+    )
+
+    response = await operations_client.delete(f"/accounts/{operations_account.id}/users/{user.id}")
+    assert response.status_code == 204
+
+
+async def test_remove_with_not_existing_user_id(
+    operations_client: AsyncClient,
+    operations_account: Account,
+):
+    wrong_user_id = "FUSR-4068-9870"
+    response = await operations_client.delete(
+        f"/accounts/{operations_account.id}/users/{wrong_user_id}"
+    )
+    assert response.status_code == 400
+    data = response.json()
+    assert (
+        data.get("detail")
+        == f"The User `{wrong_user_id}` does not belong to the Account with ID `{operations_account.id}`."  # noqa: E501
+    )
+
+
+async def test_remove_cheat_account_type_and_context(
+    affiliate_client: AsyncClient, operations_account: Account
+):
+    wrong_user_id = "FUSR-4068-9870"
+    response = await affiliate_client.delete(
+        f"/accounts/{operations_account.id}/users/{wrong_user_id}"
+    )
+    assert response.status_code == 404
+
+
+async def test_cannot_remove_deleted_user_from_account(
+    operations_client: AsyncClient,
+    operations_account: Account,
+    accountuser_factory: ModelFactory[AccountUser],
+    user_factory: ModelFactory[User],
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+    await accountuser_factory(
+        user_id=user.id, account_id=operations_account.id, status=AccountStatus.DELETED
+    )
+
+    response = await operations_client.delete(f"/accounts/{operations_account.id}/users/{user.id}")
+    assert response.status_code == 400
+    data = response.json()
+    assert (
+        data.get("detail")
+        == f"The User `{user.id}` does not belong to the Account with ID `{operations_account.id}`."
+    )  # noqa: E501
