@@ -2,7 +2,6 @@ from fastapi_pagination import create_page, resolve_params
 from fastapi_pagination.bases import AbstractPage
 from fastapi_pagination.limit_offset import LimitOffsetParams
 from sqlalchemy import ColumnExpressionArgument
-from sqlalchemy.orm.interfaces import ORMOption
 
 from app.db.handlers import ModelHandler
 from app.db.models import Base

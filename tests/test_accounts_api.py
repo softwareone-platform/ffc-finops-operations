@@ -508,7 +508,7 @@ async def test_cannot_access_not_existing_account_id_with_operations_account_con
     operations_client: AsyncClient,
 ):
     response = await operations_client.get(
-        f"/accounts/FACC-8751-0928/users",
+        "/accounts/FACC-8751-0928/users",
     )
     assert response.status_code == 404
     data = response.json()
