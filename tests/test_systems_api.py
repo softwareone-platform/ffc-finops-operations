@@ -526,3 +526,163 @@ async def test_system_cannot_delete_itself(
     # Verify the system's status hasn't changed
     await db_session.refresh(system)
     assert system.status == SystemStatus.ACTIVE
+
+
+# =============
+# Update system
+# =============
+
+
+@pytest.mark.parametrize(
+    (
+        "update_data",
+        "expected_status_code",
+        "expected_name",
+        "expected_description",
+        "expected_external_id",
+    ),
+    [
+        pytest.param(
+            {"name": "new_system_name"},
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "initial_name",
+            None,
+            "initial_external_id",
+            id="missing_description_and_external_id",
+        ),
+        pytest.param(
+            {"name": "new_system_name", "external_id": "new_external_id"},
+            status.HTTP_200_OK,
+            "new_system_name",
+            None,
+            "new_external_id",
+            id="missing_description",
+        ),
+        pytest.param(
+            {"name": "initial_name", "description": None, "external_id": "new_external_id"},
+            status.HTTP_200_OK,
+            "initial_name",
+            None,
+            "new_external_id",
+            id="update_external_id_only",
+        ),
+        pytest.param(
+            {
+                "name": "new_name",
+                "description": "new_description",
+                "external_id": "new_external_id",
+            },
+            status.HTTP_200_OK,
+            "new_name",
+            "new_description",
+            "new_external_id",
+            id="update_all_fields",
+        ),
+        pytest.param(
+            {
+                "name": None,
+                "external_id": "new_external_id",
+                "description": "new_description",
+            },
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "initial_name",
+            None,
+            "initial_external_id",
+            id="attempt_to_set_name_to_none",
+        ),
+        pytest.param(
+            {
+                "non_existant_field": None,
+                "name": "new_name",
+                "description": "new_description",
+                "external_id": "new_external_id",
+            },
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "initial_name",
+            None,
+            "initial_external_id",
+            id="attempt_to_set_non_existant_field",
+        ),
+        pytest.param(
+            {
+                "name": "new_name",
+                "description": "new_description" * 1000,
+                "external_id": "new_external_id",
+            },
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "initial_name",
+            None,
+            "initial_external_id",
+            id="attempt_to_set_description_too_long",
+        ),
+        pytest.param(
+            {
+                "name": "new_name",
+                "external_id": "new_external_id" * 1000,
+                "description": "new_description",
+            },
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "initial_name",
+            None,
+            "initial_external_id",
+            id="attempt_to_set_external_id_too_long",
+        ),
+        pytest.param(
+            {
+                "name": "new_name",
+                "external_id": "existing_external_id",
+                "description": "new_description",
+            },
+            status.HTTP_400_BAD_REQUEST,
+            "initial_name",
+            None,
+            "initial_external_id",
+            id="attempt_to_set_existing_external_id",
+        ),
+    ],
+)
+async def test_update_system(
+    ffc_extension: System,
+    system_factory: ModelFactory[System],
+    system_jwt_token_factory: Callable[[System], str],
+    api_client: AsyncClient,
+    db_session: AsyncSession,
+    update_data: dict[str, str | None],
+    expected_status_code: int,
+    expected_name: str,
+    expected_description: str | None,
+    expected_external_id: str,
+):
+    system = await system_factory(
+        name="initial_name",
+        external_id="initial_external_id",
+        status=SystemStatus.ACTIVE,
+    )
+
+    # creating another system to test the external_id uniqueness
+    await system_factory(
+        external_id="existing_external_id",
+        status=SystemStatus.ACTIVE,
+    )
+
+    response = await api_client.put(
+        f"/systems/{system.id}",
+        headers={"Authorization": f"Bearer {system_jwt_token_factory(ffc_extension)}"},
+        json=update_data,
+    )
+
+    assert response.status_code == expected_status_code
+
+    response_data = response.json()
+
+    if not response.is_error:
+        assert response_data["id"] == system.id
+        assert response_data["name"] == expected_name
+        assert response_data["description"] == expected_description
+        assert response_data["external_id"] == expected_external_id
+
+    await db_session.refresh(system)
+
+    assert system.name == expected_name
+    assert system.description == expected_description
+    assert system.external_id == expected_external_id

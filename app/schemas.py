@@ -41,7 +41,7 @@ def to_orm[M: Base, S: BaseModel](schema: S, model_cls: type[M]) -> M:
 
 
 class BaseSchema(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
 
 class IdSchema(BaseSchema):
@@ -159,8 +159,8 @@ class SystemCreate(SystemBase):
 
 
 class SystemUpdate(BaseSchema):
-    name: str | None = None
-    external_id: Annotated[str | None, Field(max_length=255)] = None
+    name: str
+    external_id: Annotated[str, Field(max_length=255)]
     description: Annotated[str | None, Field(max_length=2000)] = None
 
 

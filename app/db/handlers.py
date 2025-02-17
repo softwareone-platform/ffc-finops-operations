@@ -44,6 +44,14 @@ class ConstraintViolationError(DatabaseError):
     pass
 
 
+class CannotDeleteError(DatabaseError):
+    pass
+
+
+class NullViolationError(DatabaseError):
+    pass
+
+
 class ModelHandler[M: BaseModel]:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -75,13 +83,8 @@ class ModelHandler[M: BaseModel]:
                 with suppress(LookupError):
                     obj.updated_by = auth_context.get().get_actor()
 
-        try:
-            self.session.add(obj)
-            await self._save_changes(obj)
-        except IntegrityError as e:
-            raise ConstraintViolationError(
-                f"Failed to create {self.model_cls.__name__}: {e}."
-            ) from e
+        self.session.add(obj)
+        await self._save_changes(obj)
 
         return obj
 
@@ -213,10 +216,15 @@ class ModelHandler[M: BaseModel]:
         return id_or_obj
 
     async def _save_changes(self, obj: M):
-        if self.commit:
-            await self.session.commit()
-        else:
-            await self.session.flush()
+        try:
+            if self.commit:
+                await self.session.commit()
+            else:
+                await self.session.flush()
+        except IntegrityError as e:
+            raise ConstraintViolationError(
+                f"Failed to save changes to {self.model_cls.__name__}: {e}."
+            ) from e
         await self.session.refresh(obj)
 
 

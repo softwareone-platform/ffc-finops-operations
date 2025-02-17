@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi_pagination.limit_offset import LimitOffsetPage
 from sqlalchemy import ColumnExpressionArgument
 
-from app.db.handlers import NotFoundError
+from app.db.handlers import ConstraintViolationError, NotFoundError
 from app.db.models import System
 from app.dependencies import CurrentAuthContext, SystemId, SystemRepository
 from app.enums import AccountType, SystemStatus
@@ -74,8 +74,20 @@ async def get_system_by_id(system: Annotated[System, Depends(fetch_system_or_404
 
 
 @router.put("/{id}", response_model=SystemRead)
-async def update_system(id: SystemId, data: SystemUpdate):  # pragma: no cover
-    pass
+async def update_system(
+    system: Annotated[System, Depends(fetch_system_or_404)],
+    system_repo: SystemRepository,
+    data: SystemUpdate,
+):
+    try:
+        system = await system_repo.update(system, data.model_dump())
+    except ConstraintViolationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A system with the same external ID already exists.",
+        ) from e
+
+    return from_orm(SystemRead, system)
 
 
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
