@@ -216,15 +216,18 @@ async def list_account_users(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cheating is bad. Don't do it.",
         )
+    # This runs a JOIN like
+    # stmt = (
+    #    select(User)
+    #    .join(AccountUser, User.id == AccountUser.user_id)
+    #    .where(AccountUser.account_id == account.id)
+    # )
+
     return await paginate(
         user_repo,
         UserRead,
         extra_conditions=[
-            exists().where(
-                AccountUser.account_id == account.id,
-                User.id == AccountUser.user_id,
-                User.status == UserStatus.ACTIVE,
-            )
+            exists().where(AccountUser.account_id == account.id, User.id == AccountUser.user_id)
         ],
     )
 
