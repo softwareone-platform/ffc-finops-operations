@@ -522,8 +522,6 @@ async def test_cannot_cheat_account_type_and_context(
         f"/accounts/{operations_account.id}/users",
     )
     assert response.status_code == 404
-    data = response.json()
-
 
 async def test_fetch_account_or_404_account_not_found(mock_account_repo: AsyncMock):
     mock_account_repo.get.side_effect = NotFoundError("Account not found")
