@@ -6,8 +6,8 @@ from freezegun import freeze_time
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import settings
 from app.auth.constants import JWT_ALGORITHM
+from app.conf import Settings
 from app.db.models import Account, AccountUser, User
 from app.enums import AccountStatus, AccountUserStatus, UserStatus
 from tests.types import ModelFactory
@@ -18,6 +18,7 @@ async def test_get_tokens_from_credentials(
     db_session: AsyncSession,
     user_factory: ModelFactory[User],
     api_client: AsyncClient,
+    test_settings: Settings,
 ):
     user = await user_factory(password="ThisIsOk123$")
     assert user.last_login_at is None
@@ -40,7 +41,7 @@ async def test_get_tokens_from_credentials(
     assert data["account"]["name"] == account.name  # type: ignore
     access_token = jwt.decode(
         data["access_token"],
-        settings.auth_access_jwt_secret,
+        test_settings.auth_access_jwt_secret,
         options={"require": ["exp", "nbf", "iat", "sub"]},
         algorithms=[JWT_ALGORITHM],
     )
@@ -48,11 +49,11 @@ async def test_get_tokens_from_credentials(
     assert access_token["sub"] == user.id
     assert access_token["account_id"] == account.id  # type: ignore
     assert access_token["iat"] == access_token["nbf"] == timestamp
-    assert access_token["exp"] == timestamp + settings.auth_access_jwt_lifespan_minutes * 60
+    assert access_token["exp"] == timestamp + test_settings.auth_access_jwt_lifespan_minutes * 60
 
     refresh_token = jwt.decode(
         data["refresh_token"],
-        settings.auth_refresh_jwt_secret,
+        test_settings.auth_refresh_jwt_secret,
         options={"require": ["exp", "nbf", "iat", "sub"]},
         algorithms=[JWT_ALGORITHM],
     )
@@ -60,7 +61,7 @@ async def test_get_tokens_from_credentials(
     assert refresh_token["sub"] == user.id
     assert "account_id" not in refresh_token
     assert refresh_token["iat"] == refresh_token["nbf"] == timestamp
-    lifespan_sec = settings.auth_refresh_jwt_lifespan_days * 60 * 60 * 24
+    lifespan_sec = test_settings.auth_refresh_jwt_lifespan_days * 60 * 60 * 24
     assert refresh_token["exp"] == timestamp + lifespan_sec
 
 
@@ -297,19 +298,20 @@ async def test_get_tokens_from_refresh_expired(
     account_factory: ModelFactory[Account],
     accountuser_factory: ModelFactory[Account],
     api_client: AsyncClient,
+    test_settings: Settings,
 ):
     user = await user_factory(password="ThisIsOk123$")
     account = await account_factory(name="Another account")
     await accountuser_factory(user.id, account.id)
-    iat = nbf = datetime.now(UTC) - timedelta(days=settings.auth_refresh_jwt_lifespan_days + 2)
+    iat = nbf = datetime.now(UTC) - timedelta(days=test_settings.auth_refresh_jwt_lifespan_days + 2)
     refresh_token = jwt.encode(
         {
             "sub": user.id,
             "iat": iat,
             "nbf": nbf,
-            "exp": nbf + timedelta(days=settings.auth_refresh_jwt_lifespan_days),
+            "exp": nbf + timedelta(days=test_settings.auth_refresh_jwt_lifespan_days),
         },
-        settings.auth_refresh_jwt_secret,
+        test_settings.auth_refresh_jwt_secret,
         algorithm=JWT_ALGORITHM,
     )
     refresh_payload = {
@@ -325,12 +327,12 @@ async def test_get_tokens_from_refresh_expired(
     [UserStatus.DRAFT, UserStatus.DELETED, UserStatus.DISABLED],
 )
 async def test_get_tokens_from_refresh_user_not_active(
-    db_session: AsyncSession,
     user_factory: ModelFactory[User],
     account_factory: ModelFactory[Account],
     accountuser_factory: ModelFactory[Account],
     api_client: AsyncClient,
     user_status: UserStatus,
+    test_settings: Settings,
 ):
     user = await user_factory(password="ThisIsOk123$", status=user_status)
     account = await account_factory(name="Another account")
@@ -341,9 +343,9 @@ async def test_get_tokens_from_refresh_user_not_active(
             "sub": user.id,
             "iat": iat,
             "nbf": nbf,
-            "exp": nbf + timedelta(days=settings.auth_refresh_jwt_lifespan_days),
+            "exp": nbf + timedelta(days=test_settings.auth_refresh_jwt_lifespan_days),
         },
-        settings.auth_refresh_jwt_secret,
+        test_settings.auth_refresh_jwt_secret,
         algorithm=JWT_ALGORITHM,
     )
     refresh_payload = {
@@ -359,12 +361,12 @@ async def test_get_tokens_from_refresh_user_not_active(
     [AccountStatus.DELETED, AccountStatus.DISABLED],
 )
 async def test_get_tokens_from_refresh_account_not_active(
-    db_session: AsyncSession,
     user_factory: ModelFactory[User],
     account_factory: ModelFactory[Account],
     accountuser_factory: ModelFactory[Account],
     api_client: AsyncClient,
     account_status: AccountStatus,
+    test_settings: Settings,
 ):
     user = await user_factory(password="ThisIsOk123$")
     account = await account_factory(name="Another account", status=account_status)
@@ -375,9 +377,9 @@ async def test_get_tokens_from_refresh_account_not_active(
             "sub": user.id,
             "iat": iat,
             "nbf": nbf,
-            "exp": nbf + timedelta(days=settings.auth_refresh_jwt_lifespan_days),
+            "exp": nbf + timedelta(days=test_settings.auth_refresh_jwt_lifespan_days),
         },
-        settings.auth_refresh_jwt_secret,
+        test_settings.auth_refresh_jwt_secret,
         algorithm=JWT_ALGORITHM,
     )
     refresh_payload = {
@@ -393,12 +395,12 @@ async def test_get_tokens_from_refresh_account_not_active(
     [AccountUserStatus.DELETED, AccountUserStatus.INVITATION_EXPIRED, AccountUserStatus.INVITED],
 )
 async def test_get_tokens_from_refresh_accountuser_not_active(
-    db_session: AsyncSession,
     user_factory: ModelFactory[User],
     account_factory: ModelFactory[Account],
     accountuser_factory: ModelFactory[Account],
     api_client: AsyncClient,
     accountuser_status: AccountUserStatus,
+    test_settings: Settings,
 ):
     user = await user_factory(password="ThisIsOk123$")
     account = await account_factory(name="Another account")
@@ -409,9 +411,9 @@ async def test_get_tokens_from_refresh_accountuser_not_active(
             "sub": user.id,
             "iat": iat,
             "nbf": nbf,
-            "exp": nbf + timedelta(days=settings.auth_refresh_jwt_lifespan_days),
+            "exp": nbf + timedelta(days=test_settings.auth_refresh_jwt_lifespan_days),
         },
-        settings.auth_refresh_jwt_secret,
+        test_settings.auth_refresh_jwt_secret,
         algorithm=JWT_ALGORITHM,
     )
     refresh_payload = {

@@ -1,8 +1,37 @@
-from app.api_clients.api_modifier import *  # noqa: F401, F403
-from app.api_clients.base import BaseAPIClient  # noqa: F401
-from app.api_clients.optscale import *  # noqa: F401, F403
-from app.api_clients.optscale_auth import *  # noqa: F401, F403
+from collections.abc import AsyncGenerator
+from typing import Annotated
 
-# NOTE: We're importing all the client classes both for convenience (easier imports),
-#       and also so that the __init_subclass__ method in BaseAPIClient is called for
-#       each client (needed for automatically setting up their svcs services)
+from fastapi import Depends
+
+from app.api_clients.api_modifier import APIModifierClient as _APIModifierClient
+from app.api_clients.api_modifier import APIModifierClientError
+from app.api_clients.base import BaseAPIClient
+from app.api_clients.optscale import OptscaleAuthClient as _OptscaleAuthClient
+from app.api_clients.optscale import OptscaleAuthClientError, OptscaleClientError, UserDoesNotExist
+from app.api_clients.optscale import OptscaleClient as _OptscaleClient
+from app.conf import AppSettings
+
+
+class APIClientFactory[T: BaseAPIClient]:
+    def __init__(self, client_cls: type[T]):
+        self.client_cls = client_cls
+
+    async def __call__(self, settings: AppSettings) -> AsyncGenerator[T]:
+        client = self.client_cls(settings)
+        async with client:
+            yield client
+
+
+APIModifierClient = Annotated[_APIModifierClient, Depends(APIClientFactory(_APIModifierClient))]
+OptscaleClient = Annotated[_OptscaleClient, Depends(APIClientFactory(_OptscaleClient))]
+OptscaleAuthClient = Annotated[_OptscaleAuthClient, Depends(APIClientFactory(_OptscaleAuthClient))]
+
+__all__ = [
+    "APIModifierClient",
+    "APIModifierClientError",
+    "OptscaleClient",
+    "OptscaleAuthClient",
+    "OptscaleAuthClientError",
+    "OptscaleClientError",
+    "UserDoesNotExist",
+]

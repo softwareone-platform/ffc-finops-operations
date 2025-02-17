@@ -4,7 +4,7 @@ from httpx import AsyncClient
 from pytest_httpx import HTTPXMock
 from pytest_mock import MockerFixture
 
-from app import settings
+from app.conf import Settings
 from app.db.models import Organization
 from tests.types import ModelFactory
 
@@ -15,7 +15,7 @@ async def test_can_create_employees(
     api_client: AsyncClient,
     ffc_jwt_token: str,
 ):
-    mocker.patch("app.api_clients.base.get_api_modifier_jwt_token", return_value="test_token")
+    mocker.patch("app.api_clients.api_modifier.jwt.encode", return_value="test_token")
     mocked_token_urlsafe = mocker.patch(
         "app.routers.employees.secrets.token_urlsafe", return_value="random_password"
     )
@@ -70,8 +70,7 @@ async def test_create_employee_error_creating_employee(
     api_client: AsyncClient,
     ffc_jwt_token: str,
 ):
-    mocker.patch("app.api_clients.base.get_api_modifier_jwt_token", return_value="test_token")
-
+    mocker.patch("app.api_clients.api_modifier.jwt.encode", return_value="test_token")
     httpx_mock.add_response(
         method="POST",
         url="https://api-modifier.ffc.com/users",
@@ -106,7 +105,7 @@ async def test_create_employee_affiliate_forbidden(
 
 
 async def test_get_employee_by_email(
-    httpx_mock: HTTPXMock, api_client: AsyncClient, ffc_jwt_token: str
+    test_settings: Settings, httpx_mock: HTTPXMock, api_client: AsyncClient, ffc_jwt_token: str
 ):
     httpx_mock.add_response(
         method="GET",
@@ -120,7 +119,7 @@ async def test_get_employee_by_email(
                 "created_at": 1731059464,
             },
         },
-        match_headers={"Secret": settings.opt_cluster_secret},
+        match_headers={"Secret": test_settings.opt_cluster_secret},
     )
 
     response = await api_client.get(
@@ -140,7 +139,7 @@ async def test_get_employee_by_email(
 
 
 async def test_get_employee_by_email_not_found(
-    httpx_mock: HTTPXMock, api_client: AsyncClient, ffc_jwt_token: str
+    test_settings: Settings, httpx_mock: HTTPXMock, api_client: AsyncClient, ffc_jwt_token: str
 ):
     httpx_mock.add_response(
         method="GET",
@@ -148,7 +147,7 @@ async def test_get_employee_by_email_not_found(
         json={
             "exists": False,
         },
-        match_headers={"Secret": settings.opt_cluster_secret},
+        match_headers={"Secret": test_settings.opt_cluster_secret},
     )
 
     response = await api_client.get(
@@ -163,14 +162,14 @@ async def test_get_employee_by_email_not_found(
 
 
 async def test_get_employee_by_email_lookup_error(
-    httpx_mock: HTTPXMock, api_client: AsyncClient, ffc_jwt_token: str
+    test_settings: Settings, httpx_mock: HTTPXMock, api_client: AsyncClient, ffc_jwt_token: str
 ):
     httpx_mock.add_response(
         method="GET",
         url="https://opt-auth.ffc.com/user_existence?email=test@example.com&user_info=true",
         status_code=500,
         text="Internal Server Error",
-        match_headers={"Secret": settings.opt_cluster_secret},
+        match_headers={"Secret": test_settings.opt_cluster_secret},
     )
 
     response = await api_client.get(
@@ -192,8 +191,8 @@ async def test_get_employee_by_email_lookup_error(
 
 
 async def test_get_employees_for_organization_success(
+    test_settings: Settings,
     organization_factory: ModelFactory[Organization],
-    mocker: MockerFixture,
     httpx_mock: HTTPXMock,
     operations_client: AsyncClient,
 ):
@@ -203,8 +202,8 @@ async def test_get_employees_for_organization_success(
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{settings.opt_api_base_url}/organizations/{org.operations_external_id}/employees?roles=true",
-        match_headers={"Secret": settings.opt_cluster_secret},
+        url=f"{test_settings.opt_api_base_url}/organizations/{org.operations_external_id}/employees?roles=true",
+        match_headers={"Secret": test_settings.opt_cluster_secret},
         json={
             "employees": [
                 {
@@ -292,6 +291,7 @@ async def test_get_employees_for_missing_organization(
 
 
 async def test_get_employees_for_organization_with_no_employees(
+    test_settings: Settings,
     organization_factory: ModelFactory[Organization],
     operations_client: AsyncClient,
     httpx_mock: HTTPXMock,
@@ -302,8 +302,8 @@ async def test_get_employees_for_organization_with_no_employees(
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{settings.opt_api_base_url}/organizations/{org.operations_external_id}/employees?roles=true",
-        match_headers={"Secret": settings.opt_cluster_secret},
+        url=f"{test_settings.opt_api_base_url}/organizations/{org.operations_external_id}/employees?roles=true",
+        match_headers={"Secret": test_settings.opt_cluster_secret},
         json={"employees": []},
     )
 
@@ -335,6 +335,7 @@ async def test_get_employees_for_organization_with_no_organization_id(
 
 
 async def test_get_employees_for_organization_with_optscale_error(
+    test_settings: Settings,
     organization_factory: ModelFactory[Organization],
     operations_client: AsyncClient,
     httpx_mock: HTTPXMock,
@@ -345,8 +346,8 @@ async def test_get_employees_for_organization_with_optscale_error(
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{settings.opt_api_base_url}/organizations/{org.operations_external_id}/employees?roles=true",
-        match_headers={"Secret": settings.opt_cluster_secret},
+        url=f"{test_settings.opt_api_base_url}/organizations/{org.operations_external_id}/employees?roles=true",
+        match_headers={"Secret": test_settings.opt_cluster_secret},
         status_code=500,
     )
 
@@ -364,6 +365,7 @@ async def test_get_employees_for_organization_with_optscale_error(
 
 
 async def test_make_employee_admin(
+    test_settings: Settings,
     organization_factory: ModelFactory[Organization],
     operations_client: AsyncClient,
     httpx_mock: HTTPXMock,
@@ -376,8 +378,8 @@ async def test_make_employee_admin(
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{settings.opt_api_base_url}/employees/{user_id}?roles=true",
-        match_headers={"Secret": settings.opt_cluster_secret},
+        url=f"{test_settings.opt_api_base_url}/employees/{user_id}?roles=true",
+        match_headers={"Secret": test_settings.opt_cluster_secret},
         status_code=200,
         json={
             "deleted_at": 0,
@@ -392,8 +394,8 @@ async def test_make_employee_admin(
 
     httpx_mock.add_response(
         method="POST",
-        url=f"{settings.opt_auth_base_url}/users/{auth_user_id}/assignment_register",
-        match_headers={"Secret": settings.opt_cluster_secret},
+        url=f"{test_settings.opt_auth_base_url}/users/{auth_user_id}/assignment_register",
+        match_headers={"Secret": test_settings.opt_cluster_secret},
         status_code=200,
         json={
             "created_at": 1736352461,
@@ -417,6 +419,7 @@ async def test_make_employee_admin(
 
 
 async def test_make_user_admin_not_found(
+    test_settings: Settings,
     organization_factory: ModelFactory[Organization],
     operations_client: AsyncClient,
     httpx_mock: HTTPXMock,
@@ -428,8 +431,8 @@ async def test_make_user_admin_not_found(
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{settings.opt_api_base_url}/employees/{user_id}?roles=true",
-        match_headers={"Secret": settings.opt_cluster_secret},
+        url=f"{test_settings.opt_api_base_url}/employees/{user_id}?roles=true",
+        match_headers={"Secret": test_settings.opt_cluster_secret},
         status_code=404,
     )
 
@@ -441,6 +444,7 @@ async def test_make_user_admin_not_found(
 
 
 async def test_make_user_admin_error_assigning_role(
+    test_settings: Settings,
     organization_factory: ModelFactory[Organization],
     operations_client: AsyncClient,
     httpx_mock: HTTPXMock,
@@ -453,8 +457,8 @@ async def test_make_user_admin_error_assigning_role(
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{settings.opt_api_base_url}/employees/{user_id}?roles=true",
-        match_headers={"Secret": settings.opt_cluster_secret},
+        url=f"{test_settings.opt_api_base_url}/employees/{user_id}?roles=true",
+        match_headers={"Secret": test_settings.opt_cluster_secret},
         status_code=200,
         json={
             "deleted_at": 0,
@@ -469,8 +473,8 @@ async def test_make_user_admin_error_assigning_role(
 
     httpx_mock.add_response(
         method="POST",
-        url=f"{settings.opt_auth_base_url}/users/{auth_user_id}/assignment_register",
-        match_headers={"Secret": settings.opt_cluster_secret},
+        url=f"{test_settings.opt_auth_base_url}/users/{auth_user_id}/assignment_register",
+        match_headers={"Secret": test_settings.opt_cluster_secret},
         status_code=400,
         match_json={
             "role_id": 3,  # Admin

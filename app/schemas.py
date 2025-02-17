@@ -94,7 +94,7 @@ class AccountCreate(AccountBase):
     type: AccountType
 
 
-class AccountUpdate(AccountBase):
+class AccountUpdate(BaseSchema):
     name: Annotated[str | None, Field(max_length=255, examples=["Microsoft"])] = None
     external_id: Annotated[str | None, Field(max_length=255, examples=["ACC-9044-8753"])] = None
 

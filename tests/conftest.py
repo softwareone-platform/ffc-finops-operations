@@ -11,10 +11,10 @@ from faker import Faker
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from pytest_asyncio import is_async_test
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
-from app import settings
-from app.db import db_engine
+from app.conf import Settings, get_settings
+from app.db import get_db_engine
 from app.db.models import Account, AccountUser, Actor, Base, Entitlement, Organization, System, User
 from app.enums import (
     AccountStatus,
@@ -38,7 +38,11 @@ def pytest_collection_modifyitems(items):
 
 
 @pytest.fixture(scope="session")
-def mock_settings() -> None:
+def test_settings() -> Settings:
+    settings = Settings(
+        _env_file=("../.env", "../.env.test"),
+        _env_file_encoding="utf-8",
+    )
     settings.opt_cluster_secret = "test_cluster_secret"
     settings.opt_api_base_url = "https://opt-api.ffc.com"
     settings.opt_auth_base_url = "https://opt-auth.ffc.com"
@@ -46,12 +50,19 @@ def mock_settings() -> None:
     settings.api_modifier_jwt_secret = "test_jwt_secret"
     settings.auth_access_jwt_secret = "auth_access_jwt_secret"
     settings.auth_refresh_jwt_secret = "auth_refresh_jwt_secret"
+    return settings
 
 
 @pytest.fixture(scope="session")
-async def fastapi_app(mock_settings) -> FastAPI:
+def db_engine(test_settings: Settings) -> AsyncEngine:
+    return get_db_engine(test_settings)
+
+
+@pytest.fixture(scope="session")
+async def fastapi_app(test_settings: Settings) -> FastAPI:
     from app.main import app
 
+    app.dependency_overrides[get_settings] = lambda: test_settings
     return app
 
 
@@ -62,7 +73,7 @@ async def app_lifespan_manager(fastapi_app: FastAPI) -> AsyncGenerator[LifespanM
 
 
 @pytest.fixture(scope="session")
-def capsql():
+def capsql(db_engine: AsyncEngine) -> SQLAlchemyCapturer:
     return SQLAlchemyCapturer(db_engine)
 
 
@@ -79,7 +90,7 @@ def assert_num_queries(capsql: SQLAlchemyCapturer) -> Callable[[int], AbstractCo
 
 
 @pytest.fixture(autouse=True)
-async def db_session() -> AsyncGenerator[AsyncSession, None]:
+async def db_session(db_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, None]:
     session = async_sessionmaker(db_engine, expire_on_commit=False)
 
     async with session() as s:

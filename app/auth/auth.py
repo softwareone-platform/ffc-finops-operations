@@ -4,10 +4,10 @@ import jwt
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app import settings
 from app.auth.constants import JWT_ALGORITHM, JWT_LEEWAY, UNAUTHORIZED_EXCEPTION
 from app.auth.context import AuthenticationContext, auth_context
-from app.db.db import DBSession
+from app.conf import AppSettings
+from app.db import DBSession
 from app.db.handlers import (
     AccountHandler,
     AccountUserHandler,
@@ -55,7 +55,9 @@ class JWTBearer(HTTPBearer):
 
 
 async def get_authentication_context(
-    db_session: DBSession, credentials: Annotated[JWTCredentials, Depends(JWTBearer())]
+    settings: AppSettings,
+    db_session: DBSession,
+    credentials: Annotated[JWTCredentials, Depends(JWTBearer())],
 ):
     system_handler = SystemHandler(db_session)
     user_handler = UserHandler(db_session)

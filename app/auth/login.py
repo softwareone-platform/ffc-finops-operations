@@ -2,9 +2,9 @@ from datetime import UTC, datetime, timedelta
 
 import jwt
 
-from app import settings
 from app.auth.constants import JWT_ALGORITHM, JWT_LEEWAY, UNAUTHORIZED_EXCEPTION
-from app.db.db import DBSession
+from app.conf import Settings
+from app.db import DBSession
 from app.db.handlers import (
     AccountHandler,
     AccountUserHandler,
@@ -24,7 +24,7 @@ from app.schemas import (
 )
 
 
-def generate_access_and_refresh_tokens(subject: str, account_id: str):
+def generate_access_and_refresh_tokens(settings: Settings, subject: str, account_id: str):
     now = datetime.now(UTC)
     default_claims = {
         "sub": subject,
@@ -56,7 +56,7 @@ def generate_access_and_refresh_tokens(subject: str, account_id: str):
 
 
 async def get_tokens_from_refresh(
-    db_session: DBSession, refresh_token_data: RefreshAccessToken
+    settings: Settings, db_session: DBSession, refresh_token_data: RefreshAccessToken
 ) -> LoginRead:
     user_handler = UserHandler(db_session)
     account_user_handler = AccountUserHandler(db_session)
@@ -88,7 +88,7 @@ async def get_tokens_from_refresh(
             raise UNAUTHORIZED_EXCEPTION
 
         await user_handler.update(user.id, {"last_used_account_id": account_id})
-        tokens = generate_access_and_refresh_tokens(user_id, account_id=account_id)
+        tokens = generate_access_and_refresh_tokens(settings, user_id, account_id)
 
         return LoginRead(
             user=from_orm(UserReference, user),
@@ -101,7 +101,9 @@ async def get_tokens_from_refresh(
         raise UNAUTHORIZED_EXCEPTION from e
 
 
-async def get_tokens_from_credentials(db_session: DBSession, login_data: Login) -> LoginRead:
+async def get_tokens_from_credentials(
+    settings: Settings, db_session: DBSession, login_data: Login
+) -> LoginRead:
     user_handler = UserHandler(db_session)
     account_user_handler = AccountUserHandler(db_session)
     account_handler = AccountHandler(db_session)
@@ -136,7 +138,7 @@ async def get_tokens_from_credentials(db_session: DBSession, login_data: Login) 
                 "last_used_account_id": account_id,
             },
         )
-        tokens = generate_access_and_refresh_tokens(user.id, account_id=account_id)
+        tokens = generate_access_and_refresh_tokens(settings, user.id, account_id)
         return LoginRead(
             user=from_orm(UserReference, user),
             account=from_orm(AccountReference, account),

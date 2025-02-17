@@ -1,6 +1,5 @@
 import secrets
 
-import svcs
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api_clients import APIModifierClient, OptscaleAuthClient, OptscaleClient, UserDoesNotExist
@@ -14,9 +13,9 @@ router = APIRouter(dependencies=[Depends(check_operations_account)])
 @router.post("", response_model=EmployeeRead, status_code=status.HTTP_201_CREATED)
 async def create_employee(
     data: EmployeeCreate,
-    services: svcs.fastapi.DepContainer,
+    api_modifier_client: APIModifierClient,
+    optscale_client: OptscaleClient,
 ):
-    api_modifier_client = await services.aget(APIModifierClient)
     async with wrap_http_error_in_502("Error creating employee in FinOps for Cloud"):
         create_employee_response = await api_modifier_client.create_user(
             email=data.email,
@@ -24,7 +23,6 @@ async def create_employee(
             password=secrets.token_urlsafe(128),
         )
 
-    optscale_client = await services.aget(OptscaleClient)
     async with wrap_http_error_in_502(
         "Error resetting the password for employee in FinOps for Cloud"
     ):
@@ -36,9 +34,8 @@ async def create_employee(
 @router.get("/{email}", response_model=EmployeeRead)
 async def get_employee_by_email(
     email: str,
-    services: svcs.fastapi.DepContainer,
+    optscale_auth_client: OptscaleAuthClient,
 ):
-    optscale_auth_client = await services.aget(OptscaleAuthClient)
     async with wrap_http_error_in_502("Error checking employee existence in FinOps for Cloud"):
         try:
             response = await optscale_auth_client.get_existing_user_info(email)
