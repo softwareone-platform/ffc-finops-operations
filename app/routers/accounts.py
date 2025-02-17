@@ -213,8 +213,8 @@ async def list_account_users(
 
     if auth_context.account.type == AccountType.AFFILIATE and auth_context.account != account:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cheating is bad. Don't do it.",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Account with ID `{account.id}` wasn't found.",
         )
     # This runs a JOIN like
     # stmt = (
