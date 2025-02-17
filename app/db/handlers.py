@@ -44,10 +44,6 @@ class ConstraintViolationError(DatabaseError):
     pass
 
 
-class CannotDeleteError(DatabaseError):
-    pass
-
-
 class NullViolationError(DatabaseError):
     pass
 
