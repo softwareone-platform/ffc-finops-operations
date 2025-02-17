@@ -431,8 +431,17 @@ async def test_cannot_update_disabled_accounts(
         json={"status": AccountStatus.DISABLED},
     )
     data = response.json()
-    assert response.status_code == 400
-    assert data.get("detail") == "You can't update whatever you want."
+    assert response.status_code == 422
+    assert data == {
+        "detail": [
+            {
+                "type": "extra_forbidden",
+                "loc": ["body", "status"],
+                "msg": "Extra inputs are not permitted",
+                "input": "disabled",
+            }
+        ]
+    }
 
 
 async def test_cannot_update_accounts_if_context_is_not_operations_account(
@@ -456,16 +465,34 @@ async def test_can_only_updated_the_name_and_external_id(
         json={"type": AccountType.OPERATIONS},
     )
     data = response.json()
-    assert response.status_code == 400
-    assert data.get("detail") == "You can't update whatever you want."
+    assert response.status_code == 422
+    assert data == {
+        "detail": [
+            {
+                "type": "extra_forbidden",
+                "loc": ["body", "type"],
+                "msg": "Extra inputs are not permitted",
+                "input": "operations",
+            }
+        ]
+    }
 
     response = await operations_client.put(
         f"/accounts/{affiliate_account.id}",
         json={"status": AccountStatus.DISABLED},
     )
     data = response.json()
-    assert response.status_code == 400
-    assert data.get("detail") == "You can't update whatever you want."
+    assert response.status_code == 422
+    assert data == {
+        "detail": [
+            {
+                "type": "extra_forbidden",
+                "loc": ["body", "status"],
+                "msg": "Extra inputs are not permitted",
+                "input": "disabled",
+            }
+        ]
+    }
 
 
 # -------
