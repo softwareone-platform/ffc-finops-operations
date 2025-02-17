@@ -5,7 +5,7 @@ import uuid
 from decimal import Decimal
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr, field_validator
 
 from app.db.models import Base
 from app.enums import (
@@ -46,6 +46,33 @@ class BaseSchema(BaseModel):
 
 class IdSchema(BaseSchema):
     id: str
+
+
+class PasswordInputSchema(BaseSchema):
+    password: Annotated[SecretStr | None, Field(examples=["PKH7aqr_gwh5fgm!xdk"], default=None)]
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, secret_value: SecretStr) -> SecretStr:
+        errors = []
+
+        value = secret_value.get_secret_value()
+
+        if len(value) < 8:
+            errors.append("Must be at least 8 characters long")
+        if not any(char.isupper() for char in value):
+            errors.append("Must contain at least one uppercase letter (A-Z)")
+        if not any(char.islower() for char in value):
+            errors.append("Must contain at least one lowercase letter (a-z)")
+        if not any(char.isdigit() for char in value):
+            errors.append("Must contain at least one number (0-9)")
+        if not any(not char.isalnum() for char in value):  # Checks for special characters
+            errors.append("Must contain at least one special character (e.g., !@#$%^&*)")
+
+        if errors:
+            raise ValueError(f"{", ".join(errors)}.")
+
+        return secret_value
 
 
 class ActorBase(BaseSchema):
@@ -163,15 +190,13 @@ class UserReference(IdSchema, UserCreate):
     pass
 
 
-class UserAcceptInvitation(BaseSchema):
+class UserAcceptInvitation(PasswordInputSchema):
     invitation_token: str
-    password: Annotated[str | None, Field(examples=["PKH7aqr_gwh5fgm!xdk"], default=None)]
 
 
-class UserResetPassword(BaseSchema):
+class UserResetPassword(PasswordInputSchema):
     pwd_reset_token: uuid.UUID
     user_id: str | None = None
-    password: str | None = None
 
 
 class UserUpdate(BaseSchema):
@@ -197,7 +222,7 @@ class AccountUserRead(IdSchema, CommonEventsSchema, AccountUserBase):
 
 class Login(BaseSchema):
     email: Annotated[EmailStr, Field(examples=["lady.gaga@bennett.tony"])]
-    password: Annotated[str, Field(examples=["PKH7aqr_gwh5fgm!xdk"])]
+    password: Annotated[SecretStr, Field(examples=["PKH7aqr_gwh5fgm!xdk"])]
     account: IdSchema | None = None
 
 

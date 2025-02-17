@@ -114,7 +114,7 @@ async def get_tokens_from_credentials(
         )
         if not user:
             raise UNAUTHORIZED_EXCEPTION
-        if not pbkdf2_sha256.verify(login_data.password, user.password):  # type: ignore
+        if not pbkdf2_sha256.verify(login_data.password.get_secret_value(), user.password):  # type: ignore
             raise UNAUTHORIZED_EXCEPTION
 
         account_id: str = (
