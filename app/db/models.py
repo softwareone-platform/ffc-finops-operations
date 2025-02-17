@@ -178,6 +178,7 @@ class User(Actor, HumanReadablePKMixin, AuditableMixin):
     __mapper_args__ = {
         "polymorphic_identity": ActorType.USER.value,
         "inherit_condition": id == Actor.id,
+        "polymorphic_load": "inline",
     }
 
 
