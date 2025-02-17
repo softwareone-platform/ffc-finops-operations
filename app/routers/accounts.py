@@ -14,7 +14,7 @@ from app.dependencies import (
     UserId,
     UserRepository,
 )
-from app.enums import AccountStatus, AccountType, UserStatus
+from app.enums import AccountStatus, AccountType
 from app.pagination import paginate
 from app.schemas import (
     AccountCreate,
