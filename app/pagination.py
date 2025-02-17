@@ -19,9 +19,7 @@ async def paginate[M: Base, S: BaseSchema](
 
     total = await handler.count(*extra_conditions)
     items = await handler.fetch_page(
-        limit=params.limit,
-        offset=params.offset,
-        extra_conditions=extra_conditions,
+        limit=params.limit, offset=params.offset, extra_conditions=extra_conditions
     )
 
     return create_page(
