@@ -6,7 +6,7 @@ from sqlalchemy import ColumnExpressionArgument
 
 from app.db.handlers import ConstraintViolationError, NotFoundError
 from app.db.models import System
-from app.dependencies import CurrentAuthContext, SystemId, SystemRepository
+from app.dependencies import AccountRepository, CurrentAuthContext, SystemId, SystemRepository
 from app.enums import AccountType, SystemStatus
 from app.pagination import paginate
 from app.schemas import SystemCreate, SystemRead, SystemUpdate, from_orm
@@ -64,8 +64,44 @@ async def get_systems(
 
 
 @router.post("", response_model=SystemRead, status_code=status.HTTP_201_CREATED)
-async def create_system(data: SystemCreate):  # pragma: no cover
-    pass
+async def create_system(
+    data: SystemCreate,
+    account_repo: AccountRepository,
+    system_repo: SystemRepository,
+    auth_ctx: CurrentAuthContext,
+):
+    if auth_ctx.account.type == AccountType.AFFILIATE and data.owner.id != auth_ctx.account.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Affiliate users can only create systems bound to their own account.",
+        )
+
+    try:
+        system_owner = await account_repo.get(data.owner.id)
+    except NotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The owner account does not exist.",
+        ) from e
+
+    try:
+        system = await system_repo.create(
+            System(
+                name=data.name,
+                description=data.description,
+                external_id=data.external_id,
+                jwt_secret=data.jwt_secret,
+                owner=system_owner,
+                status=SystemStatus.ACTIVE,
+            )
+        )
+    except ConstraintViolationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A system with the same external ID already exists.",
+        ) from e
+
+    return from_orm(SystemRead, system)
 
 
 @router.get("/{id}", response_model=SystemRead)
