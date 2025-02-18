@@ -674,6 +674,8 @@ async def test_update_system(
     ("system_to_update_status", "existing_system_status", "expected_status_code"),
     [
         pytest.param(SystemStatus.ACTIVE, SystemStatus.ACTIVE, status.HTTP_400_BAD_REQUEST),
+        pytest.param(SystemStatus.ACTIVE, SystemStatus.DISABLED, status.HTTP_400_BAD_REQUEST),
+        pytest.param(SystemStatus.DISABLED, SystemStatus.DISABLED, status.HTTP_400_BAD_REQUEST),
         pytest.param(SystemStatus.ACTIVE, SystemStatus.DELETED, status.HTTP_200_OK),
         pytest.param(SystemStatus.DELETED, SystemStatus.ACTIVE, status.HTTP_200_OK),
         pytest.param(SystemStatus.DELETED, SystemStatus.DELETED, status.HTTP_200_OK),
