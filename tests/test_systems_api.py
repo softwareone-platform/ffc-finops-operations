@@ -627,18 +627,6 @@ async def test_system_cannot_delete_itself(
             "initial_external_id",
             id="attempt_to_set_external_id_too_long",
         ),
-        pytest.param(
-            {
-                "name": "new_name",
-                "external_id": "existing_external_id",
-                "description": "new_description",
-            },
-            status.HTTP_400_BAD_REQUEST,
-            "initial_name",
-            None,
-            "initial_external_id",
-            id="attempt_to_set_existing_external_id",
-        ),
     ],
 )
 async def test_update_system(
@@ -656,12 +644,6 @@ async def test_update_system(
     system = await system_factory(
         name="initial_name",
         external_id="initial_external_id",
-        status=SystemStatus.ACTIVE,
-    )
-
-    # creating another system to test the external_id uniqueness
-    await system_factory(
-        external_id="existing_external_id",
         status=SystemStatus.ACTIVE,
     )
 
@@ -686,3 +668,58 @@ async def test_update_system(
     assert system.name == expected_name
     assert system.description == expected_description
     assert system.external_id == expected_external_id
+
+
+@pytest.mark.parametrize(
+    ("system_to_update_status", "existing_system_status", "expected_status_code"),
+    [
+        pytest.param(SystemStatus.ACTIVE, SystemStatus.ACTIVE, status.HTTP_400_BAD_REQUEST),
+        pytest.param(SystemStatus.ACTIVE, SystemStatus.DISABLED, status.HTTP_400_BAD_REQUEST),
+        pytest.param(SystemStatus.DISABLED, SystemStatus.DISABLED, status.HTTP_400_BAD_REQUEST),
+        pytest.param(SystemStatus.ACTIVE, SystemStatus.DELETED, status.HTTP_200_OK),
+        pytest.param(SystemStatus.DELETED, SystemStatus.ACTIVE, status.HTTP_200_OK),
+        pytest.param(SystemStatus.DELETED, SystemStatus.DELETED, status.HTTP_200_OK),
+    ],
+)
+async def test_system_external_id_is_unique_for_non_deleted_objects(
+    ffc_extension: System,
+    system_factory: ModelFactory[System],
+    system_jwt_token_factory: Callable[[System], str],
+    api_client: AsyncClient,
+    db_session: AsyncSession,
+    system_to_update_status: SystemStatus,
+    existing_system_status: SystemStatus,
+    expected_status_code: int,
+):
+    system = await system_factory(
+        name="initial_name",
+        external_id="initial_external_id",
+        status=system_to_update_status,
+    )
+
+    # creating another system to test the external_id uniqueness
+    await system_factory(
+        external_id="existing_external_id",
+        status=existing_system_status,
+    )
+    response = await api_client.put(
+        f"/systems/{system.id}",
+        headers={"Authorization": f"Bearer {system_jwt_token_factory(ffc_extension)}"},
+        json={
+            "name": "initial_name",
+            "description": "initial_description",
+            "external_id": "existing_external_id",
+        },
+    )
+
+    assert response.status_code == expected_status_code
+    response_data = response.json()
+
+    await db_session.refresh(system)
+
+    if expected_status_code == status.HTTP_200_OK:
+        assert response_data["external_id"] == "existing_external_id"
+        assert system.external_id == "existing_external_id"
+    else:
+        assert response_data["detail"] == "A system with the same external ID already exists."
+        assert system.external_id == "initial_external_id"
