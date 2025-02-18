@@ -3,6 +3,7 @@ import inspect
 import typer
 
 from app import commands
+from app.conf import get_settings
 
 app = typer.Typer(
     help="FinOps for Cloud Operations API Command Line Interface",
@@ -23,6 +24,4 @@ for name, module in inspect.getmembers(commands):
 def main(
     ctx: typer.Context,
 ):
-    from app.conf import get_settings
-
     ctx.obj = get_settings()

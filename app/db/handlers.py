@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import AsyncGenerator, Sequence
 from contextlib import suppress
 from datetime import UTC, datetime
 from typing import Any
@@ -123,13 +123,16 @@ class ModelHandler[M: BaseModel]:
         obj = await self.create(self.model_cls(**params))
         return obj, True
 
-    async def update(self, id_or_obj: str | M, data: dict[str, Any]) -> M:
+    async def update(self, id_or_obj: str | M, data: dict[str, Any] | None = None) -> M:
         obj = await self._get_model_obj(id_or_obj)
 
-        for key, value in data.items():
-            setattr(obj, key, value)
+        if data:
+            for key, value in data.items():
+                setattr(obj, key, value)
 
-        if isinstance(obj, AuditableMixin) and "updated_by" not in data:  # pragma: no branch
+        if (
+            isinstance(obj, AuditableMixin) and data and "updated_by" not in data
+        ):  # pragma: no branch
             with suppress(LookupError):
                 obj.updated_by = auth_context.get().get_actor()
 
@@ -165,7 +168,7 @@ class ModelHandler[M: BaseModel]:
             with suppress(LookupError):
                 column_updates["deleted_by"] = auth_context.get().get_actor()
 
-        await self.update(obj, column_updates)
+        await self.update(obj, data=column_updates)
 
     async def fetch_page(
         self,
@@ -181,6 +184,27 @@ class ModelHandler[M: BaseModel]:
 
         results = await self.session.execute(query)
         return results.scalars().all()
+
+    async def stream_scalars(
+        self,
+        extra_conditions: list[ColumnExpressionArgument] | None = None,
+        order_by: list[ColumnExpressionArgument] | None = None,
+        batch_size: int = 100,
+    ) -> AsyncGenerator[M, None]:
+        query = select(self.model_cls)
+        if extra_conditions:
+            query = query.where(*extra_conditions)
+        if self.default_options:
+            query = query.options(*self.default_options)
+        if order_by:
+            query = query.order_by(*order_by)
+        result = await self.session.stream_scalars(
+            query,
+            execution_options={"yield_per": batch_size},
+        )
+        async for row in result:
+            yield row
+        await result.close()
 
     async def count(self, *extra_conditions: ColumnExpressionArgument) -> int:
         query = select(func.count(self.model_cls.id))
@@ -236,7 +260,7 @@ class EntitlementHandler(ModelHandler[Entitlement]):
     async def terminate(self, entitlement: Entitlement) -> Entitlement:
         return await self.update(
             entitlement.id,
-            {
+            data={
                 "status": EntitlementStatus.TERMINATED,
                 "terminated_at": datetime.now(UTC),
                 "terminated_by": auth_context.get().get_actor(),
