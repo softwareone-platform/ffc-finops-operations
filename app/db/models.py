@@ -1,7 +1,7 @@
 import datetime
 
 import sqlalchemy as sa
-from sqlalchemy import Enum, ForeignKey, String, Text
+from sqlalchemy import Enum, ForeignKey, Index, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, mapped_column, relationship
 from sqlalchemy_utils import StringEncryptedType
 from sqlalchemy_utils.types.encrypted.encrypted_type import FernetEngine
@@ -125,7 +125,7 @@ class System(Actor, AuditableMixin):
     id: Mapped[str] = mapped_column(ForeignKey("actors.id"), primary_key=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text(), nullable=True)
-    external_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True, unique=True)
+    external_id: Mapped[str] = mapped_column(String(255), nullable=False)
     jwt_secret: Mapped[str] = mapped_column(
         StringEncryptedType(
             String(255), lambda: get_settings().secrets_encryption_key, FernetEngine
@@ -146,6 +146,15 @@ class System(Actor, AuditableMixin):
         "inherit_condition": id == Actor.id,
         "polymorphic_load": "inline",
     }
+
+    __table_args__ = (
+        Index(
+            "ix_systems_external_id_for_non_deleted",
+            external_id,
+            unique=True,
+            postgresql_where=(status != SystemStatus.DELETED),
+        ),
+    )
 
 
 class User(Actor, HumanReadablePKMixin, AuditableMixin):
