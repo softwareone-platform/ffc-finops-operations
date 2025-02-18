@@ -88,10 +88,13 @@ class ActorReference(IdSchema):
     name: Annotated[str, Field(examples=["Barack Obama"])]
 
 
-class CommonEventsSchema(BaseSchema):
+class TimestampSchema(BaseSchema):
     created_at: datetime.datetime
     updated_at: datetime.datetime
     deleted_at: datetime.datetime | None = None
+
+
+class CommonEventsSchema(TimestampSchema):
     created_by: ActorReference | None = None
     updated_by: ActorReference | None = None
     deleted_by: ActorReference | None = None
@@ -338,3 +341,10 @@ class DatasourceRead(BaseSchema):
     resources_changed_this_month: int
     expenses_so_far_this_month: float
     expenses_forecast_this_month: float
+
+
+class ChargesFileRead(IdSchema, TimestampSchema):
+    document_date: datetime.date
+    amount: Decimal | None
+    currency: str
+    owner: AccountReference

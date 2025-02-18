@@ -7,7 +7,16 @@ from fastapi import Depends, FastAPI
 from app.auth.auth import get_authentication_context
 from app.conf import get_settings
 from app.db import verify_db_connection
-from app.routers import accounts, auth, employees, entitlements, organizations, systems, users
+from app.routers import (
+    accounts,
+    auth,
+    chargesfiles,
+    employees,
+    entitlements,
+    organizations,
+    systems,
+    users,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +76,12 @@ fastapi_pagination.add_pagination(app)
 app.include_router(
     entitlements.router,
     prefix="/entitlements",
+    dependencies=[Depends(get_authentication_context)],
+    tags=["Billing"],
+)
+app.include_router(
+    chargesfiles.router,
+    prefix="/charges",
     dependencies=[Depends(get_authentication_context)],
     tags=["Billing"],
 )

@@ -1,4 +1,5 @@
 import datetime
+from decimal import Decimal
 
 import sqlalchemy as sa
 from sqlalchemy import Enum, ForeignKey, String, Text
@@ -14,6 +15,7 @@ from app.enums import (
     AccountUserStatus,
     ActorType,
     EntitlementStatus,
+    InvoiceStatus,
     OrganizationStatus,
     SystemStatus,
     UserStatus,
@@ -252,3 +254,22 @@ class Entitlement(Base, HumanReadablePKMixin, AuditableMixin):
     terminated_at: Mapped[datetime.datetime | None] = mapped_column(sa.DateTime(timezone=True))
     terminated_by_id: Mapped[str | None] = mapped_column(ForeignKey("actors.id"))
     terminated_by: Mapped[Actor | None] = relationship(foreign_keys=[terminated_by_id])
+
+
+class Invoice(Base, HumanReadablePKMixin, TimestampMixin):
+    __tablename__ = "invoices"
+
+    PK_PREFIX = "FINV"
+    PK_NUM_LENGTH = 12
+
+    document_date: Mapped[datetime.date] = mapped_column(sa.Date())
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    amount: Mapped[Decimal | None] = mapped_column(sa.Numeric(10, 2), nullable=True)
+    owner_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), nullable=False)
+    owner: Mapped[Account] = relationship(foreign_keys=[owner_id])
+    status: Mapped[InvoiceStatus] = mapped_column(
+        Enum(InvoiceStatus, values_callable=lambda obj: [e.value for e in obj]),
+        nullable=False,
+        default=InvoiceStatus.DRAFT,
+        server_default=InvoiceStatus.DRAFT.value,
+    )
