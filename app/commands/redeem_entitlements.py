@@ -1,12 +1,16 @@
+import asyncio
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
 import httpx
 import typer
 from rich.console import Console
-from sqlalchemy import create_engine, select
 from sqlalchemy.exc import DatabaseError
-from sqlalchemy.orm import sessionmaker
 
+from app.api_clients.optscale import OptscaleClient
+from app.conf import Settings
+from app.db.base import get_db_engine, get_db_session
+from app.db.handlers import EntitlementHandler, OrganizationHandler
 from app.db.models import Entitlement, Organization
 from app.enums import EntitlementStatus, OrganizationStatus
 
@@ -16,50 +20,36 @@ BATCH_SIZE = 100
 console = Console(highlighter=None)
 
 
-def fetch_datasources_for_organization(
-    ctx: typer.Context,
+async def fetch_datasources_for_organization(
+    settings: Settings,
     organization_id: str,
 ) -> dict:
-    response = httpx.get(
-        f"{ctx.obj.opt_api_base_url}/organizations/{organization_id}/cloud_accounts",
-        params={
-            "details": "true",
-        },
-        headers={
-            "Secret": ctx.obj.opt_cluster_secret,
-        },
-    )
-    response.raise_for_status()
+    client = OptscaleClient(settings)
+    response = await client.fetch_datasources_for_organization(organization_id)
     return response.json()["cloud_accounts"]
 
 
-def command(
-    ctx: typer.Context,
+async def redeem_entitlements(
+    settings: Settings,
 ):
-    """Redeem entitlements for an Organization."""
-    db_engine = create_engine(
-        str(ctx.obj.postgres_url),
-        echo=ctx.obj.debug,
-        future=True,
-    )
+    engine = get_db_engine(settings)
+    async with asynccontextmanager(get_db_session)(engine) as session:
+        organization_handler = OrganizationHandler(session)
+        entitlement_handler = EntitlementHandler(session)
 
-    SessionMaker = sessionmaker(bind=db_engine)
-    with SessionMaker() as session:
-        stmt = (
-            select(Organization)
-            .where(Organization.status == OrganizationStatus.ACTIVE)
-            .order_by(Organization.created_at)
-            .execution_options(yield_per=BATCH_SIZE)
-        )
-        for organization in session.scalars(stmt):
+        async for organization in organization_handler.stream_scalars(
+            extra_conditions=[Organization.status == OrganizationStatus.ACTIVE],
+            order_by=[Organization.created_at],
+            batch_size=BATCH_SIZE,
+        ):
             console.print(
                 "[blue]Fetching datasources for organization: "
                 f"[bold]{organization.id} - {organization.name}[/bold][/blue]",
             )
             datasources = None
             try:
-                datasources = fetch_datasources_for_organization(
-                    ctx,
+                datasources = await fetch_datasources_for_organization(
+                    settings,
                     organization.operations_external_id,  # type: ignore
                 )
             except httpx.HTTPError as e:
@@ -92,18 +82,20 @@ def command(
                         )
                         continue
                 try:
-                    query = select(Entitlement).where(
+                    instance = await entitlement_handler.first(
                         Entitlement.datasource_id == datasource_id,
                         Entitlement.status == EntitlementStatus.NEW,
                     )
-                    instance = session.scalar(query)
                     if instance:
-                        instance.status = EntitlementStatus.ACTIVE
-                        instance.redeemed_at = datetime.now(UTC)
-                        instance.redeemed_by = organization
-                        instance.operations_external_id = datasource["id"]
-                        session.add(instance)
-                        session.commit()
+                        await entitlement_handler.update(
+                            instance,
+                            data={
+                                "status": EntitlementStatus.ACTIVE,
+                                "redeemed_at": datetime.now(UTC),
+                                "redeemed_by": organization,
+                                "operations_external_id": datasource["id"],
+                            },
+                        )
                         console.print(
                             f"\t\t[green]Entitlement {instance.id} for datasource {datasource_id} "
                             "has been redeemed successfully![/green]"
@@ -117,3 +109,10 @@ def command(
                 except DatabaseError as e:  # pragma: no cover
                     console.print(f"[red]An error with the database occurred: {e}[/red]")
                     continue
+
+
+def command(
+    ctx: typer.Context,
+):
+    """Redeem entitlements for an Organization."""
+    asyncio.run(redeem_entitlements(ctx.obj))

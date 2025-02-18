@@ -1,32 +1,26 @@
+import asyncio
+
 import typer
 from rich import print
-from sqlalchemy import create_engine, select
-from sqlalchemy.orm import sessionmaker
 
+from app.conf import Settings
+from app.db.base import get_db_engine, get_tx_db_session
+from app.db.handlers import AccountHandler
 from app.db.models import Account
 from app.enums import AccountStatus, AccountType
 
 
-def command(
-    ctx: typer.Context,
-    external_id: str = typer.Argument(..., help="Operation Account external ID"),
+async def create_operations_account(
+    settings: Settings,
+    external_id: str,
 ):
-    """
-    Create the SoftwareOne Operations Account.
-    """
-    db_engine = create_engine(
-        str(ctx.obj.postgres_url),
-        echo=ctx.obj.debug,
-        future=True,
-    )
-    SessionMaker = sessionmaker(bind=db_engine)
-    with SessionMaker() as session:
-        query = select(Account).where(
+    engine = get_db_engine(settings)
+    async with get_tx_db_session(engine) as session:
+        account_handler = AccountHandler(session)
+        instance = await account_handler.first(
             Account.type == AccountType.OPERATIONS,
             Account.status != AccountStatus.DELETED,
         )
-        result = session.execute(query)
-        instance = result.scalar_one_or_none()
         if instance:
             print(
                 "[orange3]The Operations Account already exist: [/orange3]"
@@ -40,10 +34,18 @@ def command(
             status=AccountStatus.ACTIVE,
             external_id=external_id,
         )
-        session.add(account)
-        session.commit()
-        session.refresh(account)
+        account = await account_handler.create(account)
         print(
             "[green]The Operations Account has been created: [/green]"
             f"[blue]{account.id} - {account.name}[/blue]."
         )
+
+
+def command(
+    ctx: typer.Context,
+    external_id: str = typer.Argument(..., help="Operation Account external ID"),
+):
+    """
+    Create the SoftwareOne Operations Account.
+    """
+    asyncio.run(create_operations_account(ctx.obj, external_id))

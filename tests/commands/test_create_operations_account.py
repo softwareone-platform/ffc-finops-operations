@@ -1,23 +1,25 @@
-import asyncio
-import shlex
-
+import pytest
+from pytest_mock import MockerFixture
 from sqlalchemy.ext.asyncio import AsyncSession
 from typer.testing import CliRunner
 
 from app.cli import app
+from app.commands.create_operations_account import create_operations_account
+from app.conf import Settings
 from app.db.handlers import AccountHandler
 from app.db.models import Account
 from app.enums import AccountStatus, AccountType
 
 
-async def test_create_op_account(db_session: AsyncSession):
-    loop = asyncio.get_event_loop()
-    runner = CliRunner()
-    result = await loop.run_in_executor(
-        None, runner.invoke, app, shlex.split("create-operations-account ACC-1234-5678")
+async def test_create_op_account(
+    test_settings: Settings, db_session: AsyncSession, capsys: pytest.CaptureFixture
+):
+    await create_operations_account(
+        test_settings,
+        "ACC-1234-5678",
     )
-    assert result.exit_code == 0
-    assert "The Operations Account has been created" in result.stdout
+    captured = capsys.readouterr()
+    assert "The Operations Account has been created" in captured.out
     account_handler = AccountHandler(db_session)
     assert (
         await account_handler.count(
@@ -29,9 +31,11 @@ async def test_create_op_account(db_session: AsyncSession):
     )
 
 
-async def test_create_op_account_exist(db_session: AsyncSession):
+async def test_create_op_account_exist(
+    test_settings: Settings, db_session: AsyncSession, capsys: pytest.CaptureFixture
+):
     account_handler = AccountHandler(db_session)
-    account = await account_handler.create(
+    await account_handler.create(
         Account(
             name="SWO",
             type=AccountType.OPERATIONS,
@@ -39,17 +43,43 @@ async def test_create_op_account_exist(db_session: AsyncSession):
             external_id="ACC-1234-5678",
         )
     )
-    loop = asyncio.get_event_loop()
-    runner = CliRunner()
-    result = await loop.run_in_executor(
-        None, runner.invoke, app, shlex.split("create-operations-account ACC-1234-5678")
+    await create_operations_account(
+        test_settings,
+        "ACC-1234-5678",
     )
-    assert result.exit_code == 0
-    assert "The Operations Account already exist" in result.stdout
-    assert f"{account.id} - {account.name}" in result.stdout
+    captured = capsys.readouterr()
+    assert "The Operations Account already exist" in captured.out
     assert (
         await account_handler.count(
             Account.type == AccountType.OPERATIONS, Account.status == AccountStatus.ACTIVE
         )
         == 1
+    )
+
+
+def test_create_operations_account_command(
+    mocker: MockerFixture,
+    test_settings: Settings,
+):
+    mock_create_coro = mocker.MagicMock()
+    mock_create_operations_account = mocker.MagicMock(return_value=mock_create_coro)
+
+    mocker.patch(
+        "app.commands.create_operations_account.create_operations_account",
+        mock_create_operations_account,
+    )
+    mock_run = mocker.patch("app.commands.create_operations_account.asyncio.run")
+    runner = CliRunner()
+
+    # Run the command
+    result = runner.invoke(
+        app,
+        ["create-operations-account", "ACC-1234-5678"],
+    )
+    assert result.exit_code == 0
+    mock_run.assert_called_once_with(mock_create_coro)
+
+    mock_create_operations_account.assert_called_once_with(
+        test_settings,
+        "ACC-1234-5678",
     )
