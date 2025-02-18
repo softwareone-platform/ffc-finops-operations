@@ -74,14 +74,14 @@ def extract_events[M: Base, S: BaseModel](db_model: M, events_schema_cls: type[S
     for field_name, field_info in events_schema_cls.model_fields.items():
         event_field_schema_cls = resolve_field_type(field_info.annotation)
 
-        if not issubclass(event_field_schema_cls, AuditFieldSchema):
+        if not issubclass(event_field_schema_cls, AuditFieldSchema):  # type: ignore
             raise TypeError(f"Unsupported schema type: {event_field_schema_cls}")
 
         at_value = getattr(db_model, f"{field_name}_at", None)
         by_value = getattr(db_model, f"{field_name}_by", None)
 
         schema_values[field_name] = (
-            event_field_schema_cls(at=at_value, by=by_value) if at_value else None
+            event_field_schema_cls(at=at_value, by=by_value) if at_value else None  # type: ignore
         )
     return events_schema_cls(**schema_values)
 
