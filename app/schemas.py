@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import secrets
 import uuid
 from decimal import Decimal
 from typing import Annotated
@@ -146,9 +147,11 @@ class SystemBase(BaseSchema):
     jwt_secret: Annotated[
         str | None,
         Field(
+            min_length=64,
+            default_factory=lambda: secrets.token_hex(64),
             examples=[
                 "eowlqbNqQiKVudOJ-x-nHE1MNQphe3llEzqCOR5FgnPgJj4gLIqD6utRB9qI-Lw64tR1_f3QEhoyJiyz1rsXAg"
-            ]
+            ],
         ),
     ] = None
     owner: AccountReference
