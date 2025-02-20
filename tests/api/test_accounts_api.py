@@ -84,6 +84,17 @@ async def test_can_create_accounts(
         "/accounts",
         json={"name": "Microsoft", "external_id": "ACC-9044-8753", "type": "affiliate"},
     )
+    """
+    {"name":"Microsoft",
+    "external_id":"ACC-9044-8753",
+    "created_at":"2025-02-19T09:40:55.850868Z",
+    "updated_at":"2025-02-19T09:40:55.850875Z",
+    "deleted_at":null,"created_by":
+    {"id":"FUSR-5243-4812","type":"user","name":"Antonio Di Mariano"},
+    "updated_by":{"id":"FUSR-5243-4812","type":"user","name":"Antonio Di Mariano"},
+    "deleted_by":null,"id":"FACC-5297-1380","entitlements_stats":null,"status":"active",
+    "type":"affiliate"}
+    """
     assert response.status_code == 201
     data = response.json()
     assert data["id"] is not None
