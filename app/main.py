@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 import fastapi_pagination
 from fastapi import Depends, FastAPI
+from fastapi.routing import APIRoute
 
 from app.auth.auth import get_authentication_context
 from app.conf import get_settings
@@ -50,53 +51,67 @@ tags_metadata = [
 ]
 
 
-app = FastAPI(
-    title="FinOps for Cloud Operations API",
-    description="API to be used to manage FinOps for Cloud tool",
-    openapi_tags=tags_metadata,
-    version="4.0.0",
-    root_path="/ops/v1",
-    lifespan=lifespan,
-)
+def set_response_model_exclude_unset(app: FastAPI):
+    for api_route in app.routes:
+        if (
+            isinstance(api_route, APIRoute)
+            and hasattr(api_route, "response_model")
+            and api_route.response_model
+        ):
+            print(api_route)
+            api_route.response_model_exclude_unset = True
+            api_route.response_model_exclude_defaults = True
 
 
-fastapi_pagination.add_pagination(app)
+def setup_app():
+    app = FastAPI(
+        title="FinOps for Cloud Operations API",
+        description="API to be used to manage FinOps for Cloud tool",
+        openapi_tags=tags_metadata,
+        version="4.0.0",
+        root_path="/ops/v1",
+        lifespan=lifespan,
+    )
+    fastapi_pagination.add_pagination(app)
+    # TODO: Add healthcheck
+    app.include_router(
+        entitlements.router,
+        prefix="/entitlements",
+        dependencies=[Depends(get_authentication_context)],
+        tags=["Billing"],
+    )
+    app.include_router(
+        organizations.router,
+        prefix="/organizations",
+        dependencies=[Depends(get_authentication_context)],
+        tags=["FinOps for Cloud Provisioning"],
+    )
+    app.include_router(
+        employees.router,
+        prefix="/employees",
+        dependencies=[Depends(get_authentication_context)],
+        tags=["FinOps for Cloud Provisioning"],
+    )
+    app.include_router(
+        accounts.router,
+        prefix="/accounts",
+        dependencies=[Depends(get_authentication_context)],
+        tags=["Portal Administration"],
+    )
+    app.include_router(
+        users.router,
+        prefix="/users",
+        tags=["Portal Settings"],
+    )
+    app.include_router(
+        systems.router,
+        prefix="/systems",
+        dependencies=[Depends(get_authentication_context)],
+        tags=["Portal Settings"],
+    )
+    app.include_router(auth.router, prefix="/auth", tags=["Auth"])
+    set_response_model_exclude_unset(app)
+    return app
 
-# TODO: Add healthcheck
 
-app.include_router(
-    entitlements.router,
-    prefix="/entitlements",
-    dependencies=[Depends(get_authentication_context)],
-    tags=["Billing"],
-)
-app.include_router(
-    organizations.router,
-    prefix="/organizations",
-    dependencies=[Depends(get_authentication_context)],
-    tags=["FinOps for Cloud Provisioning"],
-)
-app.include_router(
-    employees.router,
-    prefix="/employees",
-    dependencies=[Depends(get_authentication_context)],
-    tags=["FinOps for Cloud Provisioning"],
-)
-app.include_router(
-    accounts.router,
-    prefix="/accounts",
-    dependencies=[Depends(get_authentication_context)],
-    tags=["Portal Administration"],
-)
-app.include_router(
-    users.router,
-    prefix="/users",
-    tags=["Portal Settings"],
-)
-app.include_router(
-    systems.router,
-    prefix="/systems",
-    dependencies=[Depends(get_authentication_context)],
-    tags=["Portal Settings"],
-)
-app.include_router(auth.router, prefix="/auth", tags=["Auth"])
+app = setup_app()
