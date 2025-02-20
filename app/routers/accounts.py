@@ -64,7 +64,7 @@ async def update_data_and_format_response(
     return from_orm(AccountRead, db_account)
 
 
-async def validate_required_conditions_before_update(account: Account):
+def validate_required_conditions_before_update(account: Account):
     """
     This function performs the following required checks before
     proceeding to update an Account:

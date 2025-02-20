@@ -125,7 +125,7 @@ async def get_authentication_context(
         auth_context.reset(reset_token)
 
 
-async def check_operations_account(
+def check_operations_account(
     context: Annotated[AuthenticationContext, Depends(get_authentication_context)],
 ):
     """

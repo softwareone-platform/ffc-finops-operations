@@ -17,7 +17,7 @@ from app.utils import wrap_exc_in_http_response
 # ============
 
 
-async def common_extra_conditions(auth_ctx: CurrentAuthContext) -> list[ColumnExpressionArgument]:
+def common_extra_conditions(auth_ctx: CurrentAuthContext) -> list[ColumnExpressionArgument]:
     conditions: list[ColumnExpressionArgument] = []
 
     if auth_ctx.account.type == AccountType.AFFILIATE:
@@ -34,7 +34,7 @@ async def fetch_system_or_404(
     system_repo: SystemRepository,
     extra_conditions: CommonConditions,
 ) -> System:
-    async with wrap_exc_in_http_response(NotFoundError, status_code=status.HTTP_404_NOT_FOUND):
+    with wrap_exc_in_http_response(NotFoundError, status_code=status.HTTP_404_NOT_FOUND):
         return await system_repo.get(id=id, extra_conditions=extra_conditions)
 
 
@@ -81,10 +81,10 @@ async def create_system(
                 detail="Affiliate users can only create systems bound to their own account.",
             )
 
-        async with wrap_exc_in_http_response(NotFoundError, "The owner account does not exist."):
+        with wrap_exc_in_http_response(NotFoundError, "The owner account does not exist."):
             system_owner = await account_repo.get(data.owner.id)
 
-    async with wrap_exc_in_http_response(
+    with wrap_exc_in_http_response(
         ConstraintViolationError, "A system with the same external ID already exists."
     ):
         system = await system_repo.create(
@@ -112,7 +112,7 @@ async def update_system(
     system_repo: SystemRepository,
     data: SystemUpdate,
 ):
-    async with wrap_exc_in_http_response(
+    with wrap_exc_in_http_response(
         ConstraintViolationError, "A system with the same external ID already exists."
     ):
         system = await system_repo.update(system, data.model_dump(exclude_unset=True))

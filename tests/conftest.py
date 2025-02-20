@@ -59,7 +59,7 @@ def db_engine(test_settings: Settings) -> AsyncEngine:
 
 
 @pytest.fixture(scope="session")
-async def fastapi_app(test_settings: Settings) -> FastAPI:
+def fastapi_app(test_settings: Settings) -> FastAPI:
     from app.main import app
 
     app.dependency_overrides[get_settings] = lambda: test_settings

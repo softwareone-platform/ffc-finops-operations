@@ -7,8 +7,8 @@ from fastapi import HTTPException, status
 logger = logging.getLogger(__name__)
 
 
-@contextlib.asynccontextmanager
-async def wrap_http_error_in_502(base_msg: str = "Error in FinOps for Cloud"):
+@contextlib.contextmanager
+def wrap_http_error_in_502(base_msg: str = "Error in FinOps for Cloud"):
     try:
         yield
     except httpx.HTTPStatusError as e:
@@ -18,8 +18,8 @@ async def wrap_http_error_in_502(base_msg: str = "Error in FinOps for Cloud"):
         ) from e
 
 
-@contextlib.asynccontextmanager
-async def wrap_exc_in_http_response(
+@contextlib.contextmanager
+def wrap_exc_in_http_response(
     exc_cls: type[Exception],
     error_msg: str | None = None,
     status_code: int = status.HTTP_400_BAD_REQUEST,

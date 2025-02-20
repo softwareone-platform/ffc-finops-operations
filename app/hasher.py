@@ -26,7 +26,7 @@ class PBKDF2Sha256PasswordHasher:
             raise ValueError("Password and hashed value cannot be empty.")
 
         try:
-            algorithm, iterations, salt_encoded, hash_encoded = hashed_value.split("$", 3)
+            _algorithm, iterations, salt_encoded, hash_encoded = hashed_value.split("$", 3)
             iterations = int(iterations)  # type: ignore
             salt = base64.b64decode(salt_encoded)
             expected_hash = base64.b64decode(hash_encoded)

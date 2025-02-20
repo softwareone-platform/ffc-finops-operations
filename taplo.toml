@@ -1,0 +1,2 @@
+[formatting]
+array_auto_collapse = false # Automatically collapse arrays if they fit in one line.
