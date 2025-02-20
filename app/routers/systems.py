@@ -67,6 +67,12 @@ async def create_system(
     auth_ctx: CurrentAuthContext,
 ):
     if data.owner is None:
+        if auth_ctx.account.type == AccountType.OPERATIONS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Operations users must specify an owner account when creating a system.",
+            )
+
         system_owner = auth_ctx.account
     else:
         if auth_ctx.account.type == AccountType.AFFILIATE:

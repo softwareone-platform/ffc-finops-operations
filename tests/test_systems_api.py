@@ -883,10 +883,12 @@ async def test_create_system_by_operations_account(
         "expected_status_code",
     ),
     [
+        (AccountType.OPERATIONS, None, status.HTTP_400_BAD_REQUEST),
         (AccountType.OPERATIONS, "self", status.HTTP_201_CREATED),
         (AccountType.OPERATIONS, "affiliate", status.HTTP_201_CREATED),
         (AccountType.OPERATIONS, "operations", status.HTTP_201_CREATED),
-        (AccountType.AFFILIATE, "self", status.HTTP_201_CREATED),
+        (AccountType.AFFILIATE, None, status.HTTP_201_CREATED),
+        (AccountType.AFFILIATE, "self", status.HTTP_400_BAD_REQUEST),
         (AccountType.AFFILIATE, "affiliate", status.HTTP_400_BAD_REQUEST),
         (AccountType.AFFILIATE, "operations", status.HTTP_400_BAD_REQUEST),
     ],
@@ -898,7 +900,7 @@ async def test_create_system_with_different_owners(
     api_client: AsyncClient,
     db_session: AsyncSession,
     creator_account_type: AccountType,
-    owner_account: Literal["self", "affiliate", "operations"],
+    owner_account: Literal["self", "affiliate", "operations"] | None,
     expected_status_code: int,
 ):
     creator_account = await account_factory(type=creator_account_type)
@@ -906,16 +908,16 @@ async def test_create_system_with_different_owners(
     affiliate_account = await account_factory(type=AccountType.AFFILIATE)
     operations_account = await account_factory(type=AccountType.OPERATIONS)
 
-    if owner_account == "self":
-        owner_id = creator_account.id
+    if owner_account is None:
+        owner_json_field = {}
+    elif owner_account == "self":
+        owner_json_field = {"owner": {"id": creator_account.id}}
     elif owner_account == "affiliate":
-        owner_id = affiliate_account.id
+        owner_json_field = {"owner": {"id": affiliate_account.id}}
     elif owner_account == "operations":
-        owner_id = operations_account.id
+        owner_json_field = {"owner": {"id": operations_account.id}}
     else:
         raise RuntimeError("invalid branch")
-
-    owner_json_field = {"owner": {"id": owner_id}} if owner_id != creator_account.id else {}
 
     response = await api_client.post(
         "/systems",
