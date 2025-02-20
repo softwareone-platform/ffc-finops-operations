@@ -57,7 +57,7 @@ async def create_organization(
                 ),
             )
 
-    async with wrap_http_error_in_502("Error creating organization in FinOps for Cloud"):
+    with wrap_http_error_in_502("Error creating organization in FinOps for Cloud"):
         response = await api_modifier_client.create_organization(
             org_name=db_organization.name, user_id=data.user_id, currency=data.currency
         )
@@ -105,9 +105,7 @@ async def get_datasources_by_organization_id(
             ),
         )
 
-    async with wrap_http_error_in_502(
-        f"Error fetching datasources for organization {organization.name}"
-    ):
+    with wrap_http_error_in_502(f"Error fetching datasources for organization {organization.name}"):
         response = await optscale_client.fetch_datasources_for_organization(
             organization_id=organization.operations_external_id
         )
@@ -142,7 +140,7 @@ async def get_datasource_by_id(
             ),
         )
 
-    async with wrap_http_error_in_502(f"Error fetching cloud account with ID {datasource_id}"):
+    with wrap_http_error_in_502(f"Error fetching cloud account with ID {datasource_id}"):
         response = await optscale_client.fetch_datasource_by_id(datasource_id)
 
     datasource = response.json()
@@ -171,9 +169,7 @@ async def get_employees_by_organization_id(
             ),
         )
 
-    async with wrap_http_error_in_502(
-        f"Error fetching employees for organization {organization.name}"
-    ):
+    with wrap_http_error_in_502(f"Error fetching employees for organization {organization.name}"):
         response = await optscale_client.fetch_users_for_organization(
             organization_id=organization.operations_external_id
         )
@@ -203,7 +199,7 @@ async def make_organization_user_admin(
     optscale_auth_client: OptscaleAuthClient,
     optscale_client: OptscaleClient,
 ):
-    async with wrap_http_error_in_502("Error making employee admin in FinOps for Cloud"):
+    with wrap_http_error_in_502("Error making employee admin in FinOps for Cloud"):
         # check user exists in optscale
         response = await optscale_client.fetch_user_by_id(str(user_id))
         user = response.json()

@@ -16,16 +16,14 @@ async def create_employee(
     api_modifier_client: APIModifierClient,
     optscale_client: OptscaleClient,
 ):
-    async with wrap_http_error_in_502("Error creating employee in FinOps for Cloud"):
+    with wrap_http_error_in_502("Error creating employee in FinOps for Cloud"):
         create_employee_response = await api_modifier_client.create_user(
             email=data.email,
             display_name=data.display_name,
             password=secrets.token_urlsafe(128),
         )
 
-    async with wrap_http_error_in_502(
-        "Error resetting the password for employee in FinOps for Cloud"
-    ):
+    with wrap_http_error_in_502("Error resetting the password for employee in FinOps for Cloud"):
         await optscale_client.reset_password(data.email)
 
         return EmployeeRead(**create_employee_response.json())
@@ -36,7 +34,7 @@ async def get_employee_by_email(
     email: str,
     optscale_auth_client: OptscaleAuthClient,
 ):
-    async with wrap_http_error_in_502("Error checking employee existence in FinOps for Cloud"):
+    with wrap_http_error_in_502("Error checking employee existence in FinOps for Cloud"):
         try:
             response = await optscale_auth_client.get_existing_user_info(email)
         except UserDoesNotExist:
