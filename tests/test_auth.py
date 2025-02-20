@@ -250,7 +250,6 @@ async def test_get_authentication_context_user_account_does_not_exist(
         auth_context.get()
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("account_type", "should_raise_exception", "expected_status", "expected_detail"),
     [
@@ -263,7 +262,7 @@ async def test_get_authentication_context_user_account_does_not_exist(
         (AccountType.OPERATIONS, False, None, None),
     ],
 )
-async def test_check_operations_account(
+def test_check_operations_account(
     mocker: MockerFixture,
     account_type: AccountType,
     should_raise_exception: bool,
@@ -274,10 +273,10 @@ async def test_check_operations_account(
     context.account.type = account_type
     if should_raise_exception:
         with pytest.raises(HTTPException) as exc_info:
-            await check_operations_account(context)
+            check_operations_account(context)
 
         assert exc_info.value.status_code == expected_status
         assert expected_detail in str(exc_info.value.detail)
     else:
-        result = await check_operations_account(context)
+        result = check_operations_account(context)
         assert result is None

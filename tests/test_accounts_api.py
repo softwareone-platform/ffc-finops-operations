@@ -325,20 +325,20 @@ async def test_validate_account_type_and_required_conditions_account_deleted(
     )
 
 
-async def test_validate_required_conditions_before_update_account_type_operations(
+def test_validate_required_conditions_before_update_account_type_operations(
     operations_account: Account,
 ):
     with pytest.raises(HTTPException) as exc_info:
-        await validate_required_conditions_before_update(account=operations_account)
+        validate_required_conditions_before_update(account=operations_account)
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == "You cannot update an Account of type Operations."
 
 
-async def test_validate_required_conditions_before_update_account_deleted():
+def test_validate_required_conditions_before_update_account_deleted():
     account = Account(name="Microsoft", external_id="ACC-9044-8753", type=AccountType.AFFILIATE)
     account.status = AccountStatus.DELETED
     with pytest.raises(HTTPException) as exc_info:
-        await validate_required_conditions_before_update(account=account)
+        validate_required_conditions_before_update(account=account)
 
     assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
     assert "You cannot update an Account Deleted." in str(exc_info.value.detail)
