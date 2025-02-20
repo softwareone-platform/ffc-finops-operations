@@ -21,7 +21,7 @@ from app.schemas import EntitlementCreate, EntitlementRead, EntitlementRedeem, f
 # ============
 
 
-async def common_extra_conditions(auth_ctx: CurrentAuthContext) -> list[ColumnExpressionArgument]:
+def common_extra_conditions(auth_ctx: CurrentAuthContext) -> list[ColumnExpressionArgument]:
     conditions: list[ColumnExpressionArgument] = []
 
     if auth_ctx.account.type == AccountType.AFFILIATE:

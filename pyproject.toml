@@ -2,11 +2,11 @@
 name = "mpt-finops-operations"
 version = "0.1.0"
 description = "SWO FinOps For Cloud Operations API"
-readme = {file = "README.md", content-type = "text/markdown"}
+readme = { file = "README.md", content-type = "text/markdown" }
 authors = [
-    {name = "SoftwareOne AG"},
+    { name = "SoftwareOne AG" },
 ]
-license = {file = "LICENSE.txt"}
+license = { file = "LICENSE.txt" }
 requires-python = ">=3.12,<4"
 dependencies = [
     "alembic==1.14.*",
@@ -70,16 +70,19 @@ extend-exclude = [
 cache-dir = ".cache/ruff"
 
 [tool.ruff.lint]
+preview = true # enable linting rules in preview (e.g. RUF029 as of 2025-02-20)
+explicit-preview-rules = true # only enable preview rules we explicitly specify
 select = [
-    "E",  # w errors
-    "W",  # pycodestyle warnings
-    "F",  # pyflakes
-    "I",  # isort
-    "B",  # flake8-bugbear
-    "C4",  # flake8-comprehensions
-    "UP",  # pyupgrade,
-    "PT",  # flake8-pytest-style
-    "T10",  # flake8-pytest-style
+    "E",      # w errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade,
+    "PT",     # flake8-pytest-style
+    "T10",    # flake8-pytest-style
+    "RUF029", # unused-async
 ]
 ignore = [
     "PT001", # Use `@pytest.fixture()` over `@pytest.fixture`

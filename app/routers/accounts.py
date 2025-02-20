@@ -64,7 +64,7 @@ async def update_data_and_format_response(
     return from_orm(AccountRead, db_account)
 
 
-async def validate_required_conditions_before_update(account: Account):
+def validate_required_conditions_before_update(account: Account):
     """
     This function performs the following required checks before
     proceeding to update an Account:
@@ -191,7 +191,7 @@ async def update_account(
         - HTTPException with status 403 if the check (1) fails
         - HTTPException with status 400 if the checks (2), (4) or (3) fail.
     """
-    await validate_required_conditions_before_update(account=account)
+    validate_required_conditions_before_update(account=account)
     return await update_data_and_format_response(
         id=account.id, account_repo=account_repo, data=data
     )

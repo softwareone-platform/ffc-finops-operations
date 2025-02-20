@@ -9,14 +9,15 @@ from app.db.models import System
 from app.dependencies import AccountRepository, CurrentAuthContext, SystemId, SystemRepository
 from app.enums import AccountType, SystemStatus
 from app.pagination import paginate
-from app.schemas import SystemCreate, SystemRead, SystemUpdate, from_orm
+from app.schemas import SystemCreate, SystemCreateResponse, SystemRead, SystemUpdate, from_orm
+from app.utils import wrap_exc_in_http_response
 
 # ============
 # Dependencies
 # ============
 
 
-async def common_extra_conditions(auth_ctx: CurrentAuthContext) -> list[ColumnExpressionArgument]:
+def common_extra_conditions(auth_ctx: CurrentAuthContext) -> list[ColumnExpressionArgument]:
     conditions: list[ColumnExpressionArgument] = []
 
     if auth_ctx.account.type == AccountType.AFFILIATE:
@@ -33,13 +34,8 @@ async def fetch_system_or_404(
     system_repo: SystemRepository,
     extra_conditions: CommonConditions,
 ) -> System:
-    try:
+    with wrap_exc_in_http_response(NotFoundError, status_code=status.HTTP_404_NOT_FOUND):
         return await system_repo.get(id=id, extra_conditions=extra_conditions)
-    except NotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        ) from e
 
 
 # ======
@@ -63,28 +59,34 @@ async def get_systems(
     )
 
 
-@router.post("", response_model=SystemRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=SystemCreateResponse, status_code=status.HTTP_201_CREATED)
 async def create_system(
     data: SystemCreate,
     account_repo: AccountRepository,
     system_repo: SystemRepository,
     auth_ctx: CurrentAuthContext,
 ):
-    if auth_ctx.account.type == AccountType.AFFILIATE and data.owner.id != auth_ctx.account.id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Affiliate users can only create systems bound to their own account.",
-        )
+    if data.owner is None:
+        if auth_ctx.account.type == AccountType.OPERATIONS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Operations users must specify an owner account when creating a system.",
+            )
 
-    try:
-        system_owner = await account_repo.get(data.owner.id)
-    except NotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="The owner account does not exist.",
-        ) from e
+        system_owner = auth_ctx.account
+    else:
+        if auth_ctx.account.type == AccountType.AFFILIATE:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Affiliate users can only create systems bound to their own account.",
+            )
 
-    try:
+        with wrap_exc_in_http_response(NotFoundError, "The owner account does not exist."):
+            system_owner = await account_repo.get(data.owner.id)
+
+    with wrap_exc_in_http_response(
+        ConstraintViolationError, "A system with the same external ID already exists."
+    ):
         system = await system_repo.create(
             System(
                 name=data.name,
@@ -95,13 +97,8 @@ async def create_system(
                 status=SystemStatus.ACTIVE,
             )
         )
-    except ConstraintViolationError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A system with the same external ID already exists.",
-        ) from e
 
-    return from_orm(SystemRead, system)
+    return from_orm(SystemCreateResponse, system)
 
 
 @router.get("/{id}", response_model=SystemRead)
@@ -115,13 +112,10 @@ async def update_system(
     system_repo: SystemRepository,
     data: SystemUpdate,
 ):
-    try:
-        system = await system_repo.update(system, data.model_dump())
-    except ConstraintViolationError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A system with the same external ID already exists.",
-        ) from e
+    with wrap_exc_in_http_response(
+        ConstraintViolationError, "A system with the same external ID already exists."
+    ):
+        system = await system_repo.update(system, data.model_dump(exclude_unset=True))
 
     return from_orm(SystemRead, system)
 

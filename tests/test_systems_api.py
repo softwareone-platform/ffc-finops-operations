@@ -34,7 +34,6 @@ async def test_get_system_by_id(
     assert data["name"] == gcp_extension.name
     assert data["external_id"] == gcp_extension.external_id
     assert data["description"] == gcp_extension.description
-    assert data["jwt_secret"] == gcp_extension.jwt_secret
     assert data["owner"]["id"] == gcp_extension.owner_id
     assert datetime.fromisoformat(data["created_at"]) == gcp_extension.created_at
     assert datetime.fromisoformat(data["updated_at"]) == gcp_extension.updated_at
@@ -44,6 +43,8 @@ async def test_get_system_by_id(
     assert data["updated_by"] == gcp_extension.updated_by
     assert data["deleted_by"] is None
     assert data["status"] == gcp_extension.status._value_
+
+    assert "jwt_secret" not in data
 
 
 async def test_get_system_by_id_no_auth(
@@ -81,6 +82,8 @@ async def test_get_system_with_deleted_status(
     assert data["id"] == second_active_system.id
     assert data["status"] == "active"
 
+    assert "jwt_secret" not in data
+
     response = await api_client.get(
         f"/systems/{deleted_system.id}",
         headers={"Authorization": f"Bearer {system_jwt_token_factory(first_active_system)}"},
@@ -95,6 +98,8 @@ async def test_get_system_with_deleted_status(
 
     assert data["id"] == deleted_system.id
     assert data["status"] == "deleted"
+
+    assert "jwt_secret" not in data
 
 
 async def test_get_system_by_id_auth_different_account(
@@ -157,8 +162,13 @@ async def test_get_all_systems_single_active_record(
     )
 
     assert response.status_code == 200
-    assert response.json()["total"] == 1
-    assert response.json()["items"][0]["id"] == gcp_extension.id
+
+    data = response.json()
+
+    assert data["total"] == 1
+    assert data["items"][0]["id"] == gcp_extension.id
+
+    assert "jwt_secret" not in data["items"][0]
 
 
 async def test_get_all_systems_multiple_systems_single_account(
@@ -352,6 +362,7 @@ async def test_disable_system(
     else:
         data = response.json()
         assert data["status"] == expected_new_status._value_
+        assert "jwt_secret" not in data
 
     await db_session.refresh(system)
     assert system.status == expected_new_status
@@ -438,6 +449,7 @@ async def test_enable_system(
     else:
         data = response.json()
         assert data["status"] == expected_new_status._value_
+        assert "jwt_secret" not in data
 
     await db_session.refresh(system)
     assert system.status == expected_new_status
@@ -665,6 +677,8 @@ async def test_update_system(
         assert response_data["description"] == expected_description
         assert response_data["external_id"] == expected_external_id
 
+        assert "jwt_secret" not in response_data
+
     await db_session.refresh(system)
 
     assert system.name == expected_name
@@ -720,6 +734,7 @@ async def test_system_external_id_is_unique_for_non_deleted_objects(
     await db_session.refresh(system)
 
     if expected_status_code == status.HTTP_200_OK:
+        assert "jwt_secret" not in response_data
         assert response_data["external_id"] == "existing_external_id"
         assert system.external_id == "existing_external_id"
     else:
@@ -849,10 +864,11 @@ async def test_create_system_by_operations_account(
             assert response_data["description"] is None
             assert db_system.description is None
 
+        assert "jwt_secret" in response_data
+
         if "jwt_secret" in input_data:
             assert response_data["jwt_secret"] == input_data["jwt_secret"] == db_system.jwt_secret
         else:
-            assert "jwt_secret" in response_data
             assert len(response_data["jwt_secret"]) >= 64
             assert response_data["jwt_secret"] == db_system.jwt_secret
 
@@ -867,10 +883,12 @@ async def test_create_system_by_operations_account(
         "expected_status_code",
     ),
     [
+        (AccountType.OPERATIONS, None, status.HTTP_400_BAD_REQUEST),
         (AccountType.OPERATIONS, "self", status.HTTP_201_CREATED),
         (AccountType.OPERATIONS, "affiliate", status.HTTP_201_CREATED),
         (AccountType.OPERATIONS, "operations", status.HTTP_201_CREATED),
-        (AccountType.AFFILIATE, "self", status.HTTP_201_CREATED),
+        (AccountType.AFFILIATE, None, status.HTTP_201_CREATED),
+        (AccountType.AFFILIATE, "self", status.HTTP_400_BAD_REQUEST),
         (AccountType.AFFILIATE, "affiliate", status.HTTP_400_BAD_REQUEST),
         (AccountType.AFFILIATE, "operations", status.HTTP_400_BAD_REQUEST),
     ],
@@ -882,7 +900,7 @@ async def test_create_system_with_different_owners(
     api_client: AsyncClient,
     db_session: AsyncSession,
     creator_account_type: AccountType,
-    owner_account: Literal["self", "affiliate", "operations"],
+    owner_account: Literal["self", "affiliate", "operations"] | None,
     expected_status_code: int,
 ):
     creator_account = await account_factory(type=creator_account_type)
@@ -890,12 +908,14 @@ async def test_create_system_with_different_owners(
     affiliate_account = await account_factory(type=AccountType.AFFILIATE)
     operations_account = await account_factory(type=AccountType.OPERATIONS)
 
-    if owner_account == "self":
-        owner_id = creator_account.id
+    if owner_account is None:
+        owner_json_field = {}
+    elif owner_account == "self":
+        owner_json_field = {"owner": {"id": creator_account.id}}
     elif owner_account == "affiliate":
-        owner_id = affiliate_account.id
+        owner_json_field = {"owner": {"id": affiliate_account.id}}
     elif owner_account == "operations":
-        owner_id = operations_account.id
+        owner_json_field = {"owner": {"id": operations_account.id}}
     else:
         raise RuntimeError("invalid branch")
 
@@ -906,11 +926,14 @@ async def test_create_system_with_different_owners(
             "name": "test system",
             "external_id": "test-system",
             "description": "test description",
-            "owner": {"id": owner_id},
+            **owner_json_field,
         },
     )
 
     assert response.status_code == expected_status_code
+
+    if not response.is_error:
+        assert "jwt_secret" in response.json()
 
 
 @pytest.mark.parametrize(
@@ -957,3 +980,4 @@ async def test_create_system_duplicate_external_id_with_deleted(
     else:
         assert response_data["external_id"] == "existing_external_id"
         assert created_system.external_id == "existing_external_id"
+        assert "jwt_secret" in response_data

@@ -144,6 +144,15 @@ class SystemBase(BaseSchema):
     ]
     external_id: Annotated[str, Field(max_length=255)]
     description: Annotated[str | None, Field(max_length=2000)] = None
+    owner: AccountReference
+
+
+class SystemRead(IdSchema, CommonEventsSchema, SystemBase):
+    status: SystemStatus
+
+
+class SystemCreate(SystemBase):
+    owner: IdSchema | None = None  # type: ignore[assignment]
     jwt_secret: Annotated[
         str | None,
         Field(
@@ -154,21 +163,17 @@ class SystemBase(BaseSchema):
             ],
         ),
     ] = None
-    owner: AccountReference
-
-
-class SystemCreate(SystemBase):
-    owner: IdSchema  # type: ignore
 
 
 class SystemUpdate(BaseSchema):
     name: str
     external_id: Annotated[str, Field(max_length=255)]
     description: Annotated[str | None, Field(max_length=2000)] = None
+    jwt_secret: Annotated[str | None, Field(min_length=64)] = None
 
 
-class SystemRead(IdSchema, CommonEventsSchema, SystemBase):
-    status: SystemStatus
+class SystemCreateResponse(SystemRead):
+    jwt_secret: str
 
 
 class UserBase(BaseSchema):
