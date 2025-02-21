@@ -1,7 +1,7 @@
 import logging
-import re
 import secrets
 from datetime import UTC, datetime, timedelta
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
@@ -10,7 +10,14 @@ from app.conf import AppSettings
 from app.db import DBEngine, DBSession, get_tx_db_session
 from app.db.handlers import AccountHandler, AccountUserHandler, NotFoundError, UserHandler
 from app.db.models import Account, AccountUser, User
-from app.dependencies import CurrentAuthContext, UserId
+from app.dependencies import (
+    AccountId,
+    AccountRepository,
+    AccountUserRepository,
+    CurrentAuthContext,
+    UserId,
+    UserRepository,
+)
 from app.enums import AccountStatus, AccountType, AccountUserStatus, UserStatus
 from app.hasher import pbkdf2_sha256
 from app.pagination import LimitOffsetPage
@@ -18,16 +25,20 @@ from app.schemas import (
     AccountUserCreate,
     AccountUserRead,
     UserAcceptInvitation,
-    UserCreateResponse,
+    UserInvitationRead,
     UserRead,
     UserResetPassword,
     UserUpdate,
     from_orm,
 )
+from app.utils import wrap_exc_in_http_response
 
 logger = logging.getLogger(__name__)
 
-PWD_COMPLEXITY_REGEX = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$")
+
+async def fetch_user_or_404(id: UserId, user_repo: UserRepository) -> User:
+    with wrap_exc_in_http_response(NotFoundError, status_code=status.HTTP_404_NOT_FOUND):
+        return await user_repo.get(id=id)
 
 
 # ======
@@ -49,7 +60,7 @@ async def get_users():  # pragma: no cover
 @router.post(
     "",
     dependencies=[Depends(authentication_required)],
-    response_model=UserCreateResponse,
+    response_model=UserInvitationRead,
     status_code=status.HTTP_201_CREATED,
 )
 async def invite_user(
@@ -136,7 +147,7 @@ async def invite_user(
         accountuser_handler = AccountUserHandler(tx_session)
         account_user = await accountuser_handler.create(account_user)
 
-        response = from_orm(UserCreateResponse, user)
+        response = from_orm(UserInvitationRead, user)
         response.account_user = from_orm(AccountUserRead, account_user)
         return response
 
@@ -187,12 +198,64 @@ async def enable_user(id: str):  # pragma: no cover
 
 
 @router.post(
-    "/{id}/resend-invitation",
+    "/{id}/accounts/{account_id}/resend-invitation",
     dependencies=[Depends(authentication_required)],
-    response_model=UserRead,
+    response_model=UserInvitationRead,
 )
-async def resend_user_invitation(id: str):  # pragma: no cover
-    pass  # not yet implemented
+async def resend_user_invitation(
+    settings: AppSettings,
+    auth_context: CurrentAuthContext,
+    user: Annotated[User, Depends(fetch_user_or_404)],
+    account_id: AccountId,
+    account_repository: AccountRepository,
+    accountuser_repository: AccountUserRepository,
+):
+    if user.status == UserStatus.DELETED:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with ID `{user.id}` wasn't found.",
+        )
+
+    account = await account_repository.first(
+        Account.id == account_id, Account.status != AccountStatus.DELETED
+    )
+
+    if not account or (
+        auth_context.account.type == AccountType.AFFILIATE and auth_context.account != account  # type: ignore
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Account with ID `{account_id}` wasn't found.",
+        )
+
+    account_user = await accountuser_repository.get_account_user(
+        account_id=account.id,
+        user_id=user.id,
+        extra_conditions=[AccountUser.status != AccountUserStatus.DELETED],
+    )
+    if not account_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"No invitation to Account with ID `{account_id}` "
+                f"was found for User with ID `{user.id}."
+            ),
+        )
+    if account_user.status == AccountUserStatus.ACTIVE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(f"User with ID `{user.id}` already belong to the Account with ID `{user.id}."),
+        )
+
+    account_user.status = AccountUserStatus.INVITED
+    account_user.invitation_token = secrets.token_urlsafe(settings.invitation_token_length)
+    account_user.invitation_token_expires_at = datetime.now(UTC) + timedelta(
+        days=settings.invitation_token_expires_days
+    )
+    account_user = await accountuser_repository.update(account_user)
+    response = from_orm(UserInvitationRead, user)
+    response.account_user = from_orm(AccountUserRead, account_user)
+    return response
 
 
 @router.get("/{id}", response_model=UserRead)

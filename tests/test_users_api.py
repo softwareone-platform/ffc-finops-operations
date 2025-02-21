@@ -1,7 +1,7 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from freezegun import freeze_time
+import time_machine
 from httpx import AsyncClient
 from pytest_mock import MockerFixture
 from sqlalchemy import select
@@ -14,7 +14,7 @@ from app.hasher import pbkdf2_sha256
 from tests.types import JWTTokenFactory, ModelFactory
 
 
-@freeze_time("2025-03-07T10:00:00Z")
+@time_machine.travel("2025-03-07T10:00:00Z", tick=False)
 async def test_invite_user(
     test_settings: Settings,
     mocker: MockerFixture,
@@ -407,7 +407,7 @@ async def test_invite_by_operations_already_belong_to_account(
     )
 
 
-@freeze_time("2025-03-07T10:00:00")
+@time_machine.travel("2025-03-07T10:00:00", tick=False)
 async def test_accept_invitation(
     user_factory: ModelFactory[User],
     accountuser_factory: ModelFactory[AccountUser],
@@ -692,7 +692,7 @@ async def test_accept_invitation_active_user_with_password(
     assert response.json()["detail"] == "A password cannot be provided for an Active User."
 
 
-@freeze_time("2025-03-07T10:00:00")
+@time_machine.travel("2025-03-07T10:00:00", tick=False)
 async def test_accept_invitation_second_account(
     user_factory: ModelFactory[User],
     accountuser_factory: ModelFactory[AccountUser],
@@ -724,3 +724,175 @@ async def test_accept_invitation_second_account(
     assert response.status_code == 200
     await db_session.refresh(account_user)
     assert account_user.status == AccountUserStatus.ACTIVE
+
+
+@time_machine.travel("2025-03-07T10:00:00Z", tick=False)
+@pytest.mark.parametrize(
+    "accountuser_status",
+    [AccountUserStatus.INVITED, AccountUserStatus.INVITATION_EXPIRED],
+)
+async def test_resend_invitation(
+    test_settings: Settings,
+    mocker: MockerFixture,
+    gcp_account: Account,
+    gcp_extension: System,
+    jwt_token_factory: JWTTokenFactory,
+    api_client: AsyncClient,
+    db_session: AsyncSession,
+    user_factory: ModelFactory[User],
+    accountuser_factory: ModelFactory[AccountUser],
+    accountuser_status: AccountUserStatus,
+):
+    user = await user_factory(
+        status=UserStatus.ACTIVE,
+    )
+    await accountuser_factory(
+        user_id=user.id,
+        account_id=gcp_account.id,
+        invitation_token="current-invitation-token",
+        invitation_token_expires_at=datetime.now(UTC) - timedelta(days=1),
+        status=accountuser_status,
+    )
+    token = jwt_token_factory(gcp_extension.id, gcp_extension.jwt_secret)
+    mocker.patch(
+        "app.routers.users.secrets.token_urlsafe",
+        return_value="new-invitation-token",
+    )
+    response = await api_client.post(
+        f"/users/{user.id}/accounts/{gcp_account.id}/resend-invitation",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["account_user"]["invitation_token"] == "new-invitation-token"
+
+    query = select(AccountUser).where(
+        AccountUser.user_id == user.id,
+        AccountUser.account_id == gcp_account.id,
+        AccountUser.status == AccountUserStatus.INVITED,
+    )
+
+    result = await db_session.execute(query)
+    account_user = result.scalars().first()
+    assert account_user is not None
+    assert account_user.invitation_token == "new-invitation-token"
+    assert account_user.invitation_token_expires_at is not None
+    assert account_user.invitation_token_expires_at == datetime.now(UTC) + timedelta(
+        days=test_settings.invitation_token_expires_days,
+    )
+
+
+async def test_resend_invitation_user_not_found(
+    gcp_jwt_token: str,
+    api_client: AsyncClient,
+):
+    response = await api_client.post(
+        "/users/FUSR-1234-5678/accounts/FACC-1234-5678/resend-invitation",
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+    )
+    assert response.status_code == 404
+
+
+async def test_resend_invitation_user_deleted(
+    gcp_jwt_token: str,
+    api_client: AsyncClient,
+    user_factory: ModelFactory[User],
+):
+    user = await user_factory(
+        status=UserStatus.DELETED,
+    )
+    response = await api_client.post(
+        f"/users/{user.id}/accounts/FACC-1234-5678/resend-invitation",
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+    )
+    assert response.status_code == 404
+
+
+async def test_resend_invitation_account_not_found(
+    gcp_jwt_token: str,
+    api_client: AsyncClient,
+    user_factory: ModelFactory[User],
+):
+    user = await user_factory()
+    response = await api_client.post(
+        f"/users/{user.id}/accounts/FACC-1234-5678/resend-invitation",
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+    )
+    assert response.status_code == 404
+
+
+async def test_resend_invitation_different_account(
+    gcp_jwt_token: str,
+    api_client: AsyncClient,
+    user_factory: ModelFactory[User],
+    account_factory: ModelFactory[Account],
+):
+    user = await user_factory()
+    account = await account_factory()
+    response = await api_client.post(
+        f"/users/{user.id}/accounts/{account.id}/resend-invitation",
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+    )
+    assert response.status_code == 404
+
+
+async def test_resend_invitation_no_account_user(
+    gcp_jwt_token: str,
+    api_client: AsyncClient,
+    gcp_account: Account,
+    user_factory: ModelFactory[User],
+):
+    user = await user_factory()
+    response = await api_client.post(
+        f"/users/{user.id}/accounts/{gcp_account.id}/resend-invitation",
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+    )
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert (
+        f"No invitation to Account with ID `{gcp_account.id}` "
+        f"was found for User with ID `{user.id}."
+    ) == detail
+
+
+async def test_resend_invitation_account_user_deleted(
+    gcp_jwt_token: str,
+    api_client: AsyncClient,
+    gcp_account: Account,
+    user_factory: ModelFactory[User],
+    accountuser_factory: ModelFactory[AccountUser],
+):
+    user = await user_factory()
+    await accountuser_factory(
+        user_id=user.id, account_id=gcp_account.id, status=AccountUserStatus.DELETED
+    )
+    response = await api_client.post(
+        f"/users/{user.id}/accounts/{gcp_account.id}/resend-invitation",
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+    )
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert (
+        f"No invitation to Account with ID `{gcp_account.id}` "
+        f"was found for User with ID `{user.id}."
+    ) == detail
+
+
+async def test_resend_invitation_account_user_active(
+    gcp_jwt_token: str,
+    api_client: AsyncClient,
+    gcp_account: Account,
+    user_factory: ModelFactory[User],
+    accountuser_factory: ModelFactory[AccountUser],
+):
+    user = await user_factory()
+    await accountuser_factory(
+        user_id=user.id, account_id=gcp_account.id, status=AccountUserStatus.ACTIVE
+    )
+    response = await api_client.post(
+        f"/users/{user.id}/accounts/{gcp_account.id}/resend-invitation",
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+    )
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert (f"User with ID `{user.id}` already belong to the Account with ID `{user.id}.") == detail

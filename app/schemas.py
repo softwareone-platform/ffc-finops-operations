@@ -184,7 +184,7 @@ class UserCreate(UserBase):
     email: Annotated[EmailStr, Field(max_length=255, examples=["lady.gaga@bennett.tony"])]
 
 
-class UserCreateResponse(IdSchema, CommonEventsSchema, UserCreate):
+class UserInvitationRead(IdSchema, CommonEventsSchema, UserCreate):
     account_user: AccountUserRead | None = None
     status: UserStatus
 

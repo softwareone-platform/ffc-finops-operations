@@ -2,7 +2,7 @@ import shlex
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from freezegun import freeze_time
+import time_machine
 from pytest_mock import MockerFixture
 from sqlalchemy.ext.asyncio import AsyncSession
 from typer import Abort
@@ -17,7 +17,7 @@ from app.enums import AccountStatus, AccountUserStatus, UserStatus
 from tests.types import ModelFactory
 
 
-@freeze_time("2025-03-07T10:00:00Z")
+@time_machine.travel("2025-03-07T10:00:00Z", tick=False)
 async def test_invite_user(
     test_settings: Settings,
     db_session: AsyncSession,
@@ -46,7 +46,7 @@ async def test_invite_user(
     )
 
 
-@freeze_time("2025-03-07T10:00:00Z")
+@time_machine.travel("2025-03-07T10:00:00Z", tick=False)
 async def test_invite_user_already_invited(
     test_settings: Settings,
     db_session: AsyncSession,
@@ -114,7 +114,7 @@ async def test_invite_user_user_disabled(
     assert "The user test@example.com is disabled." in captured.out
 
 
-@freeze_time("2025-03-07T10:00:00Z")
+@time_machine.travel("2025-03-07T10:00:00Z", tick=False)
 async def test_invite_user_non_default_account(
     test_settings: Settings,
     db_session: AsyncSession,
