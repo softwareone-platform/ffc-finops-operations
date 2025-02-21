@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import datetime
 import secrets
+import types
 import uuid
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Generic, TypeVar
 
 from pydantic import (
     BaseModel,
@@ -37,15 +38,50 @@ def from_orm[M: Base, S: BaseModel](schema_cls: type[S], db_model: M) -> S:
     #       but to do it properly we need to spend more time in learning how pydantic
     #       works and possibly do quite a lot of refactoring of our schemas
 
-    events = AuditEventsSchema(
-        created=AuditFieldSchema(at=db_model.created_at, by=db_model.created_by),
-        updated=AuditFieldSchema(at=db_model.updated_at, by=db_model.updated_by),
-        deleted=(
-            AuditFieldSchema(at=db_model.deleted_at, by=db_model.deleted_by)
-            if db_model.deleted_at is not None
-            else None
-        ),
-    )
+    # TODO: I'm not sure Annotation is the best thing to use here, we can possibly simplify
+    #       the code a lot more by using a higher level API
+
+    events_schema_cls = schema_cls.model_fields["events"].annotation
+
+    # TODO: Replace with schema_cls.model_fields["events"].apply_typevars_map
+    #       (if that's what that metohd is for)
+    if isinstance(events_schema_cls, TypeVar):
+        events_schema_cls = events_schema_cls.__bound__
+
+    if not issubclass(events_schema_cls, AuditEventsSchema):
+        raise TypeError(f"Unsupported schema type: {events_schema_cls}")
+
+    schema_values: dict[str, AuditFieldSchema | None] = {}
+
+    for field_name, field_info in events_schema_cls.model_fields.items():
+        event_field_schema_cls = field_info.annotation
+
+        if isinstance(event_field_schema_cls, types.UnionType):
+            match event_field_schema_cls.__args__:
+                case (field_schema_cls, types.NoneType) | (types.NoneType, field_schema_cls):
+                    event_field_schema_cls = field_schema_cls
+                case _:
+                    raise TypeError(f"Unsupported union type: {event_field_schema_cls.__args__}")
+
+        if isinstance(event_field_schema_cls, TypeVar):
+            event_field_schema_cls = event_field_schema_cls.__bound__
+
+        if not issubclass(event_field_schema_cls, AuditFieldSchema):
+            raise TypeError(f"Unsupported schema type: {event_field_schema_cls}")
+
+        at_value = getattr(db_model, f"{field_name}_at")
+
+        if at_value is None:
+            schema_values[field_name] = None
+            continue
+
+        # TODO: The following will fail unless we've joined the related table
+
+        by_value = getattr(db_model, f"{field_name}_by")
+
+        schema_values[field_name] = event_field_schema_cls(at=at_value, by=by_value)
+
+    events = events_schema_cls(**schema_values)
 
     fields = {
         field_name: getattr(db_model, field_name)
@@ -109,27 +145,38 @@ class ActorBase(BaseSchema):
     type: ActorType
 
 
-class ActorRead(ActorBase, IdSchema):
+class AuditFieldReference(IdSchema):
     pass
 
 
-class ActorReference(ActorBase, IdSchema):
+AuditFieldReferenceT = TypeVar("AuditFieldReferenceT", bound=AuditFieldReference)
+
+
+class ActorRead(IdSchema, ActorBase):
+    pass
+
+
+class AuditFieldSchema(BaseSchema, Generic[AuditFieldReferenceT]):
+    at: datetime.datetime
+    by: AuditFieldReferenceT | None
+
+
+class ActorReference(AuditFieldReference):
+    type: ActorType
     name: Annotated[str, Field(examples=["Barack Obama"])]
 
 
-class AuditFieldSchema(BaseSchema):
-    at: datetime.datetime
-    by: ActorReference | None
-
-
 class AuditEventsSchema(BaseSchema):
-    created: AuditFieldSchema
-    updated: AuditFieldSchema
-    deleted: AuditFieldSchema | None = None
+    created: AuditFieldSchema[ActorReference]
+    updated: AuditFieldSchema[ActorReference]
+    deleted: AuditFieldSchema[ActorReference] | None = None
 
 
-class CommonEventsSchema(BaseSchema):
-    events: AuditEventsSchema
+AuditEventsT = TypeVar("AuditEventsT", bound=AuditEventsSchema)
+
+
+class CommonEventsSchema(BaseSchema, Generic[AuditEventsT]):
+    events: AuditEventsT
 
 
 class AccountEntitlementsStats(BaseSchema):
@@ -342,7 +389,12 @@ class EntitlementUpdate(BaseSchema):
     datasource_id: str | None = None
 
 
-class EntitlementRead(IdSchema, CommonEventsSchema, EntitlementBase):
+class EntitlementsEventsSchema(AuditEventsSchema):
+    redeemed: AuditFieldSchema[OrganizationReference] | None = None
+    terminated: AuditFieldSchema[ActorReference] | None = None
+
+
+class EntitlementRead(IdSchema, CommonEventsSchema[EntitlementsEventsSchema], EntitlementBase):
     linked_datasource_id: Annotated[
         str | None, Field(max_length=255, examples=["ee7ebfaf-a222-4209-aecc-67861694a488"])
     ] = None
@@ -352,11 +404,6 @@ class EntitlementRead(IdSchema, CommonEventsSchema, EntitlementBase):
     linked_datasource_type: DatasourceType | None = None
     owner: AccountReference
     status: EntitlementStatus
-    # TODO: Add these to the common events?
-    redeemed_at: datetime.datetime | None = None
-    redeemed_by: OrganizationReference | None = None
-    terminated_at: datetime.datetime | None = None
-    terminated_by: ActorReference | None = None
 
 
 class EntitlementRedeem(BaseSchema):
