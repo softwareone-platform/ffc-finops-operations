@@ -197,12 +197,12 @@ async def test_get_employees_for_organization_success(
     operations_client: AsyncClient,
 ):
     org = await organization_factory(
-        operations_external_id=str(uuid.uuid4()),
+        linked_organization_id=str(uuid.uuid4()),
     )
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{test_settings.opt_api_base_url}/organizations/{org.operations_external_id}/employees?roles=true",
+        url=f"{test_settings.opt_api_base_url}/organizations/{org.linked_organization_id}/employees?roles=true",
         match_headers={"Secret": test_settings.opt_cluster_secret},
         json={
             "employees": [
@@ -211,7 +211,7 @@ async def test_get_employees_for_organization_success(
                     "id": "85a86112-a94f-4470-9343-f7d19101b15d",
                     "created_at": 1730390070,
                     "name": "Tim",
-                    "organization_id": org.operations_external_id,
+                    "organization_id": org.linked_organization_id,
                     "auth_user_id": "989d185b-8c95-4104-b152-36148743e52d",
                     "default_ssh_key_id": None,
                     "slack_connected": False,
@@ -226,7 +226,7 @@ async def test_get_employees_for_organization_success(
                     "id": "0ae68497-a912-4fc1-a559-6f52a99bf12b",
                     "created_at": 1736339978,
                     "name": "Test User",
-                    "organization_id": org.operations_external_id,
+                    "organization_id": org.linked_organization_id,
                     "auth_user_id": "c391517d-5c71-4195-82cf-47e7e44c06b1",
                     "default_ssh_key_id": None,
                     "slack_connected": False,
@@ -297,12 +297,12 @@ async def test_get_employees_for_organization_with_no_employees(
     httpx_mock: HTTPXMock,
 ):
     org = await organization_factory(
-        operations_external_id=str(uuid.uuid4()),
+        linked_organization_id=str(uuid.uuid4()),
     )
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{test_settings.opt_api_base_url}/organizations/{org.operations_external_id}/employees?roles=true",
+        url=f"{test_settings.opt_api_base_url}/organizations/{org.linked_organization_id}/employees?roles=true",
         match_headers={"Secret": test_settings.opt_cluster_secret},
         json={"employees": []},
     )
@@ -321,7 +321,7 @@ async def test_get_employees_for_organization_with_no_organization_id(
     httpx_mock: HTTPXMock,
 ):
     org = await organization_factory(
-        operations_external_id=None,
+        linked_organization_id=None,
     )
 
     response = await operations_client.get(
@@ -341,12 +341,12 @@ async def test_get_employees_for_organization_with_optscale_error(
     httpx_mock: HTTPXMock,
 ):
     org = await organization_factory(
-        operations_external_id=str(uuid.uuid4()),
+        linked_organization_id=str(uuid.uuid4()),
     )
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{test_settings.opt_api_base_url}/organizations/{org.operations_external_id}/employees?roles=true",
+        url=f"{test_settings.opt_api_base_url}/organizations/{org.linked_organization_id}/employees?roles=true",
         match_headers={"Secret": test_settings.opt_cluster_secret},
         status_code=500,
     )
@@ -372,7 +372,7 @@ async def test_make_employee_admin(
 ):
     user_id = str(uuid.uuid4())
     org = await organization_factory(
-        operations_external_id=str(uuid.uuid4()),
+        linked_organization_id=str(uuid.uuid4()),
     )
     auth_user_id = str(uuid.uuid4())
 
@@ -386,7 +386,7 @@ async def test_make_employee_admin(
             "id": "2c2e9705-8023-437c-b09d-8cbd49f0a682",
             "created_at": 1729156673,
             "name": "Ciccio",
-            "organization_id": org.operations_external_id,
+            "organization_id": org.linked_organization_id,
             "auth_user_id": auth_user_id,
             "default_ssh_key_id": None,
         },
@@ -404,12 +404,12 @@ async def test_make_employee_admin(
             "type_id": 2,
             "role_id": 3,
             "user_id": auth_user_id,
-            "resource_id": org.operations_external_id,
+            "resource_id": org.linked_organization_id,
         },
         match_json={
             "role_id": 3,  # Admin
             "type_id": 2,  # Organization
-            "resource_id": org.operations_external_id,
+            "resource_id": org.linked_organization_id,
         },
     )
     response = await operations_client.post(
@@ -426,7 +426,7 @@ async def test_make_user_admin_not_found(
 ):
     user_id = str(uuid.uuid4())
     org = await organization_factory(
-        operations_external_id=str(uuid.uuid4()),
+        linked_organization_id=str(uuid.uuid4()),
     )
 
     httpx_mock.add_response(
@@ -451,7 +451,7 @@ async def test_make_user_admin_error_assigning_role(
 ):
     user_id = str(uuid.uuid4())
     org = await organization_factory(
-        operations_external_id=str(uuid.uuid4()),
+        linked_organization_id=str(uuid.uuid4()),
     )
     auth_user_id = str(uuid.uuid4())
 
@@ -465,7 +465,7 @@ async def test_make_user_admin_error_assigning_role(
             "id": "2c2e9705-8023-437c-b09d-8cbd49f0a682",
             "created_at": 1729156673,
             "name": "Ciccio",
-            "organization_id": org.operations_external_id,
+            "organization_id": org.linked_organization_id,
             "auth_user_id": auth_user_id,
             "default_ssh_key_id": None,
         },
@@ -479,7 +479,7 @@ async def test_make_user_admin_error_assigning_role(
         match_json={
             "role_id": 3,  # Admin
             "type_id": 2,  # Organization
-            "resource_id": org.operations_external_id,
+            "resource_id": org.linked_organization_id,
         },
     )
     response = await operations_client.post(

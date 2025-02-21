@@ -137,16 +137,16 @@ async def test_get_datasources_for_organization_success(
     operations_client: AsyncClient,
 ):
     org = await organization_factory(
-        operations_external_id=str(uuid.uuid4()),
+        linked_organization_id=str(uuid.uuid4()),
     )
     httpx_mock.add_response(
         method="GET",
-        url=f"{test_settings.opt_api_base_url}/organizations/{org.operations_external_id}/cloud_accounts?details=true",
+        url=f"{test_settings.opt_api_base_url}/organizations/{org.linked_organization_id}/cloud_accounts?details=true",
         match_headers={"Secret": test_settings.opt_cluster_secret},
         json={
             "cloud_accounts": [
-                optscale_azure_cnr_datasource_response_data(org.operations_external_id),  # type: ignore
-                optscale_azure_tenant_datasource_response_data(org.operations_external_id),  # type: ignore
+                optscale_azure_cnr_datasource_response_data(org.linked_organization_id),  # type: ignore
+                optscale_azure_tenant_datasource_response_data(org.linked_organization_id),  # type: ignore
             ]
         },
     )
@@ -195,12 +195,12 @@ async def test_get_datasources_for_organization_with_no_datasources(
     httpx_mock: HTTPXMock,
 ):
     org = await organization_factory(
-        operations_external_id=str(uuid.uuid4()),
+        linked_organization_id=str(uuid.uuid4()),
     )
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{test_settings.opt_api_base_url}/organizations/{org.operations_external_id}/cloud_accounts?details=true",
+        url=f"{test_settings.opt_api_base_url}/organizations/{org.linked_organization_id}/cloud_accounts?details=true",
         match_headers={"Secret": test_settings.opt_cluster_secret},
         json={"cloud_accounts": []},
     )
@@ -218,7 +218,7 @@ async def test_get_datasources_for_organization_with_no_organization_id(
     operations_client: AsyncClient,
 ):
     org = await organization_factory(
-        operations_external_id=None,
+        linked_organization_id=None,
     )
 
     response = await operations_client.get(
@@ -238,12 +238,12 @@ async def test_get_datasources_for_organization_with_optscale_error(
     httpx_mock: HTTPXMock,
 ):
     org = await organization_factory(
-        operations_external_id=str(uuid.uuid4()),
+        linked_organization_id=str(uuid.uuid4()),
     )
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{test_settings.opt_api_base_url}/organizations/{org.operations_external_id}/cloud_accounts?details=true",
+        url=f"{test_settings.opt_api_base_url}/organizations/{org.linked_organization_id}/cloud_accounts?details=true",
         match_headers={"Secret": test_settings.opt_cluster_secret},
         status_code=500,
     )
@@ -268,7 +268,7 @@ async def test_get_datasource_by_id_success(
     operations_client: AsyncClient,
 ):
     org = await organization_factory(
-        operations_external_id=str(uuid.uuid4()),
+        linked_organization_id=str(uuid.uuid4()),
     )
 
     datasource_data = optscale_aws_cnr_datasource_get_by_id_response_data()  # type: ignore
@@ -314,7 +314,7 @@ async def test_get_datasource_by_id_for_missing_datasource(
     httpx_mock: HTTPXMock,
 ):
     org = await organization_factory(
-        operations_external_id=str(uuid.uuid4()),
+        linked_organization_id=str(uuid.uuid4()),
     )
 
     datasource_id = str(uuid.uuid4())
@@ -338,7 +338,7 @@ async def test_get_datasource_by_id_for_organization_with_no_organization_id(
     operations_client: AsyncClient,
 ):
     org = await organization_factory(
-        operations_external_id=None,
+        linked_organization_id=None,
     )
 
     response = await operations_client.get(

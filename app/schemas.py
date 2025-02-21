@@ -260,7 +260,7 @@ class OrganizationExpensesInfo(BaseSchema):
 class OrganizationBase(BaseSchema):
     name: Annotated[str, Field(max_length=255, examples=["Nimbus Nexus Inc."])]
     currency: Annotated[str, Field(examples=["EUR"])]
-    affiliate_external_id: Annotated[str, Field(max_length=255, examples=["AGR-9876-5534-9172"])]
+    operations_external_id: Annotated[str, Field(max_length=255, examples=["AGR-9876-5534-9172"])]
 
 
 class OrganizationCreate(OrganizationBase):
@@ -268,7 +268,7 @@ class OrganizationCreate(OrganizationBase):
 
 
 class OrganizationRead(IdSchema, CommonEventsSchema, OrganizationBase):
-    operations_external_id: Annotated[
+    linked_organization_id: Annotated[
         str | None, Field(max_length=255, examples=["ee7ebfaf-a222-4209-aecc-67861694a488"])
     ] = None
     status: OrganizationStatus
@@ -277,7 +277,7 @@ class OrganizationRead(IdSchema, CommonEventsSchema, OrganizationBase):
 
 class OrganizationUpdate(BaseSchema):
     name: str | None = None
-    affiliate_external_id: str | None = None
+    operations_external_id: str | None = None
 
 
 class OrganizationReference(IdSchema, OrganizationBase):
@@ -303,7 +303,7 @@ class EntitlementUpdate(BaseSchema):
 
 
 class EntitlementRead(IdSchema, CommonEventsSchema, EntitlementBase):
-    operations_external_id: Annotated[
+    linked_datasource_id: Annotated[
         str | None, Field(max_length=255, examples=["ee7ebfaf-a222-4209-aecc-67861694a488"])
     ] = None
     owner: AccountReference

@@ -50,7 +50,7 @@ async def redeem_entitlements(
             try:
                 datasources = await fetch_datasources_for_organization(
                     settings,
-                    organization.operations_external_id,  # type: ignore
+                    organization.linked_organization_id,  # type: ignore
                 )
             except httpx.HTTPError as e:
                 console.print(f"[red]Failed to fetch datasources: {e}[/red]")
@@ -93,7 +93,7 @@ async def redeem_entitlements(
                                 "status": EntitlementStatus.ACTIVE,
                                 "redeemed_at": datetime.now(UTC),
                                 "redeemed_by": organization,
-                                "operations_external_id": datasource["id"],
+                                "linked_datasource_id": datasource["id"],
                             },
                         )
                         console.print(

@@ -35,16 +35,16 @@ async def create_organization(
     defaults["updated_by"] = auth_context.get().get_actor()
     db_organization, created = await organization_repo.get_or_create(
         defaults=defaults,
-        affiliate_external_id=data.affiliate_external_id,
+        operations_external_id=data.operations_external_id,
     )
 
     if not created:
-        if db_organization.operations_external_id:
+        if db_organization.linked_organization_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=(
                     "An Organization with external ID "
-                    f"`{data.affiliate_external_id}` already exists."
+                    f"`{data.operations_external_id}` already exists."
                 ),
             )
         if db_organization.name != data.name:
@@ -52,7 +52,7 @@ async def create_organization(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=(
                     f"The name of a partially created Organization with "
-                    f"external ID {data.affiliate_external_id}  doesn't match the "
+                    f"external ID {data.operations_external_id}  doesn't match the "
                     f"current request: {db_organization.name}."
                 ),
             )
@@ -66,7 +66,7 @@ async def create_organization(
         db_organization = await organization_repo.update(
             db_organization.id,
             {
-                "operations_external_id": ffc_organization["id"],
+                "linked_organization_id": ffc_organization["id"],
             },
         )
         return from_orm(OrganizationRead, db_organization)
@@ -96,7 +96,7 @@ async def get_datasources_by_organization_id(
     organization: Annotated[Organization, Depends(fetch_organization_or_404)],
     optscale_client: OptscaleClient,
 ):
-    if organization.operations_external_id is None:
+    if organization.linked_organization_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
@@ -109,7 +109,7 @@ async def get_datasources_by_organization_id(
         f"Error fetching datasources for organization {organization.name}"
     ):
         response = await optscale_client.fetch_datasources_for_organization(
-            organization_id=organization.operations_external_id
+            organization_id=organization.linked_organization_id
         )
 
     datasources = response.json()["cloud_accounts"]
@@ -133,7 +133,7 @@ async def get_datasource_by_id(
     datasource_id: UUID,
     optscale_client: OptscaleClient,
 ):
-    if organization.operations_external_id is None:
+    if organization.linked_organization_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
@@ -162,7 +162,7 @@ async def get_employees_by_organization_id(
     organization: Annotated[Organization, Depends(fetch_organization_or_404)],
     optscale_client: OptscaleClient,
 ):
-    if organization.operations_external_id is None:
+    if organization.linked_organization_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
@@ -175,7 +175,7 @@ async def get_employees_by_organization_id(
         f"Error fetching employees for organization {organization.name}"
     ):
         response = await optscale_client.fetch_users_for_organization(
-            organization_id=organization.operations_external_id
+            organization_id=organization.linked_organization_id
         )
 
     users = response.json()["employees"]
@@ -209,7 +209,7 @@ async def make_organization_user_admin(
         user = response.json()
         # assign admin role of current organization to the user
         await optscale_auth_client.make_user_admin(
-            str(organization.operations_external_id),
+            str(organization.linked_organization_id),
             user["auth_user_id"],
         )
 
