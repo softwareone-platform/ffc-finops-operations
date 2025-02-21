@@ -41,10 +41,11 @@ async def test_invite_user(
     )
     assert response.status_code == 201
     data = response.json()
-    assert data["user"]["name"] == "Invited User"
-    assert data["account"]["id"] == gcp_account.id
+    assert data["name"] == "Invited User"
+    assert data["account_user"]["account"]["id"] == gcp_account.id
+    assert data["account_user"]["invitation_token"] == "invitation-token"
 
-    user = await db_session.get(User, data["user"]["id"])
+    user = await db_session.get(User, data["id"])
     assert user is not None
     assert user.email == "invited@user.ops"
     assert user.status == UserStatus.DRAFT
@@ -98,10 +99,10 @@ async def test_invite_user_to_second_account(
     )
     assert response.status_code == 201
     data = response.json()
-    assert data["user"]["name"] == "Invited User"
-    assert data["account"]["id"] == gcp_account.id
+    assert data["name"] == "Invited User"
+    assert data["account_user"]["account"]["id"] == gcp_account.id
 
-    assert data["user"]["id"] == user.id
+    assert data["id"] == user.id
 
     query = select(AccountUser).where(
         AccountUser.user_id == user.id,
@@ -149,10 +150,10 @@ async def test_invite_by_operations_account(
     )
     assert response.status_code == 201
     data = response.json()
-    assert data["user"]["name"] == "Invited User"
-    assert data["account"]["id"] == gcp_account.id
+    assert data["name"] == "Invited User"
+    assert data["account_user"]["account"]["id"] == gcp_account.id
 
-    assert data["user"]["id"] == user.id
+    assert data["id"] == user.id
 
     query = select(AccountUser).where(
         AccountUser.user_id == user.id,

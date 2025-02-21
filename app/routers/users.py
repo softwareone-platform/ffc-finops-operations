@@ -18,6 +18,7 @@ from app.schemas import (
     AccountUserCreate,
     AccountUserRead,
     UserAcceptInvitation,
+    UserCreateResponse,
     UserRead,
     UserResetPassword,
     UserUpdate,
@@ -48,7 +49,7 @@ async def get_users():  # pragma: no cover
 @router.post(
     "",
     dependencies=[Depends(authentication_required)],
-    response_model=AccountUserRead,
+    response_model=UserCreateResponse,
     status_code=status.HTTP_201_CREATED,
 )
 async def invite_user(
@@ -134,7 +135,10 @@ async def invite_user(
             user = await user_handler.create(user)
         accountuser_handler = AccountUserHandler(tx_session)
         account_user = await accountuser_handler.create(account_user)
-        return from_orm(AccountUserRead, account_user)
+
+        response = from_orm(UserCreateResponse, user)
+        response.account_user = from_orm(AccountUserRead, account_user)
+        return response
 
 
 @router.put(

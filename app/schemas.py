@@ -184,7 +184,8 @@ class UserCreate(UserBase):
     email: Annotated[EmailStr, Field(max_length=255, examples=["lady.gaga@bennett.tony"])]
 
 
-class UserCreateRead(IdSchema, CommonEventsSchema, UserCreate):
+class UserCreateResponse(IdSchema, CommonEventsSchema, UserCreate):
+    account_user: AccountUserRead | None = None
     status: UserStatus
 
 
@@ -222,7 +223,6 @@ class AccountUserCreate(BaseSchema):
 
 class AccountUserRead(IdSchema, CommonEventsSchema, AccountUserBase):
     account: AccountReference
-    user: UserReference
     invitation_token: str
     invitation_token_expires_at: datetime.datetime
     joined_at: datetime.datetime | None = None
