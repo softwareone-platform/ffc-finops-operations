@@ -30,6 +30,11 @@ from tests.types import ModelFactory
 from tests.utils import SQLAlchemyCapturer
 
 
+def pytest_sessionstart(session: pytest.Session) -> None:
+    # See https://github.com/pydantic/pydantic/discussions/9343
+    from app.schemas import AccountUserRead  # noqa: F401
+
+
 def pytest_collection_modifyitems(items):
     pytest_asyncio_tests = (item for item in items if is_async_test(item))
     session_scope_marker = pytest.mark.asyncio(loop_scope="session")
