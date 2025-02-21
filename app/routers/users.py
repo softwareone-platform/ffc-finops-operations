@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi_pagination.limit_offset import LimitOffsetPage
 
-from app.auth.auth import check_operations_account, get_authentication_context
+from app.auth.auth import authentication_required, check_operations_account
 from app.conf import AppSettings
 from app.db import DBEngine, DBSession, get_tx_db_session
 from app.db.handlers import AccountHandler, AccountUserHandler, NotFoundError, UserHandler
@@ -38,7 +38,7 @@ router = APIRouter()
 
 @router.get(
     "",
-    dependencies=[Depends(get_authentication_context)],
+    dependencies=[Depends(authentication_required)],
     response_model=LimitOffsetPage[UserRead],
 )
 async def get_users():  # pragma: no cover
@@ -47,7 +47,7 @@ async def get_users():  # pragma: no cover
 
 @router.post(
     "",
-    dependencies=[Depends(get_authentication_context)],
+    dependencies=[Depends(authentication_required)],
     response_model=AccountUserRead,
     status_code=status.HTTP_201_CREATED,
 )
@@ -63,13 +63,13 @@ async def invite_user(
     accountuser_handler = AccountUserHandler(db_session)
     account = None
 
-    if auth_context.account.type == AccountType.AFFILIATE:
+    if auth_context.account.type == AccountType.AFFILIATE:  # type: ignore
         if data.account:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Affiliate accounts can only invite users to the same Account.",
             )
-        account = auth_context.account
+        account = auth_context.account  # type: ignore
     else:
         if not data.account:
             raise HTTPException(
@@ -139,7 +139,7 @@ async def invite_user(
 
 @router.put(
     "/{id}",
-    dependencies=[Depends(get_authentication_context)],
+    dependencies=[Depends(authentication_required)],
     response_model=UserRead,
 )
 async def update_user(id: str, data: UserUpdate):  # pragma: no cover
@@ -157,7 +157,7 @@ async def delete_user(id: str):  # pragma: no cover
 
 @router.get(
     "/{id}/accounts",
-    dependencies=[Depends(get_authentication_context)],
+    dependencies=[Depends(authentication_required)],
     response_model=list[AccountUserRead],
 )
 async def get_user_accounts(id: str):  # pragma: no cover
@@ -166,7 +166,7 @@ async def get_user_accounts(id: str):  # pragma: no cover
 
 @router.post(
     "/{id}/disable",
-    dependencies=[Depends(get_authentication_context)],
+    dependencies=[Depends(authentication_required)],
     response_model=UserRead,
 )
 async def disable_user(id: str):  # pragma: no cover
@@ -175,7 +175,7 @@ async def disable_user(id: str):  # pragma: no cover
 
 @router.post(
     "/{id}/enable",
-    dependencies=[Depends(get_authentication_context)],
+    dependencies=[Depends(authentication_required)],
     response_model=UserRead,
 )
 async def enable_user(id: str):  # pragma: no cover
@@ -184,7 +184,7 @@ async def enable_user(id: str):  # pragma: no cover
 
 @router.post(
     "/{id}/resend-invitation",
-    dependencies=[Depends(get_authentication_context)],
+    dependencies=[Depends(authentication_required)],
     response_model=UserRead,
 )
 async def resend_user_invitation(id: str):  # pragma: no cover
