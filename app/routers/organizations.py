@@ -2,7 +2,6 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi_pagination.limit_offset import LimitOffsetPage
 
 from app.api_clients import APIModifierClient, OptscaleAuthClient, OptscaleClient
 from app.auth.auth import check_operations_account
@@ -11,7 +10,7 @@ from app.db.handlers import NotFoundError
 from app.db.models import Organization
 from app.dependencies import OrganizationId, OrganizationRepository
 from app.enums import DatasourceType
-from app.pagination import paginate
+from app.pagination import LimitOffsetPage, paginate
 from app.schemas import DatasourceRead, EmployeeRead, OrganizationCreate, OrganizationRead, from_orm
 from app.utils import wrap_http_error_in_502
 

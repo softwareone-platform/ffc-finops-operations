@@ -269,6 +269,18 @@ async def test_get_all_entitlements_multiple_pages(
             owner=gcp_account,
         )
 
+    count_response = await api_client.get(
+        "/entitlements",
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+        params={"limit": 0},
+    )
+    count_response_data = count_response.json()
+    assert count_response.status_code == 200
+    assert count_response_data["total"] == 10
+    assert count_response_data["items"] == []
+    assert count_response_data["limit"] == 0
+    assert count_response_data["offset"] == 0
+
     first_page_response = await api_client.get(
         "/entitlements",
         headers={"Authorization": f"Bearer {gcp_jwt_token}"},

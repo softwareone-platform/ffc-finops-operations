@@ -1,14 +1,13 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi_pagination.limit_offset import LimitOffsetPage
 from sqlalchemy import ColumnExpressionArgument
 
 from app.db.handlers import ConstraintViolationError, NotFoundError
 from app.db.models import System
 from app.dependencies import AccountRepository, CurrentAuthContext, SystemId, SystemRepository
 from app.enums import AccountType, SystemStatus
-from app.pagination import paginate
+from app.pagination import LimitOffsetPage, paginate
 from app.schemas import SystemCreate, SystemCreateResponse, SystemRead, SystemUpdate, from_orm
 from app.utils import wrap_exc_in_http_response
 
