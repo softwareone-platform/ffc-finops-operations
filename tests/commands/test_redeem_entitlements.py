@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
 import pytest
-from freezegun import freeze_time
+import time_machine
 from httpx import HTTPStatusError, ReadTimeout
 from pytest_httpx import HTTPXMock
 from pytest_mock import MockerFixture
@@ -15,7 +15,7 @@ from app.db.models import Entitlement, Organization
 from app.enums import DatasourceType, EntitlementStatus
 
 
-@freeze_time("2025-03-07T10:00:00Z")
+@time_machine.travel("2025-03-07T10:00:00Z", tick=False)
 async def test_redeeem_entitlements(
     mocker: MockerFixture,
     test_settings: Settings,

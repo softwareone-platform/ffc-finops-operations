@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 import jwt
 import pytest
-from freezegun import freeze_time
+import time_machine
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,7 +13,7 @@ from app.enums import AccountStatus, AccountUserStatus, UserStatus
 from tests.types import ModelFactory
 
 
-@freeze_time("2024-01-01T00:00:00Z")
+@time_machine.travel("2024-01-01T00:00:00Z", tick=False)
 async def test_get_tokens_from_credentials(
     db_session: AsyncSession,
     user_factory: ModelFactory[User],
@@ -163,7 +163,7 @@ async def test_get_tokens_from_credentials_invalid_user(
     assert response.status_code == 401
 
 
-@freeze_time("2024-01-01T00:00:00Z")
+@time_machine.travel("2024-01-01T00:00:00Z", tick=False)
 async def test_get_tokens_from_credentials_no_account_user(
     db_session: AsyncSession,
     user_factory: ModelFactory[User],
