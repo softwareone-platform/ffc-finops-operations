@@ -454,6 +454,13 @@ async def test_terminate_entitlement_success(
     assert request_start_dt < entitlement_gcp.terminated_at < request_end_dt
     assert entitlement_gcp.terminated_by_id == gcp_extension.id
 
+    assert (
+        datetime.fromisoformat(data["events"]["terminated"]["at"]) == entitlement_gcp.terminated_at
+    )
+    assert data["events"]["terminated"]["by"]["id"] == gcp_extension.id
+    assert data["events"]["terminated"]["by"]["type"] == gcp_extension.type._value_
+    assert data["events"]["terminated"]["by"]["name"] == gcp_extension.name
+
 
 async def test_terminate_new_entitlement(
     entitlement_gcp: Entitlement,
