@@ -51,4 +51,4 @@ UserId = Annotated[str, Path(pattern=models.User.build_id_regex())]
 # Auth context
 #######
 
-CurrentAuthContext = Annotated[AuthenticationContext, Depends(get_authentication_context)]
+CurrentAuthContext = Annotated[AuthenticationContext | None, Depends(get_authentication_context)]

@@ -5,7 +5,7 @@ import fastapi_pagination
 from fastapi import Depends, FastAPI
 from fastapi.routing import APIRoute
 
-from app.auth.auth import get_authentication_context
+from app.auth.auth import authentication_required
 from app.conf import get_settings
 from app.db import verify_db_connection
 from app.routers import accounts, auth, employees, entitlements, organizations, systems, users
@@ -77,25 +77,25 @@ def setup_app():
     app.include_router(
         entitlements.router,
         prefix="/entitlements",
-        dependencies=[Depends(get_authentication_context)],
+        dependencies=[Depends(authentication_required)],
         tags=["Billing"],
     )
     app.include_router(
         organizations.router,
         prefix="/organizations",
-        dependencies=[Depends(get_authentication_context)],
+        dependencies=[Depends(authentication_required)],
         tags=["FinOps for Cloud Provisioning"],
     )
     app.include_router(
         employees.router,
         prefix="/employees",
-        dependencies=[Depends(get_authentication_context)],
+        dependencies=[Depends(authentication_required)],
         tags=["FinOps for Cloud Provisioning"],
     )
     app.include_router(
         accounts.router,
         prefix="/accounts",
-        dependencies=[Depends(get_authentication_context)],
+        dependencies=[Depends(authentication_required)],
         tags=["Portal Administration"],
     )
     app.include_router(
@@ -106,7 +106,7 @@ def setup_app():
     app.include_router(
         systems.router,
         prefix="/systems",
-        dependencies=[Depends(get_authentication_context)],
+        dependencies=[Depends(authentication_required)],
         tags=["Portal Settings"],
     )
     app.include_router(auth.router, prefix="/auth", tags=["Auth"])

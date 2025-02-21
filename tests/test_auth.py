@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.auth import (
     JWTBearer,
     JWTCredentials,
+    authentication_required,
     check_operations_account,
     get_authentication_context,
 )
@@ -43,10 +44,8 @@ async def test_jwt_bearer_no_token(mocker: MockerFixture):
     bearer = JWTBearer()
     request = mocker.Mock()
     request.headers = {}
-    with pytest.raises(HTTPException) as exc_info:
-        await bearer(request)
-    assert exc_info.value.status_code == 401
-    assert exc_info.value.detail == "Unauthorized."
+    credentials = await bearer(request)
+    assert credentials is None
 
 
 async def test_get_authentication_context_system(
@@ -61,6 +60,7 @@ async def test_get_authentication_context_system(
     request = mocker.Mock()
     request.headers = {"Authorization": f"Bearer {gcp_jwt_token}"}
     credentials = await bearer(request)
+    assert credentials is not None
 
     with pytest.raises(LookupError):
         auth_context.get()
@@ -102,6 +102,7 @@ async def test_get_authentication_context_system_not_active(
     request = mocker.Mock()
     request.headers = {"Authorization": f"Bearer {jwt_token}"}
     credentials = await bearer(request)
+    assert credentials is not None
 
     with pytest.raises(HTTPException) as exc_info:
         async with asynccontextmanager(get_authentication_context)(
@@ -130,6 +131,7 @@ async def test_get_authentication_context_user(
     request = mocker.Mock()
     request.headers = {"Authorization": f"Bearer {jwt_token}"}
     credentials = await bearer(request)
+    assert credentials is not None
 
     with pytest.raises(LookupError):
         auth_context.get()
@@ -169,6 +171,7 @@ async def test_get_authentication_context_user_invalid_status(
     request = mocker.Mock()
     request.headers = {"Authorization": f"Bearer {jwt_token}"}
     credentials = await bearer(request)
+    assert credentials is not None
 
     with pytest.raises(HTTPException) as exc_info:
         async with asynccontextmanager(get_authentication_context)(
@@ -206,6 +209,7 @@ async def test_get_authentication_context_user_invalid_accountuser_status(
     request = mocker.Mock()
     request.headers = {"Authorization": f"Bearer {jwt_token}"}
     credentials = await bearer(request)
+    assert credentials is not None
 
     with pytest.raises(HTTPException) as exc_info:
         async with asynccontextmanager(get_authentication_context)(
@@ -236,6 +240,7 @@ async def test_get_authentication_context_user_account_does_not_exist(
     request = mocker.Mock()
     request.headers = {"Authorization": f"Bearer {jwt_token}"}
     credentials = await bearer(request)
+    assert credentials is not None
 
     with pytest.raises(HTTPException) as exc_info:
         async with asynccontextmanager(get_authentication_context)(
@@ -280,3 +285,63 @@ def test_check_operations_account(
     else:
         result = check_operations_account(context)
         assert result is None
+
+
+def test_check_operations_account_no_auth_context():
+    with pytest.raises(HTTPException) as exc_info:
+        check_operations_account(None)
+
+    assert exc_info.value.status_code == 401
+
+
+async def test_authentication_required(
+    mocker: MockerFixture,
+    gcp_jwt_token: str,
+    gcp_extension: System,
+    db_session: AsyncSession,
+    assert_num_queries: Callable[[int], AbstractContextManager[None]],
+    test_settings: Settings,
+):
+    bearer = JWTBearer()
+    request = mocker.Mock()
+    request.headers = {"Authorization": f"Bearer {gcp_jwt_token}"}
+    credentials = await bearer(request)
+    assert credentials is not None
+
+    with pytest.raises(LookupError):
+        auth_context.get()
+
+    with assert_num_queries(1):
+        async with asynccontextmanager(authentication_required)(
+            test_settings, db_session, credentials
+        ):
+            assert auth_context.get() is not None
+
+    with pytest.raises(LookupError):
+        auth_context.get()
+
+
+async def test_authentication_required_not_authenticated(
+    mocker: MockerFixture,
+    db_session: AsyncSession,
+    assert_num_queries: Callable[[int], AbstractContextManager[None]],
+    test_settings: Settings,
+):
+    bearer = JWTBearer()
+    request = mocker.Mock()
+    request.headers = {}
+    credentials = await bearer(request)
+    assert credentials is None
+
+    with pytest.raises(LookupError):
+        auth_context.get()
+
+    with pytest.raises(HTTPException) as exc_info:
+        async with asynccontextmanager(authentication_required)(
+            test_settings, db_session, credentials
+        ):
+            pass
+    assert exc_info.value.status_code == 401
+
+    with pytest.raises(LookupError):
+        auth_context.get()
