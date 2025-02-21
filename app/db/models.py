@@ -13,6 +13,7 @@ from app.enums import (
     AccountType,
     AccountUserStatus,
     ActorType,
+    DatasourceType,
     EntitlementStatus,
     OrganizationStatus,
     SystemStatus,
@@ -243,9 +244,14 @@ class Entitlement(Base, HumanReadablePKMixin, AuditableMixin):
     PK_NUM_LENGTH = 12
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    linked_datasource_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     affiliate_external_id: Mapped[str] = mapped_column(String(255), nullable=False)
     datasource_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    linked_datasource_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    linked_datasource_type: Mapped[DatasourceType | None] = mapped_column(
+        Enum(DatasourceType, values_callable=lambda obj: [e.value for e in obj]),
+        nullable=True,
+    )
+    linked_datasource_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     owner_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), nullable=False)
     owner: Mapped[Account] = relationship(foreign_keys=[owner_id])
     status: Mapped[EntitlementStatus] = mapped_column(

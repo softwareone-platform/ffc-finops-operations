@@ -12,7 +12,7 @@ from app.cli import app
 from app.commands.redeem_entitlements import fetch_datasources_for_organization, redeem_entitlements
 from app.conf import Settings
 from app.db.models import Entitlement, Organization
-from app.enums import EntitlementStatus
+from app.enums import DatasourceType, EntitlementStatus
 
 
 @freeze_time("2025-03-07T10:00:00Z")
@@ -26,21 +26,48 @@ async def test_redeeem_entitlements(
     mocker.patch(
         "app.commands.redeem_entitlements.fetch_datasources_for_organization",
         return_value=[
-            {"id": "ds1", "type": "aws_cnr", "account_id": entitlement_aws.datasource_id},
-            {"id": "ds2", "type": "azure_cnr", "account_id": "azure-account-id"},
-            {"id": "ds3", "type": "gcp_cnr", "account_id": "gcp-account-id"},
-            {"id": "ds4", "type": "aws_tenant", "account_id": "aws-tentant-id"},
-            {"id": "ds5", "type": "azure_tenant", "account_id": "azure-tentant-id"},
-            {"id": "ds", "type": "gcp_tenant", "account_id": "gcp-tentant-id"},
+            {
+                "id": "ds1",
+                "name": "aws ds",
+                "type": "aws_cnr",
+                "account_id": entitlement_aws.datasource_id,
+            },
+            {
+                "id": "ds2",
+                "name": "azure ds",
+                "type": "azure_cnr",
+                "account_id": "azure-account-id",
+            },
+            {"id": "ds3", "name": "gcp ds", "type": "gcp_cnr", "account_id": "gcp-account-id"},
+            {
+                "id": "ds4",
+                "name": "aws tenant ds",
+                "type": "aws_tenant",
+                "account_id": "aws-tentant-id",
+            },
+            {
+                "id": "ds5",
+                "name": "azure tenant ds",
+                "type": "azure_tenant",
+                "account_id": "azure-tentant-id",
+            },
+            {
+                "id": "ds",
+                "name": "gcp tenant ds",
+                "type": "gcp_tenant",
+                "account_id": "gcp-tentant-id",
+            },
         ],
     )
 
     await redeem_entitlements(test_settings)
 
     await db_session.refresh(entitlement_aws)
+    assert entitlement_aws.linked_datasource_id == "ds1"
+    assert entitlement_aws.linked_datasource_name == "aws ds"
+    assert entitlement_aws.linked_datasource_type == DatasourceType.AWS_CNR
     assert entitlement_aws.status == EntitlementStatus.ACTIVE
     assert entitlement_aws.redeemed_by == apple_inc_organization
-    assert entitlement_aws.linked_datasource_id == "ds1"
     assert entitlement_aws.redeemed_at is not None
     assert entitlement_aws.redeemed_at == datetime.now(UTC)
 
