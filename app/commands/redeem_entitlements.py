@@ -94,6 +94,8 @@ async def redeem_entitlements(
                                 "redeemed_at": datetime.now(UTC),
                                 "redeemed_by": organization,
                                 "linked_datasource_id": datasource["id"],
+                                "linked_datasource_type": datasource["type"],
+                                "linked_datasource_name": datasource["name"],
                             },
                         )
                         console.print(

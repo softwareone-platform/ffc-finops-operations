@@ -311,6 +311,10 @@ class EntitlementRead(IdSchema, CommonEventsSchema, EntitlementBase):
     linked_datasource_id: Annotated[
         str | None, Field(max_length=255, examples=["ee7ebfaf-a222-4209-aecc-67861694a488"])
     ] = None
+    linked_datasource_name: Annotated[
+        str | None, Field(max_length=255, examples=["Azure Dev Subscription"])
+    ] = None
+    linked_datasource_type: DatasourceType | None = None
     owner: AccountReference
     status: EntitlementStatus
     redeemed_at: datetime.datetime | None = None
