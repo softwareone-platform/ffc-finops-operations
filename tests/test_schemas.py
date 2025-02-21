@@ -3,19 +3,10 @@ from datetime import UTC, datetime
 
 from app.db.models import Account, Actor, Entitlement, Organization, System
 from app.enums import AccountType, ActorType, EntitlementStatus, OrganizationStatus, SystemStatus
-from app.schemas import (
-    ActorRead,
-    EntitlementCreate,
-    EntitlementRead,
-    EntitlementUpdate,
-    OrganizationCreate,
-    OrganizationRead,
-    OrganizationUpdate,
-    SystemCreate,
-    SystemRead,
-    from_orm,
-    to_orm,
-)
+from app.schemas.core import ActorRead, from_orm, to_orm
+from app.schemas.entitlements import EntitlementCreate, EntitlementRead, EntitlementUpdate
+from app.schemas.organizations import OrganizationCreate, OrganizationRead, OrganizationUpdate
+from app.schemas.systems import SystemCreate, SystemRead
 
 
 def test_actor_read_from_orm():

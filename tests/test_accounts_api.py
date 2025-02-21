@@ -18,7 +18,7 @@ from app.routers.accounts import (
     validate_account_type_and_required_conditions,
     validate_required_conditions_before_update,
 )
-from app.schemas import AccountCreate
+from app.schemas.accounts import AccountCreate
 from tests.types import JWTTokenFactory, ModelFactory
 
 

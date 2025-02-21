@@ -8,7 +8,8 @@ from app.db.models import System
 from app.dependencies import AccountRepository, CurrentAuthContext, SystemId, SystemRepository
 from app.enums import AccountType, SystemStatus
 from app.pagination import LimitOffsetPage, paginate
-from app.schemas import SystemCreate, SystemCreateResponse, SystemRead, SystemUpdate, from_orm
+from app.schemas.core import from_orm
+from app.schemas.systems import SystemCreate, SystemCreateResponse, SystemRead, SystemUpdate
 from app.utils import wrap_exc_in_http_response
 
 # ============

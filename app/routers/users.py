@@ -21,7 +21,8 @@ from app.dependencies import (
 from app.enums import AccountStatus, AccountType, AccountUserStatus, UserStatus
 from app.hasher import pbkdf2_sha256
 from app.pagination import LimitOffsetPage
-from app.schemas import (
+from app.schemas.core import from_orm
+from app.schemas.users import (
     AccountUserCreate,
     AccountUserRead,
     UserAcceptInvitation,
@@ -29,7 +30,6 @@ from app.schemas import (
     UserRead,
     UserResetPassword,
     UserUpdate,
-    from_orm,
 )
 from app.utils import wrap_exc_in_http_response
 

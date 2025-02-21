@@ -13,7 +13,8 @@ from app.dependencies import (
 )
 from app.enums import AccountStatus, AccountType, EntitlementStatus
 from app.pagination import LimitOffsetPage, paginate
-from app.schemas import EntitlementCreate, EntitlementRead, EntitlementRedeem, from_orm, to_orm
+from app.schemas.core import from_orm, to_orm
+from app.schemas.entitlements import EntitlementCreate, EntitlementRead, EntitlementRedeem
 
 # ============
 # Dependencies
