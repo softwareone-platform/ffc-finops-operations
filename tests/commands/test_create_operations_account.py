@@ -19,7 +19,7 @@ async def test_create_op_account(
         "ACC-1234-5678",
     )
     captured = capsys.readouterr()
-    assert "The Operations Account has been created" in captured.out
+    assert "The Operations Account has been created" in captured.out.replace("\n", "")
     account_handler = AccountHandler(db_session)
     assert (
         await account_handler.count(
@@ -48,7 +48,7 @@ async def test_create_op_account_exist(
         "ACC-1234-5678",
     )
     captured = capsys.readouterr()
-    assert "The Operations Account already exist" in captured.out
+    assert "The Operations Account already exist" in captured.out.replace("\n", "")
     assert (
         await account_handler.count(
             Account.type == AccountType.OPERATIONS, Account.status == AccountStatus.ACTIVE
