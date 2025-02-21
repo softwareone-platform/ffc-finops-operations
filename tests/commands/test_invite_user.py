@@ -27,7 +27,7 @@ async def test_invite_user(
     await invite_user(test_settings, "test@example.com", "Test User", None)
 
     captured = capsys.readouterr()
-    assert "invited successfully" in captured.out
+    assert "invited successfully" in captured.out.replace("\n", "")
 
     user_handler = UserHandler(db_session)
     user = await user_handler.first(
@@ -111,7 +111,7 @@ async def test_invite_user_user_disabled(
 
     captured = capsys.readouterr()
 
-    assert "The user test@example.com is disabled." in captured.out
+    assert "The user test@example.com is disabled." in captured.out.replace("\n", "")
 
 
 @time_machine.travel("2025-03-07T10:00:00Z", tick=False)
@@ -127,7 +127,7 @@ async def test_invite_user_non_default_account(
 
     captured = capsys.readouterr()
 
-    assert "invited successfully" in captured.out
+    assert "invited successfully" in captured.out.replace("\n", "")
 
     user_handler = UserHandler(db_session)
     user = await user_handler.first(
@@ -160,7 +160,8 @@ async def test_invite_user_non_default_account_not_active(
     with pytest.raises(Abort):
         await invite_user(test_settings, "test@example.com", "Test User", account.id)
     captured = capsys.readouterr()
-    assert f"No Active Account with ID {account.id} has been found." in captured.out
+    stderr_output = captured.out.replace("\n", "")
+    assert f"No Active Account with ID {account.id} has been found." in stderr_output
 
 
 async def test_invite_user_no_operations_account(
@@ -170,14 +171,14 @@ async def test_invite_user_no_operations_account(
     with pytest.raises(Abort):
         await invite_user(test_settings, "test@example.com", "Test User", None)
     captured = capsys.readouterr()
-    assert "No Active Operations Account has been found." in captured.out
+    assert "No Active Operations Account has been found." in captured.out.replace("\n", "")
 
 
 def test_invite_user_invalid_email():
     runner = CliRunner()
     result = runner.invoke(app, shlex.split("invite-user invalid-email UserName"))
     assert result.exit_code != 0
-    assert "Invalid value for 'EMAIL'" in result.stdout
+    assert "Invalid value for 'EMAIL'" in result.stdout.replace("\n", "")
 
 
 def test_invite_user_command(

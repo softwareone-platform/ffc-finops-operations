@@ -6,7 +6,14 @@ import uuid
 from decimal import Decimal
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    SecretStr,
+    field_validator,
+)
 
 from app.db.models import Base
 from app.enums import (
@@ -22,8 +29,30 @@ from app.enums import (
 )
 
 
-def from_orm[M: Base, S: BaseModel](cls: type[S], db_model: M) -> S:
-    return cls.model_validate(db_model)
+def from_orm[M: Base, S: BaseModel](schema_cls: type[S], db_model: M) -> S:
+    if not issubclass(schema_cls, CommonEventsSchema):
+        return schema_cls.model_validate(db_model)
+
+    # NOTE: This is a hack, ideally this behaviour should be handled by the models,
+    #       but to do it properly we need to spend more time in learning how pydantic
+    #       works and possibly do quite a lot of refactoring of our schemas
+
+    events = AuditEventsSchema(
+        created=AuditFieldSchema(at=db_model.created_at, by=db_model.created_by),
+        updated=AuditFieldSchema(at=db_model.updated_at, by=db_model.updated_by),
+        deleted=(
+            AuditFieldSchema(at=db_model.deleted_at, by=db_model.deleted_by)
+            if db_model.deleted_at is not None
+            else None
+        ),
+    )
+
+    fields = {
+        field_name: getattr(db_model, field_name)
+        for field_name, field_info in schema_cls.model_fields.items()
+        if hasattr(db_model, field_name)
+    }
+    return schema_cls(**fields, events=events)
 
 
 def to_orm[M: Base, S: BaseModel](schema: S, model_cls: type[M]) -> M:
@@ -84,18 +113,23 @@ class ActorRead(ActorBase, IdSchema):
     pass
 
 
-class ActorReference(IdSchema):
-    type: ActorType
+class ActorReference(ActorBase, IdSchema):
     name: Annotated[str, Field(examples=["Barack Obama"])]
 
 
+class AuditFieldSchema(BaseSchema):
+    at: datetime.datetime
+    by: ActorReference | None
+
+
+class AuditEventsSchema(BaseSchema):
+    created: AuditFieldSchema
+    updated: AuditFieldSchema
+    deleted: AuditFieldSchema | None = None
+
+
 class CommonEventsSchema(BaseSchema):
-    created_at: datetime.datetime
-    updated_at: datetime.datetime
-    deleted_at: datetime.datetime | None = None
-    created_by: ActorReference | None = None
-    updated_by: ActorReference | None = None
-    deleted_by: ActorReference | None = None
+    events: AuditEventsSchema
 
 
 class AccountEntitlementsStats(BaseSchema):
@@ -191,6 +225,7 @@ class UserInvitationRead(IdSchema, CommonEventsSchema, UserCreate):
 
 class UserRead(IdSchema, CommonEventsSchema, UserCreate):
     status: UserStatus
+    # TODO: Are these events too?
     last_login_at: datetime.datetime | None
     last_used_account: AccountReference | None
 
@@ -317,6 +352,7 @@ class EntitlementRead(IdSchema, CommonEventsSchema, EntitlementBase):
     linked_datasource_type: DatasourceType | None = None
     owner: AccountReference
     status: EntitlementStatus
+    # TODO: Add these to the common events?
     redeemed_at: datetime.datetime | None = None
     redeemed_by: OrganizationReference | None = None
     terminated_at: datetime.datetime | None = None
@@ -330,6 +366,7 @@ class EntitlementRedeem(BaseSchema):
 class EmployeeBase(BaseSchema):
     email: Annotated[str, Field(max_length=255, examples=["harry.potter@gryffindor.edu"])]
     display_name: Annotated[str, Field(max_length=255, examples=["Harry James Potter"])]
+    # TODO: Common audit events too?
     created_at: datetime.datetime | None = None
     last_login: datetime.datetime | None = None
     roles_count: int | None = None

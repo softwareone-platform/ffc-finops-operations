@@ -71,12 +71,12 @@ def test_system_read_from_orm(gcp_extension: System):
     assert system_read.name == system.name
     assert system_read.external_id == system.external_id
     assert system_read.description == system.description
-    assert system_read.created_at == system.created_at
-    assert system_read.updated_at == system.updated_at
-    assert system_read.created_by is not None
-    assert system_read.created_by.id == gcp_extension.id
-    assert system_read.updated_by is not None
-    assert system_read.updated_by.id == gcp_extension.id
+    assert system_read.events.created.at == system.created_at
+    assert system_read.events.updated.at == system.updated_at
+    assert system_read.events.created.by is not None
+    assert system_read.events.created.by.id == gcp_extension.id
+    assert system_read.events.updated.by is not None
+    assert system_read.events.updated.by.id == gcp_extension.id
     assert system_read.owner.id == system.owner.id
 
 
@@ -118,16 +118,16 @@ def test_entitlement_read_from_orm(gcp_extension: System, affiliate_account: Acc
     assert entitlement_read.affiliate_external_id == entitlement.affiliate_external_id
     assert entitlement_read.datasource_id == entitlement.datasource_id
     assert entitlement_read.status == entitlement.status
-    assert entitlement_read.created_at == entitlement.created_at
-    assert entitlement_read.updated_at == entitlement.updated_at
-    assert entitlement_read.created_by is not None
-    assert entitlement_read.created_by.id == gcp_extension.id
-    assert entitlement_read.created_by.type == gcp_extension.type
-    assert entitlement_read.created_by.name == gcp_extension.name
-    assert entitlement_read.updated_by is not None
-    assert entitlement_read.updated_by.id == gcp_extension.id
-    assert entitlement_read.updated_by.type == gcp_extension.type
-    assert entitlement_read.updated_by.name == gcp_extension.name
+    assert entitlement_read.events.created.at == entitlement.created_at
+    assert entitlement_read.events.updated.at == entitlement.updated_at
+    assert entitlement_read.events.created.by is not None
+    assert entitlement_read.events.created.by.id == gcp_extension.id
+    assert entitlement_read.events.created.by.type == gcp_extension.type
+    assert entitlement_read.events.created.by.name == gcp_extension.name
+    assert entitlement_read.events.updated.by is not None
+    assert entitlement_read.events.updated.by.id == gcp_extension.id
+    assert entitlement_read.events.updated.by.type == gcp_extension.type
+    assert entitlement_read.events.updated.by.name == gcp_extension.name
 
 
 def test_entitlement_update_partial():
@@ -183,16 +183,16 @@ def test_organization_read_from_orm(ffc_extension: System):
     assert org_read.operations_external_id == organization.operations_external_id
     assert org_read.linked_organization_id == organization.linked_organization_id
     assert org_read.status == organization.status
-    assert org_read.created_at == organization.created_at
-    assert org_read.updated_at == organization.updated_at
-    assert org_read.created_by is not None
-    assert org_read.created_by.id == ffc_extension.id
-    assert org_read.created_by.type == ffc_extension.type
-    assert org_read.created_by.name == ffc_extension.name
-    assert org_read.updated_by is not None
-    assert org_read.updated_by.id == ffc_extension.id
-    assert org_read.updated_by.type == ffc_extension.type
-    assert org_read.updated_by.name == ffc_extension.name
+    assert org_read.events.created.at == organization.created_at
+    assert org_read.events.updated.at == organization.updated_at
+    assert org_read.events.created.by is not None
+    assert org_read.events.created.by.id == ffc_extension.id
+    assert org_read.events.created.by.type == ffc_extension.type
+    assert org_read.events.created.by.name == ffc_extension.name
+    assert org_read.events.updated.by is not None
+    assert org_read.events.updated.by.id == ffc_extension.id
+    assert org_read.events.updated.by.type == ffc_extension.type
+    assert org_read.events.updated.by.name == ffc_extension.name
 
 
 def test_organization_update_partial():
