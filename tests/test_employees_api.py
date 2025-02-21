@@ -57,8 +57,6 @@ async def test_can_create_employees(
         "email": "test@example.com",
         "display_name": "Test User",
         "created_at": "2025-01-15T08:32:20Z",
-        "last_login": None,
-        "roles_count": None,
     }
 
     mocked_token_urlsafe.assert_called_once_with(128)
@@ -133,8 +131,6 @@ async def test_get_employee_by_email(
         "email": "test@example.com",
         "display_name": "Test User",
         "created_at": "2024-11-08T09:51:04Z",
-        "last_login": None,
-        "roles_count": None,
     }
 
 

@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 import fastapi_pagination
 from fastapi import Depends, FastAPI
-from fastapi.routing import APIRoute
+from fastapi.routing import APIRoute, APIRouter
 
 from app.auth.auth import authentication_required
 from app.conf import get_settings
@@ -51,15 +51,14 @@ tags_metadata = [
 ]
 
 
-def set_response_model_exclude_unset(app: FastAPI):
-    for api_route in app.routes:
+def setup_custom_serialization(router: APIRouter):
+    for api_route in router.routes:
         if (
             isinstance(api_route, APIRoute)
             and hasattr(api_route, "response_model")
             and api_route.response_model
         ):
-            api_route.response_model_exclude_unset = True
-            api_route.response_model_exclude_defaults = True
+            api_route.response_model_exclude_none = True
 
 
 def setup_app():
@@ -72,6 +71,16 @@ def setup_app():
         lifespan=lifespan,
     )
     fastapi_pagination.add_pagination(app)
+
+    for router in (
+        entitlements.router,
+        organizations.router,
+        employees.router,
+        accounts.router,
+        users.router,
+    ):
+        setup_custom_serialization(router)
+
     # TODO: Add healthcheck
     app.include_router(
         entitlements.router,
@@ -109,7 +118,6 @@ def setup_app():
         tags=["Portal Settings"],
     )
     app.include_router(auth.router, prefix="/auth", tags=["Auth"])
-    set_response_model_exclude_unset(app)
     return app
 
 

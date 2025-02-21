@@ -255,6 +255,7 @@ class EntitlementHandler(ModelHandler[Entitlement]):
             joinedload(Entitlement.owner),
             joinedload(Entitlement.created_by),
             joinedload(Entitlement.updated_by),
+            joinedload(Entitlement.redeemed_by),
         ]
 
     async def terminate(self, entitlement: Entitlement) -> Entitlement:
