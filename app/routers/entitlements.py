@@ -1,7 +1,6 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi_pagination.limit_offset import LimitOffsetPage
 from sqlalchemy import ColumnExpressionArgument
 
 from app.db.handlers import NotFoundError
@@ -13,7 +12,7 @@ from app.dependencies import (
     EntitlementRepository,
 )
 from app.enums import AccountStatus, AccountType, EntitlementStatus
-from app.pagination import paginate
+from app.pagination import LimitOffsetPage, paginate
 from app.schemas import EntitlementCreate, EntitlementRead, EntitlementRedeem, from_orm, to_orm
 
 # ============

@@ -1,7 +1,6 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi_pagination.limit_offset import LimitOffsetPage
 from sqlalchemy import exists
 
 from app.auth.auth import check_operations_account
@@ -16,7 +15,7 @@ from app.dependencies import (
     UserRepository,
 )
 from app.enums import AccountStatus, AccountType, AccountUserStatus
-from app.pagination import paginate
+from app.pagination import LimitOffsetPage, paginate
 from app.schemas import (
     AccountCreate,
     AccountRead,

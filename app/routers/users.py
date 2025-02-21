@@ -4,7 +4,6 @@ import secrets
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi_pagination.limit_offset import LimitOffsetPage
 
 from app.auth.auth import authentication_required, check_operations_account
 from app.conf import AppSettings
@@ -14,6 +13,7 @@ from app.db.models import Account, AccountUser, User
 from app.dependencies import CurrentAuthContext, UserId
 from app.enums import AccountStatus, AccountType, AccountUserStatus, UserStatus
 from app.hasher import pbkdf2_sha256
+from app.pagination import LimitOffsetPage
 from app.schemas import (
     AccountUserCreate,
     AccountUserRead,
