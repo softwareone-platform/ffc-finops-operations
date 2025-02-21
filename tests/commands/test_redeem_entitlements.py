@@ -40,7 +40,7 @@ async def test_redeeem_entitlements(
     await db_session.refresh(entitlement_aws)
     assert entitlement_aws.status == EntitlementStatus.ACTIVE
     assert entitlement_aws.redeemed_by == apple_inc_organization
-    assert entitlement_aws.operations_external_id == "ds1"
+    assert entitlement_aws.linked_datasource_id == "ds1"
     assert entitlement_aws.redeemed_at is not None
     assert entitlement_aws.redeemed_at == datetime.now(UTC)
 
@@ -75,7 +75,7 @@ async def test_fetch_datasources_for_organization(
     ]
     httpx_mock.add_response(
         method="GET",
-        url=f"{test_settings.opt_api_base_url}/organizations/operations_external_id/cloud_accounts?details=true",
+        url=f"{test_settings.opt_api_base_url}/organizations/linked_organization_id/cloud_accounts?details=true",
         match_headers={"Secret": test_settings.opt_cluster_secret},
         json={
             "cloud_accounts": datasources,
@@ -83,7 +83,7 @@ async def test_fetch_datasources_for_organization(
     )
 
     fetched_datasources = await fetch_datasources_for_organization(
-        test_settings, "operations_external_id"
+        test_settings, "linked_organization_id"
     )
     assert datasources == fetched_datasources
 
@@ -95,12 +95,12 @@ async def test_fetch_datasources_for_organization_error(
 ):
     httpx_mock.add_response(
         method="GET",
-        url=f"{test_settings.opt_api_base_url}/organizations/operations_external_id/cloud_accounts?details=true",
+        url=f"{test_settings.opt_api_base_url}/organizations/linked_organization_id/cloud_accounts?details=true",
         status_code=500,
     )
 
     with pytest.raises(HTTPStatusError, match="Internal Server Error"):
-        await fetch_datasources_for_organization(test_settings, "operations_external_id")
+        await fetch_datasources_for_organization(test_settings, "linked_organization_id")
 
 
 def test_redeem_entitlements_command(

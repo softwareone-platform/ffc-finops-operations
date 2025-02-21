@@ -175,8 +175,8 @@ def organization_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory
     async def _organization(
         name: str | None = None,
         currency: str | None = None,
-        affiliate_external_id: str | None = None,
         operations_external_id: str | None = None,
+        linked_organization_id: str | None = None,
         created_by: Actor | None = None,
         updated_by: Actor | None = None,
         status: OrganizationStatus = OrganizationStatus.ACTIVE,
@@ -184,8 +184,8 @@ def organization_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory
         organization = Organization(
             name=name or faker.company(),
             currency=currency or "EUR",
-            affiliate_external_id=affiliate_external_id or "AGR-1234-5678-9012",
-            operations_external_id=operations_external_id,
+            operations_external_id=operations_external_id or "AGR-1234-5678-9012",
+            linked_organization_id=linked_organization_id,
             created_by=created_by,
             updated_by=updated_by,
             status=status,
@@ -432,5 +432,5 @@ async def apple_inc_organization(organization_factory: ModelFactory[Organization
     return await organization_factory(
         name="Apple Inc.",
         currency="USD",
-        operations_external_id=str(uuid.uuid4()),
+        linked_organization_id=str(uuid.uuid4()),
     )

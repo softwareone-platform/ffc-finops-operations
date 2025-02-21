@@ -222,10 +222,10 @@ class Organization(Base, AuditableMixin, HumanReadablePKMixin):
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
-    affiliate_external_id: Mapped[str] = mapped_column(
+    operations_external_id: Mapped[str] = mapped_column(
         String(255), nullable=False, index=True, unique=True
     )
-    operations_external_id: Mapped[str | None] = mapped_column(
+    linked_organization_id: Mapped[str | None] = mapped_column(
         String(255), nullable=True, index=True
     )
     status: Mapped[OrganizationStatus] = mapped_column(
@@ -243,7 +243,7 @@ class Entitlement(Base, HumanReadablePKMixin, AuditableMixin):
     PK_NUM_LENGTH = 12
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    operations_external_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    linked_datasource_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     affiliate_external_id: Mapped[str] = mapped_column(String(255), nullable=False)
     datasource_id: Mapped[str] = mapped_column(String(255), nullable=False)
     owner_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), nullable=False)

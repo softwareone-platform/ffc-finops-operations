@@ -145,7 +145,7 @@ def test_entitlement_update_partial():
 def test_organization_create_to_orm():
     data = {
         "name": "Test Org",
-        "affiliate_external_id": "ORG-123",
+        "operations_external_id": "ORG-123",
         "user_id": "user-123",
         "currency": "USD",
     }
@@ -155,7 +155,7 @@ def test_organization_create_to_orm():
 
     assert isinstance(organization, Organization)
     assert organization.name == data["name"]
-    assert organization.affiliate_external_id == data["affiliate_external_id"]
+    assert organization.operations_external_id == data["operations_external_id"]
     # These fields should not be in the ORM model
     assert not hasattr(organization, "user_id")
 
@@ -165,8 +165,8 @@ def test_organization_read_from_orm(ffc_extension: System):
         id="FORG-1234-5678-9012",
         name="Test Org",
         currency="EUR",
-        affiliate_external_id="ORG-123",
-        operations_external_id="FFC-123",
+        operations_external_id="ORG-123",
+        linked_organization_id="FFC-123",
         status=OrganizationStatus.ACTIVE,
     )
     # Set timestamps and audit fields after creation
@@ -180,8 +180,8 @@ def test_organization_read_from_orm(ffc_extension: System):
     assert org_read.id == organization.id
     assert org_read.name == organization.name
     assert org_read.currency == organization.currency
-    assert org_read.affiliate_external_id == organization.affiliate_external_id
     assert org_read.operations_external_id == organization.operations_external_id
+    assert org_read.linked_organization_id == organization.linked_organization_id
     assert org_read.status == organization.status
     assert org_read.created_at == organization.created_at
     assert org_read.updated_at == organization.updated_at
@@ -198,7 +198,7 @@ def test_organization_read_from_orm(ffc_extension: System):
 def test_organization_update_partial():
     update_data = {
         "name": "Updated Org",
-        "affiliate_external_id": "FFC-456",
+        "operations_external_id": "FFC-456",
     }
 
     org_update = OrganizationUpdate(**update_data)
@@ -206,4 +206,4 @@ def test_organization_update_partial():
 
     assert len(data) == 2
     assert data["name"] == update_data["name"]
-    assert data["affiliate_external_id"] == update_data["affiliate_external_id"]
+    assert data["operations_external_id"] == update_data["operations_external_id"]
