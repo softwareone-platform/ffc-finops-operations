@@ -58,7 +58,6 @@ def set_response_model_exclude_unset(app: FastAPI):
             and hasattr(api_route, "response_model")
             and api_route.response_model
         ):
-            print(api_route)
             api_route.response_model_exclude_unset = True
             api_route.response_model_exclude_defaults = True
 
