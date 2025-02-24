@@ -4,6 +4,7 @@ import jwt
 import pytest
 import time_machine
 from httpx import AsyncClient
+from pytest_mock import MockerFixture
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.constants import JWT_ALGORITHM
@@ -165,7 +166,6 @@ async def test_get_tokens_from_credentials_invalid_user(
 
 @time_machine.travel("2024-01-01T00:00:00Z", tick=False)
 async def test_get_tokens_from_credentials_no_account_user(
-    db_session: AsyncSession,
     user_factory: ModelFactory[User],
     account_factory: ModelFactory[Account],
     accountuser_factory: ModelFactory[AccountUser],
@@ -422,3 +422,68 @@ async def test_get_tokens_from_refresh_accountuser_not_active(
     }
     response = await api_client.post("/auth/tokens", json=refresh_payload)
     assert response.status_code == 401
+
+
+@time_machine.travel("2024-01-01T00:00:00Z", tick=False)
+async def test_start_reset_password_flow(
+    test_settings: Settings,
+    mocker: MockerFixture,
+    db_session: AsyncSession,
+    api_client: AsyncClient,
+    user_factory: ModelFactory[User],
+):
+    mock_token_urlsafe = mocker.patch(
+        "app.routers.auth.secrets.token_urlsafe",
+        return_value="my-pwd-reset-token",
+    )
+    user: User = await user_factory()
+    assert user.pwd_reset_token is None
+    assert user.pwd_reset_token_expires_at is None
+
+    response = await api_client.post(f"/auth/password-recovery-requests/{user.email}")
+    assert response.status_code == 204
+    mock_token_urlsafe.assert_called_once_with(test_settings.pwd_reset_token_length)
+    await db_session.refresh(user)
+    assert user.pwd_reset_token == "my-pwd-reset-token"
+    assert user.pwd_reset_token_expires_at == datetime.now(UTC) + timedelta(
+        minutes=test_settings.pwd_reset_token_length_expires_minutes
+    )
+
+
+@pytest.mark.parametrize(
+    "user_status",
+    [UserStatus.DRAFT, UserStatus.DELETED, UserStatus.DISABLED],
+)
+async def test_start_reset_password_flow_invalid_user_status(
+    db_session: AsyncSession,
+    api_client: AsyncClient,
+    user_factory: ModelFactory[User],
+    user_status: UserStatus,
+):
+    user: User = await user_factory(status=user_status)
+    assert user.pwd_reset_token is None
+    assert user.pwd_reset_token_expires_at is None
+
+    response = await api_client.post(f"/auth/password-recovery-requests/{user.email}")
+    assert response.status_code == 204
+    await db_session.refresh(user)
+    assert user.pwd_reset_token is None
+    assert user.pwd_reset_token_expires_at is None
+
+
+async def test_start_reset_password_flow_token_still_valid(
+    db_session: AsyncSession,
+    api_client: AsyncClient,
+    user_factory: ModelFactory[User],
+):
+    expires_at = datetime.now(UTC) + timedelta(minutes=10)
+    user: User = await user_factory(
+        pwd_reset_token="my-awesome-token",
+        pwd_reset_token_expires_at=expires_at,
+    )
+
+    response = await api_client.post(f"/auth/password-recovery-requests/{user.email}")
+    assert response.status_code == 204
+    await db_session.refresh(user)
+    assert user.pwd_reset_token == "my-awesome-token"
+    assert user.pwd_reset_token_expires_at == expires_at

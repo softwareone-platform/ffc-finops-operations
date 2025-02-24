@@ -20,8 +20,8 @@ from app.utils import wrap_exc_in_http_response
 def common_extra_conditions(auth_ctx: CurrentAuthContext) -> list[ColumnExpressionArgument]:
     conditions: list[ColumnExpressionArgument] = []
 
-    if auth_ctx.account.type == AccountType.AFFILIATE:
-        conditions.append(System.owner == auth_ctx.account)
+    if auth_ctx.account.type == AccountType.AFFILIATE:  # type: ignore
+        conditions.append(System.owner == auth_ctx.account)  # type: ignore
 
     return conditions
 
@@ -67,15 +67,15 @@ async def create_system(
     auth_ctx: CurrentAuthContext,
 ):
     if data.owner is None:
-        if auth_ctx.account.type == AccountType.OPERATIONS:
+        if auth_ctx.account.type == AccountType.OPERATIONS:  # type: ignore
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Operations users must specify an owner account when creating a system.",
             )
 
-        system_owner = auth_ctx.account
+        system_owner = auth_ctx.account  # type: ignore
     else:
-        if auth_ctx.account.type == AccountType.AFFILIATE:
+        if auth_ctx.account.type == AccountType.AFFILIATE:  # type: ignore
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Affiliate users can only create systems bound to their own account.",
@@ -126,7 +126,7 @@ async def delete_system_by_id(
     system_repo: SystemRepository,
     auth_ctx: CurrentAuthContext,
 ):
-    if system == auth_ctx.system:
+    if system == auth_ctx.system:  # type: ignore
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="A system cannot delete itself.",
@@ -147,7 +147,7 @@ async def disable_system(
     system_repo: SystemRepository,
     auth_ctx: CurrentAuthContext,
 ):
-    if system == auth_ctx.system:
+    if system == auth_ctx.system:  # type: ignore
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="A system cannot disable itself.",
