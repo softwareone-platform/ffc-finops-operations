@@ -301,7 +301,9 @@ async def get_user_by_id(
             raise UNAUTHORIZED_EXCEPTION
         response = await user_repo.get(id=user_id)
     elif auth_context.account.type == AccountType.OPERATIONS:
-        with wrap_exc_in_http_response(NotFoundError, "User Not Found."):
+        with wrap_exc_in_http_response(
+            NotFoundError, status_code=status.HTTP_404_NOT_FOUND, error_msg="User Not Found."
+        ):
             response = await user_repo.get(id=user_id)
     elif auth_context.account.type == AccountType.AFFILIATE:
         account_user = await accountuser_repo.get_account_user(
@@ -315,12 +317,14 @@ async def get_user_by_id(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User Not Found.",
             )
-        with wrap_exc_in_http_response(NotFoundError, "User Not Found."):
+        with wrap_exc_in_http_response(
+            NotFoundError, status_code=status.HTTP_404_NOT_FOUND, error_msg="User Not Found."
+        ):
             # not filtering [AccountUser.status != AccountUserStatus.DELETED]
             # because if the user is in
             # status DELETE then the account user will be deleted as well
             response = await user_repo.get(id=user_id)
-
+            print("Response:", response)
     return from_orm(UserRead, response)
 
 
