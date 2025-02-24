@@ -61,6 +61,7 @@ def test_create_operations_account_command(
     mocker: MockerFixture,
     test_settings: Settings,
 ):
+    mocker.patch("app.cli.get_settings", return_value=test_settings)
     mock_create_coro = mocker.MagicMock()
     mock_create_operations_account = mocker.MagicMock(return_value=mock_create_coro)
 
