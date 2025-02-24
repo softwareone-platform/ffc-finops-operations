@@ -1,3 +1,4 @@
+import datetime
 import uuid
 from typing import Annotated
 
@@ -6,11 +7,9 @@ from pydantic import Field
 from app.enums import DatasourceType, EntitlementStatus
 from app.schemas.accounts import AccountReference
 from app.schemas.core import (
-    ActorReference,
     AuditEventsSchema,
     AuditFieldSchema,
     BaseSchema,
-    CommonEventsSchema,
     IdSchema,
 )
 from app.schemas.organizations import OrganizationReference
@@ -34,12 +33,17 @@ class EntitlementUpdate(BaseSchema):
     datasource_id: str | None = None
 
 
+class EntitlementReedemEventSchema(AuditFieldSchema):
+    at: datetime.datetime
+    by: OrganizationReference
+
+
 class EntitlementsEventsSchema(AuditEventsSchema):
-    redeemed: AuditFieldSchema[OrganizationReference] | None = None
-    terminated: AuditFieldSchema[ActorReference] | None = None
+    redeemed: EntitlementReedemEventSchema | None = None
+    terminated: AuditFieldSchema | None = None
 
 
-class EntitlementRead(IdSchema, CommonEventsSchema[EntitlementsEventsSchema], EntitlementBase):
+class EntitlementRead(IdSchema, EntitlementBase):
     linked_datasource_id: Annotated[
         str | None, Field(max_length=255, examples=["ee7ebfaf-a222-4209-aecc-67861694a488"])
     ] = None
@@ -49,6 +53,7 @@ class EntitlementRead(IdSchema, CommonEventsSchema[EntitlementsEventsSchema], En
     linked_datasource_type: DatasourceType | None = None
     owner: AccountReference
     status: EntitlementStatus
+    events: EntitlementsEventsSchema
 
 
 class EntitlementRedeem(BaseSchema):

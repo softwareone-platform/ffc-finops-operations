@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 import types
-from typing import Annotated, Generic, TypeVar
+from typing import Annotated
 
 from pydantic import (
     BaseModel,
@@ -19,22 +19,14 @@ from app.enums import (
 
 
 def from_orm[M: Base, S: BaseModel](schema_cls: type[S], db_model: M) -> S:
-    if not issubclass(schema_cls, CommonEventsSchema):
+    if "events" not in schema_cls.model_fields:
         return schema_cls.model_validate(db_model)
 
     # NOTE: This is a hack, ideally this behaviour should be handled by the models,
     #       but to do it properly we need to spend more time in learning how pydantic
     #       works and possibly do quite a lot of refactoring of our schemas
 
-    # TODO: I'm not sure Annotation is the best thing to use here, we can possibly simplify
-    #       the code a lot more by using a higher level API
-
     events_schema_cls = schema_cls.model_fields["events"].annotation
-
-    # TODO: Replace with schema_cls.model_fields["events"].apply_typevars_map
-    #       (if that's what that metohd is for)
-    if isinstance(events_schema_cls, TypeVar):
-        events_schema_cls = events_schema_cls.__bound__
 
     if not issubclass(events_schema_cls, AuditEventsSchema):
         raise TypeError(f"Unsupported schema type: {events_schema_cls}")
@@ -45,27 +37,23 @@ def from_orm[M: Base, S: BaseModel](schema_cls: type[S], db_model: M) -> S:
         event_field_schema_cls = field_info.annotation
 
         if isinstance(event_field_schema_cls, types.UnionType):
-            match event_field_schema_cls.__args__:
-                case (field_schema_cls, types.NoneType) | (types.NoneType, field_schema_cls):
-                    event_field_schema_cls = field_schema_cls
-                case _:
-                    raise TypeError(f"Unsupported union type: {event_field_schema_cls.__args__}")
+            non_none_types = [t for t in event_field_schema_cls.__args__ if t != types.NoneType]
 
-        if isinstance(event_field_schema_cls, TypeVar):
-            event_field_schema_cls = event_field_schema_cls.__bound__
+            if len(non_none_types) != 1:
+                raise TypeError(f"Unsupported union type: {event_field_schema_cls.__args__}")
+
+            event_field_schema_cls = non_none_types[0]
 
         if not issubclass(event_field_schema_cls, AuditFieldSchema):
             raise TypeError(f"Unsupported schema type: {event_field_schema_cls}")
 
-        at_value = getattr(db_model, f"{field_name}_at")
+        at_value = getattr(db_model, f"{field_name}_at", None)
 
         if at_value is None:
             schema_values[field_name] = None
             continue
 
-        # TODO: The following will fail unless we've joined the related table
-
-        by_value = getattr(db_model, f"{field_name}_by")
+        by_value = getattr(db_model, f"{field_name}_by", None)
 
         schema_values[field_name] = event_field_schema_cls(at=at_value, by=by_value)
 
@@ -133,35 +121,25 @@ class ActorBase(BaseSchema):
     type: ActorType
 
 
-class AuditFieldReference(IdSchema):
-    pass
-
-
-AuditFieldReferenceT = TypeVar("AuditFieldReferenceT", bound=AuditFieldReference)
-
-
 class ActorRead(IdSchema, ActorBase):
     pass
 
 
-class AuditFieldSchema(BaseSchema, Generic[AuditFieldReferenceT]):
-    at: datetime.datetime
-    by: AuditFieldReferenceT | None
-
-
-class ActorReference(AuditFieldReference):
+class ActorReference(IdSchema):
     type: ActorType
     name: Annotated[str, Field(examples=["Barack Obama"])]
 
 
+class AuditFieldSchema(BaseSchema):
+    at: datetime.datetime
+    by: ActorReference | None
+
+
 class AuditEventsSchema(BaseSchema):
-    created: AuditFieldSchema[ActorReference]
-    updated: AuditFieldSchema[ActorReference]
-    deleted: AuditFieldSchema[ActorReference] | None = None
+    created: AuditFieldSchema
+    updated: AuditFieldSchema
+    deleted: AuditFieldSchema | None = None
 
 
-AuditEventsT = TypeVar("AuditEventsT", bound=AuditEventsSchema)
-
-
-class CommonEventsSchema(BaseSchema, Generic[AuditEventsT]):
-    events: AuditEventsT
+class CommonEventsSchema(BaseSchema):
+    events: AuditEventsSchema
