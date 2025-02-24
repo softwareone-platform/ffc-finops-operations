@@ -19,7 +19,6 @@ class UserCreate(UserBase):
 
 class UserRead(IdSchema, CommonEventsSchema, UserCreate):
     status: UserStatus
-    # TODO: Are these events too?
     last_login_at: datetime.datetime | None
     last_used_account: AccountReference | None
 

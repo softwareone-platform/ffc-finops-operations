@@ -1,6 +1,8 @@
 import secrets
 from datetime import UTC, datetime
 
+import pytest
+
 from app.db.models import Account, Actor, Entitlement, Organization, System
 from app.enums import AccountType, ActorType, EntitlementStatus, OrganizationStatus, SystemStatus
 from app.schemas.core import ActorRead, from_orm, to_orm
@@ -87,7 +89,15 @@ def test_entitlement_create_to_orm():
     assert entitlement.datasource_id == data["datasource_id"]
 
 
-def test_entitlement_read_from_orm(gcp_extension: System, affiliate_account: Account):
+@pytest.mark.parametrize("set_redeemed", [True, False])
+@pytest.mark.parametrize("set_terminated", [True, False])
+def test_entitlement_read_from_orm(
+    gcp_extension: System,
+    affiliate_account: Account,
+    organization_factory: Organization,
+    set_terminated: bool,
+    set_redeemed: bool,
+):
     entitlement = Entitlement(
         id="FENT-1234-5678-9012",
         name="AWS",
@@ -101,6 +111,23 @@ def test_entitlement_read_from_orm(gcp_extension: System, affiliate_account: Acc
     entitlement.updated_at = datetime.now(UTC)
     entitlement.created_by = gcp_extension
     entitlement.updated_by = gcp_extension
+
+    if set_terminated:
+        entitlement.terminated_at = datetime.now(UTC)
+        entitlement.terminated_by = gcp_extension
+
+    if set_redeemed:
+        redeeemer_organization = Organization(
+            id="FORG-1234-5678-9012",
+            name="Test Org",
+            currency="EUR",
+            affiliate_external_id="ORG-123",
+            operations_external_id="FFC-123",
+            status=OrganizationStatus.ACTIVE,
+        )
+
+        entitlement.redeemed_at = datetime.now(UTC)
+        entitlement.redeemed_by = redeeemer_organization
 
     entitlement_read = from_orm(EntitlementRead, entitlement)
 
@@ -119,6 +146,32 @@ def test_entitlement_read_from_orm(gcp_extension: System, affiliate_account: Acc
     assert entitlement_read.events.updated.by.id == gcp_extension.id
     assert entitlement_read.events.updated.by.type == gcp_extension.type
     assert entitlement_read.events.updated.by.name == gcp_extension.name
+
+    if set_terminated:
+        assert entitlement_read.events.terminated is not None
+
+        assert entitlement_read.events.terminated.at == entitlement.terminated_at
+        assert entitlement_read.events.terminated.by is not None
+        assert entitlement_read.events.terminated.by.id == gcp_extension.id
+        assert entitlement_read.events.terminated.by.type == gcp_extension.type
+        assert entitlement_read.events.terminated.by.name == gcp_extension.name
+    else:
+        assert entitlement_read.events.terminated is None
+
+    if set_redeemed:
+        assert entitlement_read.events.redeemed is not None
+
+        assert entitlement_read.events.redeemed.at == entitlement.redeemed_at
+        assert entitlement_read.events.redeemed.by is not None
+        assert entitlement_read.events.redeemed.by.id == redeeemer_organization.id
+        assert entitlement_read.events.redeemed.by.name == redeeemer_organization.name
+        assert entitlement_read.events.redeemed.by.currency == redeeemer_organization.currency
+        assert (
+            entitlement_read.events.redeemed.by.affiliate_external_id
+            == redeeemer_organization.affiliate_external_id
+        )
+    else:
+        assert entitlement_read.events.redeemed is None
 
 
 def test_entitlement_update_partial():
