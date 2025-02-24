@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     auth_refresh_jwt_lifespan_days: int = 7
     invitation_token_length: int = 64
     invitation_token_expires_days: int = 7
+    pwd_reset_token_length: int = 64
+    pwd_reset_token_length_expires_minutes: int = 15
 
     opt_auth_base_url: str
     opt_api_base_url: str

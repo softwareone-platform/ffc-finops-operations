@@ -257,6 +257,8 @@ def user_factory(
         name: str | None = None,
         email: str | None = None,
         password: str | None = None,
+        pwd_reset_token: str | None = None,
+        pwd_reset_token_expires_at: datetime | None = None,
         status: UserStatus = UserStatus.ACTIVE,
         account: Account | None = None,
         accountuser_status: AccountUserStatus = AccountUserStatus.ACTIVE,
@@ -268,6 +270,8 @@ def user_factory(
             password=pbkdf2_sha256.hash(password or "mySuperPass123$"),
             last_used_account=account,
             status=status,
+            pwd_reset_token=pwd_reset_token,
+            pwd_reset_token_expires_at=pwd_reset_token_expires_at,
         )
 
         db_session.add(user)

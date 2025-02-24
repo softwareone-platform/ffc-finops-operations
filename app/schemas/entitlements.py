@@ -35,7 +35,7 @@ class EntitlementUpdate(BaseSchema):
 
 class EntitlementReedemEventSchema(AuditFieldSchema):
     at: datetime.datetime
-    by: OrganizationReference
+    by: OrganizationReference  # type: ignore
 
 
 class EntitlementsEventsSchema(AuditEventsSchema):

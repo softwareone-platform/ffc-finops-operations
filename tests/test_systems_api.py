@@ -810,8 +810,6 @@ async def test_system_external_id_is_unique_for_non_deleted_objects(
     ],
 )
 async def test_create_system_by_operations_account(
-    account_factory: ModelFactory[Account],
-    system_factory: ModelFactory[System],
     system_jwt_token_factory: Callable[[System], str],
     api_client: AsyncClient,
     db_session: AsyncSession,
@@ -849,7 +847,7 @@ async def test_create_system_by_operations_account(
         assert expected_errors is None
 
         db_system = await db_session.get(System, response_data["id"])
-
+        assert db_system is not None
         assert response_data["name"] == input_data["name"] == db_system.name
         assert response_data["external_id"] == input_data["external_id"] == db_system.external_id
         assert response_data["status"] == "active" == db_system.status._value_
@@ -976,6 +974,7 @@ async def test_create_system_duplicate_external_id_with_deleted(
         assert response_data["detail"] == "A system with the same external ID already exists."
         assert created_system is None
     else:
+        assert created_system is not None
         assert response_data["external_id"] == "existing_external_id"
         assert created_system.external_id == "existing_external_id"
         assert "jwt_secret" in response_data
