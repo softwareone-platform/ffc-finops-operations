@@ -259,11 +259,47 @@ async def resend_user_invitation(
 
 
 @router.get("/{id}", response_model=UserRead)
-async def get_user_by_id(id: str, token: str | None = None):  # pragma: no cover
+async def get_user_by_id(
+    id: str,
+    auth_context: CurrentAuthContext,
+    accountuser_repo: AccountUserRepository,
+    user_repo: UserRepository,
+    token: str | None = None,
+):  # pragma: no cover
     # if token is provided no authentication is needed but
     # an AccountOperator in status invited must exist with
     # user id and token and the token must not be expired
-    pass  # not yet implemented
+
+    """
+    If Access_Token
+    1. operations => ritorno utente
+    2. affiliate =>  authcontext AccountUser e vedere se esiste un record per
+    {userid}, l'account preso dell'autocontext e status != deleted .
+
+
+    If No Access Token but there is an Invitation Token
+
+    controllare in BD AccountUser per verificare invitation token e {id}
+    Se nn esiste -> 401
+
+
+    """
+    user_id = id
+    if auth_context.account.type == AccountType.OPERATIONS:
+        return await user_repo.get(id=user_id)
+    elif auth_context.account.type == AccountType.AFFILIATE:
+        account_user = await accountuser_repo.get_account_user(
+            account_id=auth_context.account.id,
+            user_id=user_id,
+            extra_conditions=[AccountUser.status != AccountUserStatus.DELETED],
+        )
+        if account_user is None:
+            logger.error("No account user has been found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Account Not Found",
+            )
+    return await user_repo.get(id=user_id)
 
 
 @router.post(
