@@ -3,7 +3,7 @@ from fastapi import APIRouter, status
 from app.auth.login import get_tokens_from_credentials, get_tokens_from_refresh
 from app.conf import AppSettings
 from app.dependencies import DBSession
-from app.schemas import Login, LoginRead, RefreshAccessToken
+from app.schemas.auth import Login, LoginRead, RefreshAccessToken
 
 router = APIRouter()
 

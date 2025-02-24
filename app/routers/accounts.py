@@ -16,14 +16,9 @@ from app.dependencies import (
 )
 from app.enums import AccountStatus, AccountType, AccountUserStatus
 from app.pagination import LimitOffsetPage, paginate
-from app.schemas import (
-    AccountCreate,
-    AccountRead,
-    AccountUpdate,
-    UserRead,
-    from_orm,
-    to_orm,
-)
+from app.schemas.accounts import AccountCreate, AccountRead, AccountUpdate
+from app.schemas.core import from_orm, to_orm
+from app.schemas.users import UserRead
 
 router = APIRouter()
 

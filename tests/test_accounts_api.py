@@ -18,7 +18,7 @@ from app.routers.accounts import (
     validate_account_type_and_required_conditions,
     validate_required_conditions_before_update,
 )
-from app.schemas import AccountCreate
+from app.schemas.accounts import AccountCreate
 from tests.types import JWTTokenFactory, ModelFactory
 
 
@@ -91,14 +91,14 @@ async def test_can_create_accounts(
     assert data["external_id"] == "ACC-9044-8753"
     assert data["type"] == "affiliate"
     assert data["status"] == "active"
-    assert data["created_at"] is not None
-    assert data["created_by"]["id"] == str(ffc_extension.id)
-    assert data["created_by"]["type"] == ffc_extension.type
-    assert data["created_by"]["name"] == ffc_extension.name
-    assert data["updated_at"] is not None
-    assert data["updated_by"]["id"] == str(ffc_extension.id)
-    assert data["updated_by"]["type"] == ffc_extension.type
-    assert data["updated_by"]["name"] == ffc_extension.name
+    assert data["events"]["created"]["at"] is not None
+    assert data["events"]["created"]["by"]["id"] == str(ffc_extension.id)
+    assert data["events"]["created"]["by"]["type"] == ffc_extension.type
+    assert data["events"]["created"]["by"]["name"] == ffc_extension.name
+    assert data["events"]["updated"]["at"] is not None
+    assert data["events"]["updated"]["by"]["id"] == str(ffc_extension.id)
+    assert data["events"]["updated"]["by"]["type"] == ffc_extension.type
+    assert data["events"]["updated"]["by"]["name"] == ffc_extension.name
 
     result = await db_session.execute(select(Account).where(Account.id == data["id"]))
     assert result.one_or_none() is not None
@@ -188,14 +188,14 @@ async def test_get_account_by_id(
     assert data["external_id"] == affiliate_account.external_id
     assert data["type"] == affiliate_account.type
     assert data["status"] == affiliate_account.status
-    assert data["created_at"] is not None
-    assert data["created_by"]["id"] == str(ffc_extension.id)
-    assert data["created_by"]["type"] == ffc_extension.type
-    assert data["created_by"]["name"] == ffc_extension.name
-    assert data["updated_at"] is not None
-    assert data["updated_by"]["id"] == str(ffc_extension.id)
-    assert data["updated_by"]["type"] == ffc_extension.type
-    assert data["updated_by"]["name"] == ffc_extension.name
+    assert data["events"]["created"]["at"] is not None
+    assert data["events"]["created"]["by"]["id"] == str(ffc_extension.id)
+    assert data["events"]["created"]["by"]["type"] == ffc_extension.type
+    assert data["events"]["created"]["by"]["name"] == ffc_extension.name
+    assert data["events"]["updated"]["at"] is not None
+    assert data["events"]["updated"]["by"]["id"] == str(ffc_extension.id)
+    assert data["events"]["updated"]["by"]["type"] == ffc_extension.type
+    assert data["events"]["updated"]["by"]["name"] == ffc_extension.name
 
 
 async def test_get_invalid_account(operations_client: AsyncClient, ffc_jwt_token: str):
@@ -366,11 +366,11 @@ async def test_can_update_accounts_name(
     assert data["external_id"] == affiliate_account.external_id
     assert data["type"] == affiliate_account.type
     assert data["status"] == affiliate_account.status
-    assert data["created_at"] is not None
-    assert data["updated_at"] is not None
-    assert data["updated_by"]["id"] == str(ffc_extension.id)
-    assert data["updated_by"]["type"] == ffc_extension.type
-    assert data["updated_by"]["name"] == ffc_extension.name
+    assert data["events"]["created"]["at"] is not None
+    assert data["events"]["updated"]["at"] is not None
+    assert data["events"]["updated"]["by"]["id"] == str(ffc_extension.id)
+    assert data["events"]["updated"]["by"]["type"] == ffc_extension.type
+    assert data["events"]["updated"]["by"]["name"] == ffc_extension.name
 
     result = await db_session.execute(select(Account).where(Account.id == data["id"]))
     assert result.one_or_none() is not None
@@ -393,11 +393,11 @@ async def test_can_update_accounts_external_id(
     assert data["external_id"] == "ACC-9044-8753"
     assert data["type"] == affiliate_account.type
     assert data["status"] == affiliate_account.status
-    assert data["created_at"] is not None
-    assert data["updated_at"] is not None
-    assert data["updated_by"]["id"] == str(ffc_extension.id)
-    assert data["updated_by"]["type"] == ffc_extension.type
-    assert data["updated_by"]["name"] == ffc_extension.name
+    assert data["events"]["created"]["at"] is not None
+    assert data["events"]["updated"]["at"] is not None
+    assert data["events"]["updated"]["by"]["id"] == str(ffc_extension.id)
+    assert data["events"]["updated"]["by"]["type"] == ffc_extension.type
+    assert data["events"]["updated"]["by"]["name"] == ffc_extension.name
 
     result = await db_session.execute(select(Account).where(Account.id == data["id"]))
     assert result.one_or_none() is not None

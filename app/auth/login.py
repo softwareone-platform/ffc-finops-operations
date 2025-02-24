@@ -14,14 +14,10 @@ from app.db.handlers import (
 from app.db.models import Account, AccountUser, User
 from app.enums import AccountStatus, AccountUserStatus, UserStatus
 from app.hasher import pbkdf2_sha256
-from app.schemas import (
-    AccountReference,
-    Login,
-    LoginRead,
-    RefreshAccessToken,
-    UserReference,
-    from_orm,
-)
+from app.schemas.accounts import AccountReference
+from app.schemas.auth import Login, LoginRead, RefreshAccessToken
+from app.schemas.core import from_orm
+from app.schemas.users import UserReference
 
 
 def generate_access_and_refresh_tokens(settings: Settings, subject: str, account_id: str):

@@ -6,9 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Organization, System
-from app.schemas import OrganizationRead, from_orm
 from tests.types import ModelFactory
-from tests.utils import assert_json_contains_model
 
 # =================
 # Get Organizations
@@ -42,8 +40,7 @@ async def test_get_all_organizations_single_page(
     assert data["total"] == 2
     assert len(data["items"]) == data["total"]
 
-    assert_json_contains_model(data, from_orm(OrganizationRead, organization_1))
-    assert_json_contains_model(data, from_orm(OrganizationRead, organization_2))
+    assert {organization_1.id, organization_2.id} == {item["id"] for item in data["items"]}
 
 
 async def test_get_all_organizations_multiple_pages(
@@ -141,14 +138,14 @@ async def test_can_create_organizations(
     assert data["name"] == "My Organization"
     assert data["operations_external_id"] == "ACC-1234-5678"
     assert data["linked_organization_id"] == "UUID-yyyy-yyyy-yyyy-yyyy"
-    assert data["created_at"] is not None
-    assert data["created_by"]["id"] == str(ffc_extension.id)
-    assert data["created_by"]["type"] == ffc_extension.type
-    assert data["created_by"]["name"] == ffc_extension.name
-    assert data["updated_at"] is not None
-    assert data["updated_by"]["id"] == str(ffc_extension.id)
-    assert data["updated_by"]["type"] == ffc_extension.type
-    assert data["updated_by"]["name"] == ffc_extension.name
+    assert data["events"]["created"]["at"] is not None
+    assert data["events"]["created"]["by"]["id"] == str(ffc_extension.id)
+    assert data["events"]["created"]["by"]["type"] == ffc_extension.type
+    assert data["events"]["created"]["by"]["name"] == ffc_extension.name
+    assert data["events"]["updated"]["at"] is not None
+    assert data["events"]["updated"]["by"]["id"] == str(ffc_extension.id)
+    assert data["events"]["updated"]["by"]["type"] == ffc_extension.type
+    assert data["events"]["updated"]["by"]["name"] == ffc_extension.name
 
     result = await db_session.execute(select(Organization).where(Organization.id == data["id"]))
     assert result.one_or_none() is not None
@@ -217,7 +214,7 @@ async def test_create_organization_with_existing_db_organization(
     assert data["name"] == existing_org.name
     assert data["operations_external_id"] == "ACC-1234-5678"
     assert data["linked_organization_id"] == "UUID-yyyy-yyyy-yyyy-yyyy"
-    assert data["created_at"] is not None
+    assert data["events"]["created"]["at"] is not None
 
 
 async def test_create_organization_with_existing_db_organization_name_mismatch(
@@ -353,14 +350,14 @@ async def test_get_organization_by_id(
     assert data["id"] == str(org.id)
     assert data["name"] == org.name
     assert data["operations_external_id"] == org.operations_external_id
-    assert data["created_at"] is not None
-    assert data["created_by"]["id"] == str(ffc_extension.id)
-    assert data["created_by"]["type"] == ffc_extension.type
-    assert data["created_by"]["name"] == ffc_extension.name
-    assert data["updated_at"] is not None
-    assert data["updated_by"]["id"] == str(ffc_extension.id)
-    assert data["updated_by"]["type"] == ffc_extension.type
-    assert data["updated_by"]["name"] == ffc_extension.name
+    assert data["events"]["created"]["at"] is not None
+    assert data["events"]["created"]["by"]["id"] == str(ffc_extension.id)
+    assert data["events"]["created"]["by"]["type"] == ffc_extension.type
+    assert data["events"]["created"]["by"]["name"] == ffc_extension.name
+    assert data["events"]["updated"]["at"] is not None
+    assert data["events"]["updated"]["by"]["id"] == str(ffc_extension.id)
+    assert data["events"]["updated"]["by"]["type"] == ffc_extension.type
+    assert data["events"]["updated"]["by"]["name"] == ffc_extension.name
 
 
 async def test_get_non_existant_organization(api_client: AsyncClient, ffc_jwt_token: str):

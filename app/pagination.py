@@ -11,7 +11,7 @@ from sqlalchemy import ColumnExpressionArgument
 
 from app.db.handlers import ModelHandler
 from app.db.models import Base
-from app.schemas import BaseSchema, from_orm
+from app.schemas.core import BaseSchema, from_orm
 
 T = TypeVar("T")
 

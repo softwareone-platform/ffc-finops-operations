@@ -80,14 +80,14 @@ async def test_can_create_entitlements(
     assert data["affiliate_external_id"] == "EXTERNAL_ID_987123"
     assert data["datasource_id"] == "SPONSOR_CONTAINER_ID_1234"
     assert data["status"] == "new"
-    assert data["created_at"] is not None
-    assert data["created_by"]["id"] == str(gcp_extension.id)
-    assert data["created_by"]["type"] == gcp_extension.type
-    assert data["created_by"]["name"] == gcp_extension.name
-    assert data["updated_at"] is not None
-    assert data["updated_by"]["id"] == str(gcp_extension.id)
-    assert data["updated_by"]["type"] == gcp_extension.type
-    assert data["updated_by"]["name"] == gcp_extension.name
+    assert data["events"]["created"]["at"] is not None
+    assert data["events"]["created"]["by"]["id"] == str(gcp_extension.id)
+    assert data["events"]["created"]["by"]["type"] == gcp_extension.type
+    assert data["events"]["created"]["by"]["name"] == gcp_extension.name
+    assert data["events"]["updated"]["at"] is not None
+    assert data["events"]["updated"]["by"]["id"] == str(gcp_extension.id)
+    assert data["events"]["updated"]["by"]["type"] == gcp_extension.type
+    assert data["events"]["updated"]["by"]["name"] == gcp_extension.name
 
     result = await db_session.execute(select(Entitlement).where(Entitlement.id == data["id"]))
     assert result.one_or_none() is not None
@@ -349,14 +349,14 @@ async def test_get_entitlement_by_id(
     assert data["affiliate_external_id"] == entitlement_gcp.affiliate_external_id
     assert data["datasource_id"] == entitlement_gcp.datasource_id
     assert data["status"] == "new"
-    assert data["created_at"] is not None
-    assert data["created_by"]["id"] == str(gcp_extension.id)
-    assert data["created_by"]["type"] == gcp_extension.type
-    assert data["created_by"]["name"] == gcp_extension.name
-    assert data["updated_at"] is not None
-    assert data["updated_by"]["id"] == str(gcp_extension.id)
-    assert data["updated_by"]["type"] == gcp_extension.type
-    assert data["updated_by"]["name"] == gcp_extension.name
+    assert data["events"]["created"]["at"] is not None
+    assert data["events"]["created"]["by"]["id"] == str(gcp_extension.id)
+    assert data["events"]["created"]["by"]["type"] == gcp_extension.type
+    assert data["events"]["created"]["by"]["name"] == gcp_extension.name
+    assert data["events"]["updated"]["at"] is not None
+    assert data["events"]["updated"]["by"]["id"] == str(gcp_extension.id)
+    assert data["events"]["updated"]["by"]["type"] == gcp_extension.type
+    assert data["events"]["updated"]["by"]["name"] == gcp_extension.name
 
 
 async def test_get_entitlement_by_id_operations(
@@ -378,14 +378,14 @@ async def test_get_entitlement_by_id_operations(
     assert data["affiliate_external_id"] == entitlement_gcp.affiliate_external_id
     assert data["datasource_id"] == entitlement_gcp.datasource_id
     assert data["status"] == "new"
-    assert data["created_at"] is not None
-    assert data["created_by"]["id"] == str(gcp_extension.id)
-    assert data["created_by"]["type"] == gcp_extension.type
-    assert data["created_by"]["name"] == gcp_extension.name
-    assert data["updated_at"] is not None
-    assert data["updated_by"]["id"] == str(gcp_extension.id)
-    assert data["updated_by"]["type"] == gcp_extension.type
-    assert data["updated_by"]["name"] == gcp_extension.name
+    assert data["events"]["created"]["at"] is not None
+    assert data["events"]["created"]["by"]["id"] == str(gcp_extension.id)
+    assert data["events"]["created"]["by"]["type"] == gcp_extension.type
+    assert data["events"]["created"]["by"]["name"] == gcp_extension.name
+    assert data["events"]["updated"]["at"] is not None
+    assert data["events"]["updated"]["by"]["id"] == str(gcp_extension.id)
+    assert data["events"]["updated"]["by"]["type"] == gcp_extension.type
+    assert data["events"]["updated"]["by"]["name"] == gcp_extension.name
 
 
 async def test_get_non_existant_entitlement(api_client: AsyncClient, gcp_jwt_token: str):
@@ -453,6 +453,13 @@ async def test_terminate_entitlement_success(
     assert entitlement_gcp.terminated_at is not None
     assert request_start_dt < entitlement_gcp.terminated_at < request_end_dt
     assert entitlement_gcp.terminated_by_id == gcp_extension.id
+
+    assert (
+        datetime.fromisoformat(data["events"]["terminated"]["at"]) == entitlement_gcp.terminated_at
+    )
+    assert data["events"]["terminated"]["by"]["id"] == gcp_extension.id
+    assert data["events"]["terminated"]["by"]["type"] == gcp_extension.type._value_
+    assert data["events"]["terminated"]["by"]["name"] == gcp_extension.name
 
 
 async def test_terminate_new_entitlement(

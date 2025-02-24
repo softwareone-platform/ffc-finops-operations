@@ -11,7 +11,13 @@ from app.db.models import Organization
 from app.dependencies import OrganizationId, OrganizationRepository
 from app.enums import DatasourceType
 from app.pagination import LimitOffsetPage, paginate
-from app.schemas import DatasourceRead, EmployeeRead, OrganizationCreate, OrganizationRead, from_orm
+from app.schemas.core import from_orm
+from app.schemas.employees import EmployeeRead
+from app.schemas.organizations import (
+    DatasourceRead,
+    OrganizationCreate,
+    OrganizationRead,
+)
 from app.utils import wrap_http_error_in_502
 
 router = APIRouter(dependencies=[Depends(check_operations_account)])
