@@ -315,7 +315,7 @@ async def get_user_by_id(
             logger.error("No account user has been found.")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="User Not Found.",
+                detail=f"User with ID `{user_id}` wasn't found.",
             )
         with wrap_exc_in_http_response(
             NotFoundError, status_code=status.HTTP_404_NOT_FOUND, error_msg="User Not Found."
