@@ -121,7 +121,7 @@ def test_entitlement_read_from_orm(
             id="FORG-1234-5678-9012",
             name="Test Org",
             currency="EUR",
-            affiliate_external_id="ORG-123",
+            linked_organization_id="ORG-123",
             operations_external_id="FFC-123",
             status=OrganizationStatus.ACTIVE,
         )
@@ -167,8 +167,8 @@ def test_entitlement_read_from_orm(
         assert entitlement_read.events.redeemed.by.name == redeeemer_organization.name
         assert entitlement_read.events.redeemed.by.currency == redeeemer_organization.currency
         assert (
-            entitlement_read.events.redeemed.by.affiliate_external_id
-            == redeeemer_organization.affiliate_external_id
+            entitlement_read.events.redeemed.by.operations_external_id
+            == redeeemer_organization.operations_external_id
         )
     else:
         assert entitlement_read.events.redeemed is None
