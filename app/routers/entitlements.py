@@ -24,8 +24,8 @@ from app.schemas.entitlements import EntitlementCreate, EntitlementRead, Entitle
 def common_extra_conditions(auth_ctx: CurrentAuthContext) -> list[ColumnExpressionArgument]:
     conditions: list[ColumnExpressionArgument] = []
 
-    if auth_ctx.account.type == AccountType.AFFILIATE:
-        conditions.append(Entitlement.owner == auth_ctx.account)
+    if auth_ctx.account.type == AccountType.AFFILIATE:  # type: ignore
+        conditions.append(Entitlement.owner == auth_ctx.account)  # type: ignore
 
     return conditions
 
@@ -69,13 +69,13 @@ async def create_entitlement(
     auth_context: CurrentAuthContext,
 ):
     owner = None
-    if auth_context.account.type == AccountType.AFFILIATE:
+    if auth_context.account.type == AccountType.AFFILIATE:  # type: ignore
         if data.owner:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Affiliate accounts cannot provide an owner for an Entitlement.",
             )
-        owner = auth_context.account
+        owner = auth_context.account  # type: ignore
     else:
         if not data.owner:
             raise HTTPException(

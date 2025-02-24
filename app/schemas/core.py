@@ -28,12 +28,12 @@ def from_orm[M: Base, S: BaseModel](schema_cls: type[S], db_model: M) -> S:
 
     events_schema_cls = schema_cls.model_fields["events"].annotation
 
-    if not issubclass(events_schema_cls, AuditEventsSchema):
+    if not issubclass(events_schema_cls, AuditEventsSchema):  # type: ignore
         raise TypeError(f"Unsupported schema type: {events_schema_cls}")
 
     schema_values: dict[str, AuditFieldSchema | None] = {}
 
-    for field_name, field_info in events_schema_cls.model_fields.items():
+    for field_name, field_info in events_schema_cls.model_fields.items():  # type: ignore
         event_field_schema_cls = field_info.annotation
 
         if isinstance(event_field_schema_cls, types.UnionType):
@@ -57,11 +57,11 @@ def from_orm[M: Base, S: BaseModel](schema_cls: type[S], db_model: M) -> S:
 
         schema_values[field_name] = event_field_schema_cls(at=at_value, by=by_value)
 
-    events = events_schema_cls(**schema_values)
+    events = events_schema_cls(**schema_values)  # type: ignore
 
     fields = {
         field_name: getattr(db_model, field_name)
-        for field_name, field_info in schema_cls.model_fields.items()
+        for field_name, _ in schema_cls.model_fields.items()
         if hasattr(db_model, field_name)
     }
     return schema_cls(**fields, events=events)

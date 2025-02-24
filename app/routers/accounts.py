@@ -206,7 +206,7 @@ async def list_account_users(
     Returns a list of accounts if any.
     """
 
-    if auth_context.account.type == AccountType.AFFILIATE and auth_context.account != account:
+    if auth_context.account.type == AccountType.AFFILIATE and auth_context.account != account:  # type: ignore
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Account with ID `{account.id}` wasn't found.",
@@ -241,7 +241,7 @@ async def remove_user_from_account(
         - HTTPException 400 if the query doesn't return a valid account's user object
 
     """
-    if auth_context.account.type == AccountType.AFFILIATE and auth_context.account != account:
+    if auth_context.account.type == AccountType.AFFILIATE and auth_context.account != account:  # type: ignore
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Account with ID `{account.id}` wasn't found.",
