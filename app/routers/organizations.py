@@ -1,12 +1,13 @@
 from typing import Annotated
 from uuid import UUID
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api_clients import APIModifierClient, OptscaleAuthClient, OptscaleClient
 from app.auth.auth import check_operations_account
 from app.auth.context import auth_context
-from app.db.handlers import NotFoundError
+from app.db.handlers import ConstraintViolationError, NotFoundError
 from app.db.models import Organization
 from app.dependencies import OrganizationId, OrganizationRepository
 from app.enums import DatasourceType
@@ -17,8 +18,9 @@ from app.schemas.organizations import (
     DatasourceRead,
     OrganizationCreate,
     OrganizationRead,
+    OrganizationUpdate,
 )
-from app.utils import wrap_http_error_in_502
+from app.utils import wrap_exc_in_http_response, wrap_http_error_in_502
 
 router = APIRouter(dependencies=[Depends(check_operations_account)])
 
@@ -213,6 +215,79 @@ async def make_organization_user_admin(
             str(organization.linked_organization_id),
             user["auth_user_id"],
         )
+
+
+@router.put("/{organization_id}", response_model=OrganizationRead)
+async def update_organization(
+    db_organization: Annotated[Organization, Depends(fetch_organization_or_404)],
+    organization_repo: OrganizationRepository,
+    api_modifier_client: APIModifierClient,
+    data: OrganizationUpdate,
+):
+    original_external_id = db_organization.operations_external_id
+    external_id_changed = (
+        data.operations_external_id is not None
+        and original_external_id != data.operations_external_id
+    )
+    name_changed = data.name is not None and db_organization.name != data.name
+
+    if name_changed and db_organization.linked_organization_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Organization {db_organization.name} has no associated "
+                "FinOps for Cloud organization."
+            ),
+        )
+
+    if external_id_changed:
+        # If the external ID is changed, we need to first change it in the DB as there is a unique
+        # constraint on it and if it fails, then we can immediately return an error response and not
+        # even make an API call to the API modifier
+
+        with wrap_exc_in_http_response(
+            ConstraintViolationError,
+            "An organization with the same operations_external_id already exists.",
+        ):
+            db_organization = await organization_repo.update(
+                db_organization,
+                {"operations_external_id": data.operations_external_id},
+            )
+
+    if not name_changed:
+        return from_orm(OrganizationRead, db_organization)
+
+    # If the name has changed, we need to first change it in Optscale as this API call can fail
+    # and change it in the DB only if the API call is successful
+
+    try:
+        # mypy isn't smart enough to unrderstand that by this point both
+        # data.name and db_organization.linked_organization_id are not None
+        # due to the checks above, so we're ignoring the type checks here
+
+        await api_modifier_client.update_organization_name(
+            db_organization.linked_organization_id,  # type: ignore[arg-type]
+            data.name,  # type: ignore[arg-type]
+        )
+    except httpx.HTTPStatusError as e:
+        if external_id_changed:
+            await organization_repo.update(
+                db_organization,
+                {"operations_external_id": original_external_id},
+            )
+
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "Error changing the organization's name in FinOps for Cloud: "
+                f"{e.response.status_code} - {e.response.text}."
+            ),
+        ) from e
+
+    # The name change on the optscale side was successful, so we can now update the name in the DB
+    db_organization = await organization_repo.update(db_organization, {"name": data.name})
+
+    return from_orm(OrganizationRead, db_organization)
 
 
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)

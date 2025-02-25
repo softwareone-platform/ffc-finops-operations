@@ -25,9 +25,11 @@ class OrganizationExpensesInfo(BaseSchema):
 
 
 class OrganizationBase(BaseSchema):
-    name: Annotated[str, Field(max_length=255, examples=["Nimbus Nexus Inc."])]
+    name: Annotated[str, Field(min_length=1, max_length=255, examples=["Nimbus Nexus Inc."])]
     currency: Annotated[str, Field(examples=["EUR"])]
-    operations_external_id: Annotated[str, Field(max_length=255, examples=["AGR-9876-5534-9172"])]
+    operations_external_id: Annotated[
+        str, Field(min_length=1, max_length=255, examples=["AGR-9876-5534-9172"])
+    ]
 
 
 class OrganizationCreate(OrganizationBase):
@@ -43,8 +45,12 @@ class OrganizationRead(IdSchema, CommonEventsSchema, OrganizationBase):
 
 
 class OrganizationUpdate(BaseSchema):
-    name: str | None = None
-    operations_external_id: str | None = None
+    name: Annotated[
+        str | None, Field(min_length=1, max_length=255, examples=["Nimbus Nexus Inc."])
+    ] = None
+    operations_external_id: Annotated[
+        str | None, Field(min_length=1, max_length=255, examples=["AGR-9876-5534-9172"])
+    ] = None
 
 
 class OrganizationReference(IdSchema, OrganizationBase):

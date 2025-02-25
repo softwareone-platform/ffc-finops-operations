@@ -88,3 +88,15 @@ class APIModifierClient(BaseAPIClient):
         )
         response.raise_for_status()
         return response
+
+    async def update_organization_name(
+        self,
+        linked_organization_id: str,
+        new_name: str,
+    ) -> httpx.Response:
+        response = await self.httpx_client.patch(
+            f"/organizations/{linked_organization_id}",
+            json={"name": new_name},
+        )
+        response.raise_for_status()
+        return response
