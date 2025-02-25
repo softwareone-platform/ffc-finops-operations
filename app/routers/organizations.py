@@ -229,6 +229,16 @@ async def update_organization(
         data.operations_external_id is not None
         and original_external_id != data.operations_external_id
     )
+    name_changed = data.name is not None and db_organization.name != data.name
+
+    if name_changed and db_organization.linked_organization_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Organization {db_organization.name} has no associated "
+                "FinOps for Cloud organization."
+            ),
+        )
 
     if external_id_changed:
         # If the external ID is changed, we need to first change it in the DB as there is a unique
@@ -244,16 +254,20 @@ async def update_organization(
                 {"operations_external_id": data.operations_external_id},
             )
 
-    if not (data.name is not None and db_organization.name != data.name):
+    if not name_changed:
         return from_orm(OrganizationRead, db_organization)
 
     # If the name has changed, we need to first change it in Optscale as this API call can fail
     # and change it in the DB only if the API call is successful
 
-    # TODO: Add a check for None linked_organization_id
     try:
+        # mypy isn't smart enough to unrderstand that by this point both
+        # data.name and db_organization.linked_organization_id are not None
+        # due to the checks above, so we're ignoring the type checks here
+
         await api_modifier_client.update_organization_name(
-            db_organization.linked_organization_id, data.name
+            db_organization.linked_organization_id,  # type: ignore[arg-type]
+            data.name,  # type: ignore[arg-type]
         )
     except httpx.HTTPStatusError as e:
         if external_id_changed:
