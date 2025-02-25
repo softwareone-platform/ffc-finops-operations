@@ -26,18 +26,17 @@ class OrganizationExpensesInfo(BaseSchema):
 
 class OrganizationBase(BaseSchema):
     name: Annotated[str, Field(min_length=1, max_length=255, examples=["Nimbus Nexus Inc."])]
+    currency: Annotated[str, Field(examples=["EUR"])]
     operations_external_id: Annotated[
         str, Field(min_length=1, max_length=255, examples=["AGR-9876-5534-9172"])
     ]
 
 
 class OrganizationCreate(OrganizationBase):
-    currency: Annotated[str, Field(examples=["EUR"])]
     user_id: str
 
 
 class OrganizationRead(IdSchema, CommonEventsSchema, OrganizationBase):
-    currency: Annotated[str, Field(examples=["EUR"])]
     linked_organization_id: Annotated[
         str | None, Field(max_length=255, examples=["ee7ebfaf-a222-4209-aecc-67861694a488"])
     ] = None
@@ -45,17 +44,17 @@ class OrganizationRead(IdSchema, CommonEventsSchema, OrganizationBase):
     expenses_info: OrganizationExpensesInfo | None = None
 
 
-class OrganizationUpdate(OrganizationBase):
+class OrganizationUpdate(BaseSchema):
     name: Annotated[
         str | None, Field(min_length=1, max_length=255, examples=["Nimbus Nexus Inc."])
-    ] = None  # type: ignore[assignment]
+    ] = None
     operations_external_id: Annotated[
         str | None, Field(min_length=1, max_length=255, examples=["AGR-9876-5534-9172"])
-    ] = None  # type: ignore[assignment]
+    ] = None
 
 
 class OrganizationReference(IdSchema, OrganizationBase):
-    currency: Annotated[str, Field(examples=["EUR"])]
+    pass
 
 
 class DatasourceRead(BaseSchema):
