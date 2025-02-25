@@ -202,7 +202,6 @@ async def list_account_users(
     The output is paginated by default.
     Raises:
         - HTTPException with status 404 if the given account is different from the context account
-        - HTTPException 404 if the provided account's id doesn't exist.
     Returns a list of accounts if any.
     """
 

@@ -105,7 +105,7 @@ async def db_session(db_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, Non
     await db_engine.dispose()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 async def api_client(fastapi_app: FastAPI, app_lifespan_manager: LifespanManager):
     async with AsyncClient(
         transport=ASGITransport(app=app_lifespan_manager.app),

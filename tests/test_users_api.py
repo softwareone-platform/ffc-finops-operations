@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import time_machine
@@ -8,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conf import Settings
+from app.db.handlers import NotFoundError
 from app.db.models import Account, AccountUser, System, User
 from app.enums import AccountStatus, AccountUserStatus, UserStatus
 from app.hasher import pbkdf2_sha256
@@ -322,7 +324,7 @@ async def test_invite_by_operations_account_user_disabled(
     )
     assert response.status_code == 400
     error = response.json()["detail"]
-    assert error == ("The user invited@user.ops cannot be invited " "because it is disabled.")
+    assert error == "The user invited@user.ops cannot be invited because it is disabled."
 
 
 @pytest.mark.parametrize(
@@ -895,4 +897,166 @@ async def test_resend_invitation_account_user_active(
     )
     assert response.status_code == 400
     detail = response.json()["detail"]
-    assert (f"User with ID `{user.id}` already belong to the Account with ID `{user.id}.") == detail
+    assert f"User with ID `{user.id}` already belong to the Account with ID `{user.id}." == detail
+
+
+# -----------
+# GET USER BY ID
+# -----------
+
+
+@pytest.mark.parametrize(
+    "account_status",
+    [
+        AccountUserStatus.INVITED,
+        AccountUserStatus.INVITATION_EXPIRED,
+        AccountUserStatus.DELETED,
+        AccountUserStatus.ACTIVE,
+    ],
+)
+async def test_operations_account_can_always_get_user_by_id(
+    user_factory: ModelFactory[User],
+    accountuser_factory: ModelFactory[AccountUser],
+    gcp_account: Account,
+    operations_client: AsyncClient,
+    test_settings: Settings,
+    account_status: str,
+):
+    user = await user_factory(
+        name="Invited User",
+        email="invited@user.ops",
+        status=UserStatus.ACTIVE,
+    )
+    await accountuser_factory(
+        user_id=user.id,
+        account_id=gcp_account.id,
+        status=account_status,
+        invitation_token="my-amazing-invitation-token",
+        invitation_token_expires_at=datetime.now()
+        + timedelta(days=test_settings.invitation_token_expires_days),
+    )
+
+    response = await operations_client.get(f"/users/{user.id}")
+    assert response.status_code == 200
+    data = response.json()
+    assert data is not None
+    assert data.get("name") == user.name
+    assert data.get("email") == user.email
+    assert data.get("id") == user.id
+
+
+@pytest.mark.parametrize(
+    ("account_status", "response_status"),
+    [
+        (AccountUserStatus.ACTIVE, 200),
+        (AccountUserStatus.INVITED, 200),
+        (AccountUserStatus.INVITATION_EXPIRED, 200),
+        (AccountUserStatus.DELETED, 404),
+    ],
+)
+async def test_affiliate_account_can_get_user_by_id_only_with_status_not_deleted(
+    user_factory: ModelFactory[User],
+    accountuser_factory: ModelFactory[AccountUser],
+    affiliate_client: AsyncClient,
+    gcp_account: Account,
+    test_settings: Settings,
+    account_status: str,
+    response_status: int,
+):
+    user = await user_factory(
+        name="Invited User",
+        email="invited@user.ops",
+        status=UserStatus.ACTIVE,
+    )
+    await accountuser_factory(
+        user_id=user.id,
+        account_id=gcp_account.id,
+        status=account_status,
+        invitation_token="my-amazing-invitation-token",
+        invitation_token_expires_at=datetime.now()
+        + timedelta(days=test_settings.invitation_token_expires_days),
+    )
+    response = await affiliate_client.get(f"/users/{user.id}")
+    assert response.status_code == response_status
+    if response_status == 200:
+        data = response.json()
+        assert data is not None
+        assert data.get("name") == user.name
+        assert data.get("email") == user.email
+        assert data.get("id") == user.id
+
+
+async def test_cannot_get_user_by_id_with_affiliate_account_client_and_not_existing_user(  # noqa: E501
+    affiliate_client: AsyncClient,
+):
+    response = await affiliate_client.get("/users/FUSR-8994-8942")
+    assert response.status_code == 404
+
+
+async def test_get_user_by_id_with_no_auth_and_invalid_invitation_token(
+    user_factory: ModelFactory[User],
+    accountuser_factory: ModelFactory[AccountUser],
+    api_client: AsyncClient,
+    gcp_account: Account,
+    test_settings: Settings,
+):
+    user = await user_factory(
+        name="Invited User",
+        email="invited@user.ops",
+        status=UserStatus.ACTIVE,
+    )
+    await accountuser_factory(
+        user_id=user.id,
+        account_id=gcp_account.id,
+        status=AccountUserStatus.INVITED,
+        invitation_token="my-amazing-invitation-token",
+        invitation_token_expires_at=datetime.now()
+        + timedelta(days=test_settings.invitation_token_expires_days),
+    )
+    response = await api_client.get(f"/users/{user.id}?token=what_a_wonderful_world")
+    assert response.status_code == 401
+
+
+async def test_get_user_by_id_with_no_auth_and_invitation_token(
+    user_factory: ModelFactory[User],
+    accountuser_factory: ModelFactory[AccountUser],
+    api_client: AsyncClient,
+    gcp_account: Account,
+    test_settings: Settings,
+):
+    user = await user_factory(
+        name="Invited User2",
+        email="invite2d@user.ops",
+        status=UserStatus.ACTIVE,
+    )
+    await accountuser_factory(
+        user_id=user.id,
+        account_id=gcp_account.id,
+        status=AccountUserStatus.INVITED,
+        invitation_token="my-amazing-invitation-token",
+        invitation_token_expires_at=datetime.now()
+        + timedelta(days=test_settings.invitation_token_expires_days),
+    )
+    response = await api_client.get(f"/users/{user.id}?token=my-amazing-invitation-token")
+    assert response.status_code == 200
+    data = response.json()
+    assert data is not None
+    assert data.get("name") == user.name
+    assert data.get("email") == user.email
+    assert data.get("id") == user.id
+
+
+async def test_get_user_by_id_exception():
+    mock_session = AsyncMock(spec=AsyncSession)
+    mock_result = AsyncMock()
+    mock_result.scalar_one_or_none.return_value = None
+    mock_session.execute.return_value = mock_result
+
+    mock_repo = MagicMock()
+    mock_repo.session = mock_session
+    mock_repo.model_cls = MagicMock(__name__="MockTest")
+
+    mock_repo.get = AsyncMock(side_effect=NotFoundError("User with ID `123` wasn't found."))
+
+    with pytest.raises(NotFoundError, match="User with ID `123` wasn't found."):
+        await mock_repo.get(id="123")
