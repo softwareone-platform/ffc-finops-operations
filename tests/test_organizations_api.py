@@ -381,3 +381,182 @@ async def test_get_invalid_id_format(api_client: AsyncClient, ffc_jwt_token: str
     [detail] = response.json()["detail"]
     assert detail["loc"] == ["path", "organization_id"]
     assert detail["type"] == "string_pattern_mismatch"
+
+
+# ===================
+# Update Organization
+# ===================
+
+
+@pytest.mark.parametrize(
+    ("updated_external_id", "expected_status_code"),
+    [
+        pytest.param("existing_external_id", 400, id="already_exists"),
+        pytest.param("", 422, id="too_short"),
+        pytest.param("super_long_ext_id" * 20, 422, id="too_long"),
+        pytest.param("updated_external_id", 200, id="just_right"),
+    ],
+)
+async def test_update_organization_external_id(
+    organization_factory: ModelFactory[Organization],
+    operations_client: AsyncClient,
+    httpx_mock: HTTPXMock,
+    db_session: AsyncSession,
+    updated_external_id: str,
+    expected_status_code: int,
+):
+    db_org = await organization_factory(
+        name="initial_name",
+        currency="EUR",
+        operations_external_id="initial_external_id",
+    )
+
+    # Add another organization to check that the external id is unique
+    await organization_factory(
+        name="another_name",
+        currency="EUR",
+        operations_external_id="existing_external_id",
+    )
+
+    response = await operations_client.put(
+        f"/organizations/{db_org.id}",
+        json={"name": "initial_name", "operations_external_id": updated_external_id},
+    )
+
+    assert response.status_code == expected_status_code
+
+    # If we want to only update the operations_external_id,
+    # we should not make requests to an external API
+    assert not httpx_mock.get_request()
+
+    await db_session.refresh(db_org)
+
+    if response.is_error:
+        assert db_org.operations_external_id == "initial_external_id"
+    else:
+        response_data = response.json()
+
+        assert response_data["id"] == db_org.id
+        assert response_data["operations_external_id"] == updated_external_id
+        assert db_org.operations_external_id == updated_external_id
+
+
+@pytest.mark.parametrize(
+    (
+        "updated_name",
+        "expected_status_code",
+        "should_call_api_modifier",
+        "api_modifier_status_code",
+    ),
+    [
+        pytest.param("", 422, False, None, id="too_short"),
+        pytest.param("super_long_name" * 20, 422, False, None, id="too_long"),
+        pytest.param("updated_name", 502, True, 500, id="api_modifier_error"),
+        pytest.param("updated_name", 200, True, 200, id="just_right"),
+    ],
+)
+async def test_update_organization_name(
+    organization_factory: ModelFactory[Organization],
+    operations_client: AsyncClient,
+    httpx_mock: HTTPXMock,
+    db_session: AsyncSession,
+    updated_name: str,
+    expected_status_code: int,
+    should_call_api_modifier: bool,
+    api_modifier_status_code: int | None,
+):
+    db_org = await organization_factory(
+        name="initial_name",
+        currency="EUR",
+        operations_external_id="initial_external_id",
+        linked_organization_id="ORG-123",
+    )
+
+    if should_call_api_modifier:
+        assert api_modifier_status_code is not None
+
+        httpx_mock.add_response(
+            method="PATCH",
+            headers={"Authorization": operations_client.headers["Authorization"]},
+            url=f"https://api-modifier.ffc.com/organizations/{db_org.linked_organization_id}",
+            status_code=api_modifier_status_code,
+            json={
+                "id": db_org.linked_organization_id,
+                "name": updated_name,
+            },
+        )
+
+    response = await operations_client.put(
+        f"/organizations/{db_org.id}",
+        json={"name": updated_name, "operations_external_id": "initial_external_id"},
+    )
+
+    assert bool(httpx_mock.get_request()) == should_call_api_modifier
+    assert response.status_code == expected_status_code
+    await db_session.refresh(db_org)
+
+    if response.is_error:
+        assert db_org.name == "initial_name"
+    else:
+        response_data = response.json()
+
+        assert response_data["id"] == db_org.id
+        assert response_data["name"] == updated_name
+        assert db_org.name == updated_name
+
+
+@pytest.mark.parametrize(
+    ("api_modifier_status_code", "expected_status_code"),
+    [
+        pytest.param(500, 502, id="api_modifier_error"),
+        pytest.param(200, 200, id="success"),
+    ],
+)
+async def test_update_organization_both_fields(
+    organization_factory: ModelFactory[Organization],
+    operations_client: AsyncClient,
+    httpx_mock: HTTPXMock,
+    db_session: AsyncSession,
+    api_modifier_status_code: int,
+    expected_status_code: int,
+):
+    db_org = await organization_factory(
+        name="initial_name",
+        currency="EUR",
+        operations_external_id="initial_external_id",
+        linked_organization_id="ORG-123",
+    )
+
+    httpx_mock.add_response(
+        method="PATCH",
+        headers={"Authorization": operations_client.headers["Authorization"]},
+        url=f"https://api-modifier.ffc.com/organizations/{db_org.linked_organization_id}",
+        status_code=api_modifier_status_code,
+        json={
+            "id": db_org.linked_organization_id,
+            "name": "updated_name",
+        },
+    )
+
+    response = await operations_client.put(
+        f"/organizations/{db_org.id}",
+        json={"name": "updated_name", "operations_external_id": "updated_external_id"},
+    )
+
+    assert response.status_code == expected_status_code
+    await db_session.refresh(db_org)
+
+    if response.is_error:
+        # Make sure that the organization hasn't been updated
+        # (most notably the operations_external_id change has been rolled back)
+        assert db_org.name == "initial_name"
+        assert db_org.operations_external_id == "initial_external_id"
+    else:
+        response_data = response.json()
+
+        assert response_data["id"] == db_org.id
+        assert response_data["name"] == "updated_name"
+        assert response_data["operations_external_id"] == "updated_external_id"
+
+        assert db_org.name == "updated_name"
+        assert db_org.operations_external_id == "updated_external_id"
