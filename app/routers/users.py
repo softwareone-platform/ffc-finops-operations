@@ -298,12 +298,11 @@ async def get_user_by_id(
             ),
         )
         if account_user is None:
+            logger.error(f"Invalid invitation token for User with ID `{user_id}`.")
             raise UNAUTHORIZED_EXCEPTION
         response = await user_repo.get(id=user_id)
     elif auth_context.account.type == AccountType.OPERATIONS:
-        with wrap_exc_in_http_response(
-            NotFoundError, status_code=status.HTTP_404_NOT_FOUND, error_msg="User Not Found."
-        ):
+        with wrap_exc_in_http_response(NotFoundError, status_code=status.HTTP_404_NOT_FOUND):
             response = await user_repo.get(id=user_id)
     elif auth_context.account.type == AccountType.AFFILIATE:
         account_user = await accountuser_repo.get_account_user(
@@ -312,19 +311,16 @@ async def get_user_by_id(
             extra_conditions=[AccountUser.status != AccountUserStatus.DELETED],
         )
         if account_user is None:
-            logger.error("No account user has been found.")
+            logger.error(f"User with ID `{user_id}` wasn't found.")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"User with ID `{user_id}` wasn't found.",
             )
-        with wrap_exc_in_http_response(
-            NotFoundError, status_code=status.HTTP_404_NOT_FOUND, error_msg="User Not Found."
-        ):
+        with wrap_exc_in_http_response(NotFoundError, status_code=status.HTTP_404_NOT_FOUND):
             # not filtering [AccountUser.status != AccountUserStatus.DELETED]
             # because if the user is in
             # status DELETE then the account user will be deleted as well
             response = await user_repo.get(id=user_id)
-            print("Response:", response)
     return from_orm(UserRead, response)
 
 

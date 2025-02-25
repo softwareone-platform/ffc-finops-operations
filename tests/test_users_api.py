@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import time_machine
@@ -8,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conf import Settings
+from app.db.handlers import NotFoundError
 from app.db.models import Account, AccountUser, System, User
 from app.enums import AccountStatus, AccountUserStatus, UserStatus
 from app.hasher import pbkdf2_sha256
@@ -1042,3 +1044,19 @@ async def test_get_user_by_id_with_no_auth_and_invitation_token(
     assert data.get("name") == user.name
     assert data.get("email") == user.email
     assert data.get("id") == user.id
+
+
+async def test_get_user_by_id_exception():
+    mock_session = AsyncMock(spec=AsyncSession)
+    mock_result = AsyncMock()
+    mock_result.scalar_one_or_none.return_value = None
+    mock_session.execute.return_value = mock_result
+
+    mock_repo = MagicMock()
+    mock_repo.session = mock_session
+    mock_repo.model_cls = MagicMock(__name__="MockTest")
+
+    mock_repo.get = AsyncMock(side_effect=NotFoundError("User with ID `123` wasn't found."))
+
+    with pytest.raises(NotFoundError, match="User with ID `123` wasn't found."):
+        await mock_repo.get(id="123")
