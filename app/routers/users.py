@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import secrets
 from datetime import UTC, datetime, timedelta
@@ -6,6 +8,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth.auth import authentication_required, check_operations_account
+from app.auth.constants import UNAUTHORIZED_EXCEPTION
 from app.conf import AppSettings
 from app.db import DBEngine, DBSession, get_tx_db_session
 from app.db.handlers import AccountHandler, AccountUserHandler, NotFoundError, UserHandler
@@ -244,7 +247,7 @@ async def resend_user_invitation(
     if account_user.status == AccountUserStatus.ACTIVE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(f"User with ID `{user.id}` already belong to the Account with ID `{user.id}."),
+            detail=f"User with ID `{user.id}` already belong to the Account with ID `{user.id}.",
         )
 
     account_user.status = AccountUserStatus.INVITED
@@ -259,11 +262,66 @@ async def resend_user_invitation(
 
 
 @router.get("/{id}", response_model=UserRead)
-async def get_user_by_id(id: str, token: str | None = None):  # pragma: no cover
-    # if token is provided no authentication is needed but
-    # an AccountOperator in status invited must exist with
-    # user id and token and the token must not be expired
-    pass  # not yet implemented
+async def get_user_by_id(
+    id: str,
+    auth_context: CurrentAuthContext,
+    accountuser_repo: AccountUserRepository,
+    user_repo: UserRepository,
+    token: str | None = None,
+):
+    """
+        This endpoint returns the user filtered by the given ID.
+    There are 3 possible scenarios
+    1. No Authentication is provided, but an invitation token is sent with the request.
+       In this case, if the invitation token is valid and the user exists, its record will
+       be returned.
+    2. Authentication is provided, and the Account is OPERATIONS. In this case, the query will
+    be run with no more checks
+    3. Authentication is provided, and the Account is AFFILIATE. In this case, the query is run only
+    if the Account User status is not DELETED.
+
+    Raises:
+        - HTTPException with status 404 if no account user is found
+        - HTTPException 401 if the invitation token is not valid
+
+
+    """
+    user_id = id
+    response = None
+    if auth_context is None:
+        # No Authentication. We must verify the invitation token
+        invitation_token = token
+        account_user = await accountuser_repo.first(
+            AccountUser.invitation_token == invitation_token,
+            AccountUser.status.in_(
+                [AccountUserStatus.INVITED, AccountUserStatus.INVITATION_EXPIRED]
+            ),
+        )
+        if account_user is None:
+            logger.error(f"Invalid invitation token for User with ID `{user_id}`.")
+            raise UNAUTHORIZED_EXCEPTION
+        response = await user_repo.get(id=user_id)
+    elif auth_context.account.type == AccountType.OPERATIONS:
+        with wrap_exc_in_http_response(NotFoundError, status_code=status.HTTP_404_NOT_FOUND):
+            response = await user_repo.get(id=user_id)
+    elif auth_context.account.type == AccountType.AFFILIATE:
+        account_user = await accountuser_repo.get_account_user(
+            account_id=auth_context.account.id,
+            user_id=user_id,
+            extra_conditions=[AccountUser.status != AccountUserStatus.DELETED],
+        )
+        if account_user is None:
+            logger.error(f"User with ID `{user_id}` wasn't found.")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User with ID `{user_id}` wasn't found.",
+            )
+        with wrap_exc_in_http_response(NotFoundError, status_code=status.HTTP_404_NOT_FOUND):
+            # not filtering [AccountUser.status != AccountUserStatus.DELETED]
+            # because if the user is in
+            # status DELETE then the account user will be deleted as well
+            response = await user_repo.get(id=user_id)
+    return from_orm(UserRead, response)
 
 
 @router.post(

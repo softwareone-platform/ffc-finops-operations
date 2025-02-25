@@ -185,6 +185,7 @@ def test_invite_user_command(
     mocker: MockerFixture,
     test_settings: Settings,
 ):
+    mocker.patch("app.cli.get_settings", return_value=test_settings)
     mock_invite_coro = mocker.MagicMock()
     mock_invite_user = mocker.MagicMock(return_value=mock_invite_coro)
 
