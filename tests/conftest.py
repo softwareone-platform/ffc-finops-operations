@@ -93,16 +93,17 @@ def assert_num_queries(capsql: SQLAlchemyCapturer) -> Callable[[int], AbstractCo
 async def db_session(db_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, None]:
     session = async_sessionmaker(db_engine, expire_on_commit=False)
 
-    async with session() as s:
-        async with db_engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-
-        yield s
-
     async with db_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
 
-    await db_engine.dispose()
+    try:
+        async with session() as s:
+            yield s
+    finally:
+        async with db_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+
+        await db_engine.dispose()
 
 
 @pytest.fixture()
