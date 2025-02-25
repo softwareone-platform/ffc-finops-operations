@@ -420,7 +420,7 @@ async def test_update_organization_external_id(
 
     response = await operations_client.put(
         f"/organizations/{db_org.id}",
-        json={"name": "initial_name", "operations_external_id": updated_external_id},
+        json={"operations_external_id": updated_external_id},
     )
 
     assert response.status_code == expected_status_code
@@ -488,7 +488,7 @@ async def test_update_organization_name(
 
     response = await operations_client.put(
         f"/organizations/{db_org.id}",
-        json={"name": updated_name, "operations_external_id": "initial_external_id"},
+        json={"name": updated_name},
     )
 
     assert bool(httpx_mock.get_request()) == should_call_api_modifier

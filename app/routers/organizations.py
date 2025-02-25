@@ -225,7 +225,10 @@ async def update_organization(
     data: OrganizationUpdate,
 ):
     original_external_id = db_organization.operations_external_id
-    external_id_changed = original_external_id != data.operations_external_id
+    external_id_changed = (
+        data.operations_external_id is not None
+        and original_external_id != data.operations_external_id
+    )
 
     if external_id_changed:
         # If the external ID is changed, we need to first change it in the DB as there is a unique
@@ -241,12 +244,13 @@ async def update_organization(
                 {"operations_external_id": data.operations_external_id},
             )
 
-    if db_organization.name == data.name:
+    if not (data.name is not None and db_organization.name != data.name):
         return from_orm(OrganizationRead, db_organization)
 
     # If the name has changed, we need to first change it in Optscale as this API call can fail
     # and change it in the DB only if the API call is successful
 
+    # TODO: Add a check for None linked_organization_id
     try:
         await api_modifier_client.update_organization_name(
             db_organization.linked_organization_id, data.name
