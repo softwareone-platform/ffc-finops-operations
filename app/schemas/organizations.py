@@ -43,8 +43,10 @@ class OrganizationRead(IdSchema, CommonEventsSchema, OrganizationBase):
 
 
 class OrganizationUpdate(BaseSchema):
-    name: str | None = None
-    operations_external_id: str | None = None
+    name: Annotated[str, Field(min_length=3, max_length=255, examples=["Nimbus Nexus Inc."])]
+    operations_external_id: Annotated[
+        str, Field(min_length=3, max_length=255, examples=["AGR-9876-5534-9172"])
+    ]
 
 
 class OrganizationReference(IdSchema, OrganizationBase):
