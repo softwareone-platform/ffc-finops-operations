@@ -560,3 +560,44 @@ async def test_update_organization_both_fields(
 
         assert db_org.name == "updated_name"
         assert db_org.operations_external_id == "updated_external_id"
+
+
+@pytest.mark.parametrize(
+    "set_operations_external_id",
+    [
+        pytest.param(True, id="only_name"),
+        pytest.param(False, id="name_and_operations_external_id"),
+    ],
+)
+async def test_try_update_name_for_organization_without_linked_organization_id(
+    organization_factory: ModelFactory[Organization],
+    operations_client: AsyncClient,
+    db_session: AsyncSession,
+    httpx_mock: HTTPXMock,
+    set_operations_external_id: bool,
+):
+    db_org = await organization_factory(
+        name="initial_name",
+        currency="EUR",
+        operations_external_id="initial_external_id",
+        linked_organization_id=None,
+    )
+
+    json_payload = {"name": "updated_name"}
+    if set_operations_external_id:
+        json_payload["operations_external_id"] = "updated_external_id"
+
+    response = await operations_client.put(f"/organizations/{db_org.id}", json=json_payload)
+
+    assert not httpx_mock.get_request()
+
+    await db_session.refresh(db_org)
+
+    assert response.status_code == 400
+    assert (
+        response.json()["detail"]
+        == "Organization initial_name has no associated FinOps for Cloud organization."
+    )
+
+    assert db_org.name == "initial_name"
+    assert db_org.operations_external_id == "initial_external_id"
