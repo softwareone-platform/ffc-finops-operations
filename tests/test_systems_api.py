@@ -556,11 +556,11 @@ async def test_system_cannot_delete_itself(
     [
         pytest.param(
             {"name": "new_system_name"},
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
-            "initial_name",
+            status.HTTP_200_OK,
+            "new_system_name",
             None,
             "initial_external_id",
-            id="missing_description_and_external_id",
+            id="update_only_name",
         ),
         pytest.param(
             {"name": "new_system_name", "external_id": "new_external_id"},
@@ -571,7 +571,7 @@ async def test_system_cannot_delete_itself(
             id="missing_description",
         ),
         pytest.param(
-            {"name": "initial_name", "description": None, "external_id": "new_external_id"},
+            {"external_id": "new_external_id"},
             status.HTTP_200_OK,
             "initial_name",
             None,
@@ -591,11 +591,7 @@ async def test_system_cannot_delete_itself(
             id="update_all_fields",
         ),
         pytest.param(
-            {
-                "name": None,
-                "external_id": "new_external_id",
-                "description": "new_description",
-            },
+            {"name": None},
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             "initial_name",
             None,
@@ -616,11 +612,7 @@ async def test_system_cannot_delete_itself(
             id="attempt_to_set_non_existant_field",
         ),
         pytest.param(
-            {
-                "name": "new_name",
-                "description": "new_description" * 1000,
-                "external_id": "new_external_id",
-            },
+            {"description": "new_description" * 1000},
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             "initial_name",
             None,
@@ -628,11 +620,7 @@ async def test_system_cannot_delete_itself(
             id="attempt_to_set_description_too_long",
         ),
         pytest.param(
-            {
-                "name": "new_name",
-                "external_id": "new_external_id" * 1000,
-                "description": "new_description",
-            },
+            {"external_id": "new_external_id" * 1000},
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             "initial_name",
             None,
@@ -719,11 +707,7 @@ async def test_system_external_id_is_unique_for_non_deleted_objects(
     response = await api_client.put(
         f"/systems/{system.id}",
         headers={"Authorization": f"Bearer {system_jwt_token_factory(ffc_extension)}"},
-        json={
-            "name": "initial_name",
-            "description": "initial_description",
-            "external_id": "existing_external_id",
-        },
+        json={"external_id": "existing_external_id"},
     )
 
     assert response.status_code == expected_status_code
