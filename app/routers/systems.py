@@ -112,10 +112,18 @@ async def update_system(
     system_repo: SystemRepository,
     data: SystemUpdate,
 ):
+    update_fields = data.model_dump(exclude_unset=True)
+
+    if not update_fields:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one field must be provided for update.",
+        )
+
     with wrap_exc_in_http_response(
         ConstraintViolationError, "A system with the same external ID already exists."
     ):
-        system = await system_repo.update(system, data.model_dump(exclude_unset=True))
+        system = await system_repo.update(system, update_fields)
 
     return from_orm(SystemRead, system)
 
