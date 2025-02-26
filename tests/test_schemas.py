@@ -5,24 +5,24 @@ import pytest
 
 from app.db.models import Account, Actor, Entitlement, Organization, System
 from app.enums import AccountType, ActorType, EntitlementStatus, OrganizationStatus, SystemStatus
-from app.schemas.core import ActorRead, from_orm, to_orm
+from app.schemas.core import ActorRead, convert_model_to_schema, convert_schema_to_model
 from app.schemas.entitlements import EntitlementCreate, EntitlementRead, EntitlementUpdate
 from app.schemas.organizations import OrganizationCreate, OrganizationRead, OrganizationUpdate
 from app.schemas.systems import SystemCreate, SystemRead
 
 
-def test_actor_read_from_orm():
+def test_actor_read_convert_model_to_schema():
     test_actor = Actor(
         id="OPE-1234-5678",
         type=ActorType.USER,
     )
-    actor_read = from_orm(ActorRead, test_actor)
+    actor_read = convert_model_to_schema(ActorRead, test_actor)
 
     assert actor_read.id == test_actor.id
     assert actor_read.type == test_actor.type
 
 
-def test_system_create_to_orm():
+def test_system_create_convert_schema_to_model():
     data = {
         "name": "Test System",
         "external_id": "test-system",
@@ -32,7 +32,7 @@ def test_system_create_to_orm():
     }
 
     system_create = SystemCreate(**data)
-    system = to_orm(system_create, System)
+    system = convert_schema_to_model(system_create, System)
 
     assert isinstance(system, System)
     assert system.name == data["name"]
@@ -42,7 +42,7 @@ def test_system_create_to_orm():
     assert system.type == ActorType.SYSTEM
 
 
-def test_system_read_from_orm(gcp_extension: System):
+def test_system_read_convert_model_to_schema(gcp_extension: System):
     system = System(
         id="FTKN-1234-5678",
         name="Test System",
@@ -58,7 +58,7 @@ def test_system_read_from_orm(gcp_extension: System):
     system.created_by = gcp_extension
     system.updated_by = gcp_extension
 
-    system_read = from_orm(SystemRead, system)
+    system_read = convert_model_to_schema(SystemRead, system)
 
     assert system_read.id == system.id
     assert system_read.name == system.name
@@ -73,7 +73,7 @@ def test_system_read_from_orm(gcp_extension: System):
     assert system_read.owner.id == system.owner.id
 
 
-def test_entitlement_create_to_orm():
+def test_entitlement_create_convert_schema_to_model():
     data = {
         "name": "AWS",
         "affiliate_external_id": "ACC-123",
@@ -81,7 +81,7 @@ def test_entitlement_create_to_orm():
     }
 
     entitlement_create = EntitlementCreate(**data)
-    entitlement = to_orm(entitlement_create, Entitlement)
+    entitlement = convert_schema_to_model(entitlement_create, Entitlement)
 
     assert isinstance(entitlement, Entitlement)
     assert entitlement.name == data["name"]
@@ -91,7 +91,7 @@ def test_entitlement_create_to_orm():
 
 @pytest.mark.parametrize("set_redeemed", [True, False])
 @pytest.mark.parametrize("set_terminated", [True, False])
-def test_entitlement_read_from_orm(
+def test_entitlement_read_convert_model_to_schema(
     gcp_extension: System,
     affiliate_account: Account,
     organization_factory: Organization,
@@ -129,7 +129,7 @@ def test_entitlement_read_from_orm(
         entitlement.redeemed_at = datetime.now(UTC)
         entitlement.redeemed_by = redeeemer_organization
 
-    entitlement_read = from_orm(EntitlementRead, entitlement)
+    entitlement_read = convert_model_to_schema(EntitlementRead, entitlement)
 
     assert entitlement_read.id == entitlement.id
     assert entitlement_read.name == entitlement.name
@@ -186,7 +186,7 @@ def test_entitlement_update_partial():
     assert data["name"] == update_data["name"]
 
 
-def test_organization_create_to_orm():
+def test_organization_create_convert_schema_to_model():
     data = {
         "name": "Test Org",
         "operations_external_id": "ORG-123",
@@ -195,7 +195,7 @@ def test_organization_create_to_orm():
     }
 
     org_create = OrganizationCreate(**data)
-    organization = to_orm(org_create, Organization)
+    organization = convert_schema_to_model(org_create, Organization)
 
     assert isinstance(organization, Organization)
     assert organization.name == data["name"]
@@ -204,7 +204,7 @@ def test_organization_create_to_orm():
     assert not hasattr(organization, "user_id")
 
 
-def test_organization_read_from_orm(ffc_extension: System):
+def test_organization_read_convert_model_to_schema(ffc_extension: System):
     organization = Organization(
         id="FORG-1234-5678-9012",
         name="Test Org",
@@ -219,7 +219,7 @@ def test_organization_read_from_orm(ffc_extension: System):
     organization.created_by = ffc_extension
     organization.updated_by = ffc_extension
 
-    org_read = from_orm(OrganizationRead, organization)
+    org_read = convert_model_to_schema(OrganizationRead, organization)
 
     assert org_read.id == organization.id
     assert org_read.name == organization.name

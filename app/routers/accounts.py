@@ -17,7 +17,7 @@ from app.dependencies import (
 from app.enums import AccountStatus, AccountType, AccountUserStatus
 from app.pagination import LimitOffsetPage, paginate
 from app.schemas.accounts import AccountCreate, AccountRead, AccountUpdate
-from app.schemas.core import from_orm, to_orm
+from app.schemas.core import convert_model_to_schema, convert_schema_to_model
 from app.schemas.users import UserRead
 
 router = APIRouter()
@@ -32,9 +32,9 @@ async def persist_data_and_format_response(account_repo, data):
     data: the data to persist
     Return: AccountRead Pydantic Model
     """
-    account = to_orm(data, Account)
+    account = convert_schema_to_model(data, Account)
     db_account = await account_repo.create(account)
-    return from_orm(AccountRead, db_account)
+    return convert_model_to_schema(AccountRead, db_account)
 
 
 async def update_data_and_format_response(
@@ -55,7 +55,7 @@ async def update_data_and_format_response(
             detail="You can't update whatever you want.",
         )
     db_account = await account_repo.update(id, data=to_update)
-    return from_orm(AccountRead, db_account)
+    return convert_model_to_schema(AccountRead, db_account)
 
 
 def validate_required_conditions_before_update(account: Account):
@@ -148,7 +148,7 @@ async def create_account(data: AccountCreate, account_repo: AccountRepository):
 async def get_account_by_id(
     account: Annotated[Account, Depends(fetch_account_or_404)],
 ):
-    return from_orm(AccountRead, account)
+    return convert_model_to_schema(AccountRead, account)
 
 
 @router.get(

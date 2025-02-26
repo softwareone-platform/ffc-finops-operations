@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Sequence
 from typing import TypeVar
 
@@ -8,10 +10,11 @@ from fastapi_pagination.limit_offset import LimitOffsetPage as _LimitOffsetPage
 from fastapi_pagination.types import GreaterEqualZero
 from pydantic import BaseModel
 from sqlalchemy import ColumnExpressionArgument
+from sqlalchemy.orm.interfaces import ORMOption
 
 from app.db.handlers import ModelHandler
 from app.db.models import Base
-from app.schemas.core import BaseSchema, from_orm
+from app.schemas.core import BaseSchema, convert_model_to_schema
 
 T = TypeVar("T")
 
@@ -38,19 +41,26 @@ async def paginate[M: Base, S: BaseSchema](
     schema_cls: type[S],
     *,
     extra_conditions: list[ColumnExpressionArgument] | None = None,
+    options: list[ORMOption] | None = None,
 ) -> AbstractPage[S]:
+    """
+    This function queries a database model (M) using a ModelHandler.
+    It applies optional filtering (extra_conditions) and query options (options).
+    It then serializes the results into a schema (S) and returns
+    a paginated response in the form of AbstractPage[S].
+    """
     params: LimitOffsetParams = resolve_params()
-    extra_conditions = extra_conditions or []
-
-    total = await handler.count(*extra_conditions)
+    total = await handler.count(*(extra_conditions or []))
     items: Sequence[M] = []
     if params.limit > 0:
         items = await handler.fetch_page(
-            limit=params.limit, offset=params.offset, extra_conditions=extra_conditions
+            limit=params.limit,
+            offset=params.offset,
+            extra_conditions=extra_conditions,
+            options=options,
         )
-
     return create_page(
-        [from_orm(schema_cls, item) for item in items],
+        [convert_model_to_schema(schema_cls, item) for item in items],
         params=params,
         total=total,
     )
