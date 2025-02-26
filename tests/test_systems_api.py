@@ -599,6 +599,14 @@ async def test_system_cannot_delete_itself(
             id="attempt_to_set_name_to_none",
         ),
         pytest.param(
+            {},
+            status.HTTP_400_BAD_REQUEST,
+            "initial_name",
+            None,
+            "initial_external_id",
+            id="empty_payload",
+        ),
+        pytest.param(
             {
                 "non_existant_field": None,
                 "name": "new_name",
