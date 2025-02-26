@@ -13,7 +13,7 @@ from app.dependencies import (
 )
 from app.enums import AccountStatus, AccountType, EntitlementStatus
 from app.pagination import LimitOffsetPage, paginate
-from app.schemas.core import from_orm, to_orm
+from app.schemas.core import convert_model_to_schema, convert_schema_to_model
 from app.schemas.entitlements import EntitlementCreate, EntitlementRead, EntitlementRedeem
 
 # ============
@@ -93,17 +93,17 @@ async def create_entitlement(
                 detail=f"No Active Affiliate Account has been found with ID {data.owner.id}.",
             )
 
-    entitlement = to_orm(data, Entitlement)
+    entitlement = convert_schema_to_model(data, Entitlement)
     entitlement.owner = owner
     db_entitlement = await entitlement_repo.create(entitlement)
-    return from_orm(EntitlementRead, db_entitlement)
+    return convert_model_to_schema(EntitlementRead, db_entitlement)
 
 
 @router.get("/{id}", response_model=EntitlementRead)
 async def get_entitlement_by_id(
     entitlement: Annotated[Entitlement, Depends(fetch_entitlement_or_404)],
 ):
-    return from_orm(EntitlementRead, entitlement)
+    return convert_model_to_schema(EntitlementRead, entitlement)
 
 
 @router.post("/{id}/terminate", response_model=EntitlementRead)
@@ -127,7 +127,7 @@ async def terminate_entitlement(
 
     entitlement = await entitlement_repo.terminate(entitlement)
 
-    return from_orm(EntitlementRead, entitlement)
+    return convert_model_to_schema(EntitlementRead, entitlement)
 
 
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)

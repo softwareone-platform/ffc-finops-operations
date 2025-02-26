@@ -16,7 +16,7 @@ from app.enums import AccountStatus, AccountUserStatus, UserStatus
 from app.hasher import pbkdf2_sha256
 from app.schemas.accounts import AccountReference
 from app.schemas.auth import Login, LoginRead, RefreshAccessToken
-from app.schemas.core import from_orm
+from app.schemas.core import convert_model_to_schema
 from app.schemas.users import UserReference
 
 
@@ -87,8 +87,8 @@ async def get_tokens_from_refresh(
         tokens = generate_access_and_refresh_tokens(settings, user_id, account_id)
 
         return LoginRead(
-            user=from_orm(UserReference, user),
-            account=from_orm(AccountReference, account),
+            user=convert_model_to_schema(UserReference, user),
+            account=convert_model_to_schema(AccountReference, account),
             access_token=tokens["access_token"],
             refresh_token=tokens["refresh_token"],
         )
@@ -136,8 +136,8 @@ async def get_tokens_from_credentials(
         )
         tokens = generate_access_and_refresh_tokens(settings, user.id, account_id)
         return LoginRead(
-            user=from_orm(UserReference, user),
-            account=from_orm(AccountReference, account),
+            user=convert_model_to_schema(UserReference, user),
+            account=convert_model_to_schema(AccountReference, account),
             access_token=tokens["access_token"],
             refresh_token=tokens["refresh_token"],
         )

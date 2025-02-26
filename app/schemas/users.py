@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 import uuid
 from typing import Annotated
@@ -15,12 +17,6 @@ class UserBase(BaseSchema):
 
 class UserCreate(UserBase):
     email: Annotated[EmailStr, Field(max_length=255, examples=["lady.gaga@bennett.tony"])]
-
-
-class UserRead(IdSchema, CommonEventsSchema, UserCreate):
-    status: UserStatus
-    last_login_at: datetime.datetime | None
-    last_used_account: AccountReference | None
 
 
 class UserReference(IdSchema, UserCreate):
@@ -57,6 +53,19 @@ class AccountUserRead(IdSchema, CommonEventsSchema, AccountUserBase):
     joined_at: datetime.datetime | None = None
 
 
+class AccountUserReference(IdSchema, AccountUserBase):
+    account: AccountReference
+    created_at: datetime.datetime | None = None
+    joined_at: datetime.datetime | None = None
+
+
 class UserInvitationRead(IdSchema, CommonEventsSchema, UserCreate):
     account_user: AccountUserRead | None = None
     status: UserStatus
+
+
+class UserRead(IdSchema, CommonEventsSchema, UserCreate):
+    status: UserStatus
+    last_login_at: datetime.datetime | None
+    last_used_account: AccountReference | None
+    account_user: AccountUserReference | None

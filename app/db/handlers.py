@@ -175,15 +175,16 @@ class ModelHandler[M: BaseModel]:
         limit: int = 50,
         offset: int = 0,
         extra_conditions: list[ColumnExpressionArgument] | None = None,
+        options: list[ORMOption] = None,
     ) -> Sequence[M]:
         query = select(self.model_cls).offset(offset).limit(limit).order_by("id")
         if extra_conditions:
             query = query.where(*extra_conditions)
-        if self.default_options:
-            query = query.options(*self.default_options)
-
+        orm_options = (self.default_options or []) + (options or [])
+        if orm_options:
+            query = query.options(*orm_options)
         results = await self.session.execute(query)
-        return results.scalars().all()
+        return results.scalars().unique().all()
 
     async def stream_scalars(
         self,

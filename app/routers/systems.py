@@ -8,7 +8,7 @@ from app.db.models import System
 from app.dependencies import AccountRepository, CurrentAuthContext, SystemId, SystemRepository
 from app.enums import AccountType, SystemStatus
 from app.pagination import LimitOffsetPage, paginate
-from app.schemas.core import from_orm
+from app.schemas.core import convert_model_to_schema
 from app.schemas.systems import SystemCreate, SystemCreateResponse, SystemRead, SystemUpdate
 from app.utils import wrap_exc_in_http_response
 
@@ -98,12 +98,12 @@ async def create_system(
             )
         )
 
-    return from_orm(SystemCreateResponse, system)
+    return convert_model_to_schema(SystemCreateResponse, system)
 
 
 @router.get("/{id}", response_model=SystemRead)
 async def get_system_by_id(system: Annotated[System, Depends(fetch_system_or_404)]):
-    return from_orm(SystemRead, system)
+    return convert_model_to_schema(SystemRead, system)
 
 
 @router.put("/{id}", response_model=SystemRead)
@@ -125,7 +125,7 @@ async def update_system(
     ):
         system = await system_repo.update(system, update_fields)
 
-    return from_orm(SystemRead, system)
+    return convert_model_to_schema(SystemRead, system)
 
 
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -171,7 +171,7 @@ async def disable_system(
         )
 
     system = await system_repo.update(system, {"status": SystemStatus.DISABLED})
-    return from_orm(SystemRead, system)
+    return convert_model_to_schema(SystemRead, system)
 
 
 @router.post("/{id}/enable", response_model=SystemRead)
@@ -192,4 +192,4 @@ async def enable_system(
         )
 
     system = await system_repo.update(system, {"status": SystemStatus.ACTIVE})
-    return from_orm(SystemRead, system)
+    return convert_model_to_schema(SystemRead, system)
