@@ -223,9 +223,7 @@ class Organization(Base, AuditableMixin, HumanReadablePKMixin):
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
-    operations_external_id: Mapped[str] = mapped_column(
-        String(255), nullable=False, index=True, unique=True
-    )
+    operations_external_id: Mapped[str] = mapped_column(String(255), nullable=False)
     linked_organization_id: Mapped[str | None] = mapped_column(
         String(255), nullable=True, index=True
     )
@@ -234,6 +232,15 @@ class Organization(Base, AuditableMixin, HumanReadablePKMixin):
         nullable=False,
         default=OrganizationStatus.ACTIVE,
         server_default=OrganizationStatus.ACTIVE.value,
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_organizations_operations_external_id_for_non_deleted",
+            operations_external_id,
+            unique=True,
+            postgresql_where=(status != OrganizationStatus.DELETED),
+        ),
     )
 
 

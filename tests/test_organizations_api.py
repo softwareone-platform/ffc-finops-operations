@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Organization, System
+from app.enums import OrganizationStatus
 from tests.types import ModelFactory
 
 # =================
@@ -391,7 +392,6 @@ async def test_get_invalid_id_format(api_client: AsyncClient, ffc_jwt_token: str
 @pytest.mark.parametrize(
     ("updated_external_id", "expected_status_code"),
     [
-        pytest.param("existing_external_id", 400, id="already_exists"),
         pytest.param("", 422, id="too_short"),
         pytest.param("super_long_ext_id" * 20, 422, id="too_long"),
         pytest.param("updated_external_id", 200, id="just_right"),
@@ -409,13 +409,6 @@ async def test_update_organization_external_id(
         name="initial_name",
         currency="EUR",
         operations_external_id="initial_external_id",
-    )
-
-    # Add another organization to check that the external id is unique
-    await organization_factory(
-        name="another_name",
-        currency="EUR",
-        operations_external_id="existing_external_id",
     )
 
     response = await operations_client.put(
@@ -439,6 +432,67 @@ async def test_update_organization_external_id(
         assert response_data["id"] == db_org.id
         assert response_data["operations_external_id"] == updated_external_id
         assert db_org.operations_external_id == updated_external_id
+
+
+@pytest.mark.parametrize(
+    ("org_to_update_status", "existing_org_status", "expected_status_code"),
+    [
+        pytest.param(OrganizationStatus.ACTIVE, OrganizationStatus.ACTIVE, 400),
+        pytest.param(OrganizationStatus.ACTIVE, OrganizationStatus.CANCELLED, 400),
+        pytest.param(OrganizationStatus.CANCELLED, OrganizationStatus.CANCELLED, 400),
+        pytest.param(OrganizationStatus.ACTIVE, OrganizationStatus.DELETED, 200),
+        pytest.param(OrganizationStatus.DELETED, OrganizationStatus.ACTIVE, 200),
+        pytest.param(OrganizationStatus.DELETED, OrganizationStatus.DELETED, 200),
+    ],
+)
+async def test_update_organization_external_id_unique_for_non_deleted_objects(
+    organization_factory: ModelFactory[Organization],
+    operations_client: AsyncClient,
+    httpx_mock: HTTPXMock,
+    db_session: AsyncSession,
+    org_to_update_status: OrganizationStatus,
+    existing_org_status: OrganizationStatus,
+    expected_status_code: int,
+):
+    db_org = await organization_factory(
+        name="organization_to_update",
+        currency="EUR",
+        operations_external_id="initial_external_id",
+        status=org_to_update_status,
+    )
+
+    # creating another organization to test the operations_external_id uniqueness
+    await organization_factory(
+        name="existing_organization",
+        currency="GBP",
+        operations_external_id="existing_external_id",
+        status=existing_org_status,
+    )
+
+    response = await operations_client.put(
+        f"/organizations/{db_org.id}",
+        json={"name": "organization_to_update", "operations_external_id": "existing_external_id"},
+    )
+
+    assert response.status_code == expected_status_code
+    response_data = response.json()
+
+    # If we want to only update the operations_external_id,
+    # we should not make requests to an external API
+    assert not httpx_mock.get_request()
+
+    await db_session.refresh(db_org)
+
+    if response.is_error:
+        assert db_org.operations_external_id == "initial_external_id"
+        assert (
+            response_data["detail"]
+            == "An organization with the same operations_external_id already exists."
+        )
+    else:
+        assert response_data["id"] == db_org.id
+        assert response_data["operations_external_id"] == "existing_external_id"
+        assert db_org.operations_external_id == "existing_external_id"
 
 
 @pytest.mark.parametrize(
