@@ -255,7 +255,7 @@ async def update_organization(
             )
 
     if not name_changed:
-        return from_orm(OrganizationRead, db_organization)
+        return convert_model_to_schema(OrganizationRead, db_organization)
 
     # If the name has changed, we need to first change it in Optscale as this API call can fail
     # and change it in the DB only if the API call is successful
@@ -287,7 +287,7 @@ async def update_organization(
     # The name change on the optscale side was successful, so we can now update the name in the DB
     db_organization = await organization_repo.update(db_organization, {"name": data.name})
 
-    return from_orm(OrganizationRead, db_organization)
+    return convert_model_to_schema(OrganizationRead, db_organization)
 
 
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
