@@ -73,7 +73,7 @@ async def get_users(user_repo: UserRepository, auth_context: CurrentAuthContext)
 
 
     """
-    if auth_context.account.type == AccountType.OPERATIONS:
+    if auth_context.account.type == AccountType.OPERATIONS:  # type: ignore
         return await paginate(user_repo, UserRead)
     else:
         return await paginate(
