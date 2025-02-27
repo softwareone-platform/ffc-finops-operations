@@ -295,7 +295,7 @@ async def resend_user_invitation(
         UserInvitationRead,
         user,
         account_user=convert_model_to_schema(AccountUserRead, account_user),
-    )  # noqa: E501
+    )
     return response
 
 

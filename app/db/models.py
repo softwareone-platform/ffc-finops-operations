@@ -190,6 +190,7 @@ class User(Actor, HumanReadablePKMixin, AuditableMixin):
         try:
             return self.accounts[0]
         except Exception:
+            # todo : improve this excepption
             return None
 
     __mapper_args__ = {

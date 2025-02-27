@@ -57,7 +57,7 @@ async def paginate[M: Base, S: BaseSchema](
             limit=params.limit,
             offset=params.offset,
             extra_conditions=extra_conditions,
-            options=options,
+            page_options=options,
         )
     return create_page(
         [convert_model_to_schema(schema_cls, item) for item in items],

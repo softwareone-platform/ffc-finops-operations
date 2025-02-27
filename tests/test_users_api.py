@@ -986,7 +986,7 @@ async def test_affiliate_account_can_get_user_by_id_only_with_status_not_deleted
         assert data.get("id") == user.id
 
 
-async def test_cannot_get_user_by_id_with_affiliate_account_client_and_not_existing_user(  # noqa: E501
+async def test_cannot_get_user_by_id_with_affiliate_account_client_and_not_existing_user(
     affiliate_client: AsyncClient,
 ):
     response = await affiliate_client.get("/users/FUSR-8994-8942")
