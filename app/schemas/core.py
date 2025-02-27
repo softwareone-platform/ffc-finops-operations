@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 import types
-from typing import Annotated, Any, TypeVar
+from typing import Annotated, Any
 
 from pydantic import (
     BaseModel,
@@ -11,17 +11,14 @@ from pydantic import (
     SecretStr,
     field_validator,
 )
-from sqlalchemy.orm import DeclarativeBase
 
-from app.enums import (
-    ActorType,
-)
-
-M = TypeVar("M", bound=DeclarativeBase)  # for each SQLAlchemy model
-S = TypeVar("S", bound=BaseModel)  # for each Pydantic schema
+from app.db.models import Base
+from app.enums import ActorType
 
 
-def convert_model_to_schema(schema_cls: type[S], db_model: M, **override_attributes: Any) -> S:
+def convert_model_to_schema[M: Base, S: BaseModel](
+    schema_cls: type[S], db_model: M, **override_attributes: Any
+) -> S:
     """
     Converts (Serialize) an SQLAlchemy model instance (`db_model`) into a
     Pydantic schema (`schema_cls`).
@@ -62,7 +59,7 @@ def convert_model_to_schema(schema_cls: type[S], db_model: M, **override_attribu
     return schema_cls(**schema_data, events=events, **override_attributes)
 
 
-def extract_events(db_model: M, events_schema_cls: type[S]) -> BaseModel:
+def extract_events[M: Base, S: BaseModel](db_model: M, events_schema_cls: type[S]) -> BaseModel:
     """
     Extracts events of type AuditFieldSchema from an SQLAlchemy model instance
 
@@ -85,11 +82,11 @@ def extract_events(db_model: M, events_schema_cls: type[S]) -> BaseModel:
 
         schema_values[field_name] = (
             event_field_schema_cls(at=at_value, by=by_value) if at_value else None
-        )  # noqa: E501
+        )
     return events_schema_cls(**schema_values)
 
 
-def resolve_field_type(field_info: Any) -> Any:
+def resolve_field_type(field_info: Any) -> BaseModel:
     """
     This function resolves the actual field type from a Pydantic model annotation,
     ensuring the correct type handling with nullable, optional, fields.
@@ -99,7 +96,7 @@ def resolve_field_type(field_info: Any) -> Any:
         field_info (Any): The field annotation from a Pydantic model instance.
 
     Returns:
-        Any: The resolved field type, without Optional or Union
+        BaseSchema: The resolved field type, without Optional or Union
     Raises:
         TypeError: If the given field type is not an acceptable type.
     """
@@ -114,7 +111,7 @@ def resolve_field_type(field_info: Any) -> Any:
     return event_field_schema_cls
 
 
-def convert_schema_to_model(schema: S, model_cls: type[M]) -> M:
+def convert_schema_to_model[M: Base, S: BaseModel](schema: S, model_cls: type[M]) -> M:
     """
     Converts a Pydantic schema instance to an ORM model instance.
 
@@ -129,9 +126,18 @@ def convert_schema_to_model(schema: S, model_cls: type[M]) -> M:
     return model_cls(**dbmodel_fields)
 
 
-def extract_fields_from_model(
-    schema_cls: type[S], db_model: M, excluded_fields: list
+def extract_fields_from_model[M: Base, S: BaseModel](
+    schema_cls: type[S], db_model: M, excluded_fields: list[str]
 ) -> dict[str, Any]:
+    """
+    This function iterates through the fields defined in the Pydantic schema (`schema_cls`),
+    retrieves the corresponding values from the database model (`db_model`), and returns
+    a dictionary with the extracted field values.
+    Any fields listed in `excluded_fields` or not present in `db_model`are ignored.
+    This function ensures that only fields present in the Pydantic model are included
+    in the returned dictionary.
+
+    """
     return {
         field_name: getattr(db_model, field_name)
         for field_name in schema_cls.model_fields.keys()

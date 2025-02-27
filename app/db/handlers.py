@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import AsyncGenerator, Sequence
 from contextlib import suppress
 from datetime import UTC, datetime
@@ -175,7 +177,7 @@ class ModelHandler[M: BaseModel]:
         limit: int = 50,
         offset: int = 0,
         extra_conditions: list[ColumnExpressionArgument] | None = None,
-        options: list[ORMOption] = None,
+        options: list[ORMOption] | None = None,
     ) -> Sequence[M]:
         query = select(self.model_cls).offset(offset).limit(limit).order_by("id")
         if extra_conditions:

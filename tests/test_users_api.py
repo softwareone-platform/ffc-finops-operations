@@ -1189,6 +1189,30 @@ async def test_list_users_multiple_pages(
     assert len(all_items) == 30
 
 
+async def test_list_users_with_deleted_account(
+    affiliate_client: AsyncClient,
+    gcp_account: Account,
+    accountuser_factory: ModelFactory[AccountUser],
+    user_factory,
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+
+    await accountuser_factory(
+        user_id=user.id, account_id=gcp_account.id, status=AccountUserStatus.DELETED
+    )
+
+    response = await affiliate_client.get("/users")
+    assert response.status_code == 200
+    page = response.json()
+    items = page.get("items")
+    assert isinstance(items, list)
+    assert len(items) == 0
+
+
 async def test_list_users_with_2_accounts(
     affiliate_client: AsyncClient,
     gcp_account: Account,
@@ -1210,7 +1234,7 @@ async def test_list_users_with_2_accounts(
         user_id=user.id, account_id=gcp_account.id, status=AccountUserStatus.ACTIVE
     )
     await accountuser_factory(
-        user_id=user.id, account_id=operations_account.id, status=AccountUserStatus.ACTIVE
+        user_id=user.id, account_id=operations_account.id, status=AccountUserStatus.DELETED
     )
     await accountuser_factory(
         user_id=user_2.id, account_id=operations_account.id, status=AccountUserStatus.INVITED

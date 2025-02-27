@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import and_
 from sqlalchemy.orm import joinedload, with_loader_criteria
 
 from app.auth.auth import authentication_required, check_operations_account
@@ -82,8 +83,10 @@ async def get_users(user_repo: UserRepository, auth_context: CurrentAuthContext)
                 joinedload(User.accounts, innerjoin=True),
                 with_loader_criteria(
                     AccountUser,
-                    AccountUser.account_id == auth_context.account.id,
-                    AccountUser.status != AccountUserStatus.DELETED,
+                    and_(
+                        AccountUser.account_id == auth_context.account.id,
+                        AccountUser.status != AccountUserStatus.DELETED,
+                    ),
                 ),
             ],
         )
