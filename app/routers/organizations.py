@@ -12,7 +12,7 @@ from app.db.models import Organization
 from app.dependencies import OrganizationId, OrganizationRepository
 from app.enums import DatasourceType
 from app.pagination import LimitOffsetPage, paginate
-from app.schemas.core import from_orm
+from app.schemas.core import convert_model_to_schema
 from app.schemas.employees import EmployeeRead
 from app.schemas.organizations import (
     DatasourceRead,
@@ -76,7 +76,7 @@ async def create_organization(
                 "linked_organization_id": ffc_organization["id"],
             },
         )
-        return from_orm(OrganizationRead, db_organization)
+        return convert_model_to_schema(OrganizationRead, db_organization)
 
 
 async def fetch_organization_or_404(
@@ -95,7 +95,7 @@ async def fetch_organization_or_404(
 async def get_organization_by_id(
     organization: Annotated[Organization, Depends(fetch_organization_or_404)],
 ):
-    return from_orm(OrganizationRead, organization)
+    return convert_model_to_schema(OrganizationRead, organization)
 
 
 @router.get("/{organization_id}/datasources", response_model=list[DatasourceRead])
@@ -255,7 +255,7 @@ async def update_organization(
             )
 
     if not name_changed:
-        return from_orm(OrganizationRead, db_organization)
+        return convert_model_to_schema(OrganizationRead, db_organization)
 
     # If the name has changed, we need to first change it in Optscale as this API call can fail
     # and change it in the DB only if the API call is successful
@@ -287,7 +287,7 @@ async def update_organization(
     # The name change on the optscale side was successful, so we can now update the name in the DB
     db_organization = await organization_repo.update(db_organization, {"name": data.name})
 
-    return from_orm(OrganizationRead, db_organization)
+    return convert_model_to_schema(OrganizationRead, db_organization)
 
 
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)

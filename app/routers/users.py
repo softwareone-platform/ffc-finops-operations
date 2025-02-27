@@ -6,6 +6,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import and_
+from sqlalchemy.orm import joinedload, with_loader_criteria
 
 from app.auth.auth import authentication_required, check_operations_account
 from app.auth.constants import UNAUTHORIZED_EXCEPTION
@@ -23,8 +25,8 @@ from app.dependencies import (
 )
 from app.enums import AccountStatus, AccountType, AccountUserStatus, UserStatus
 from app.hasher import pbkdf2_sha256
-from app.pagination import LimitOffsetPage
-from app.schemas.core import from_orm
+from app.pagination import LimitOffsetPage, paginate
+from app.schemas.core import convert_model_to_schema
 from app.schemas.users import (
     AccountUserCreate,
     AccountUserRead,
@@ -56,8 +58,38 @@ router = APIRouter()
     dependencies=[Depends(authentication_required)],
     response_model=LimitOffsetPage[UserRead],
 )
-async def get_users():  # pragma: no cover
-    pass  # not yet implemented
+async def get_users(user_repo: UserRepository, auth_context: CurrentAuthContext):
+    """
+    This endpoint returns all the users in the DB
+    There are 2 possible scenarios
+
+    1. Authentication is provided, and the Account is OPERATIONS. In this case, the query will
+    be run and return all the users in the DB
+    2. Authentication is provided, and the Account is AFFILIATE. In this case, the query is run only
+    if the Account User status is not DELETED and the users belong to the authenticated account
+     if the account is affiliated, the query will return all the users in the DB that
+     satisfie the condition that the User's account is the same as the authenticated account
+     and the account's status is not DELETED.
+
+
+    """
+    if auth_context.account.type == AccountType.OPERATIONS:  # type: ignore
+        return await paginate(user_repo, UserRead)
+    else:
+        return await paginate(
+            user_repo,
+            UserRead,
+            page_options=[
+                joinedload(User.accounts, innerjoin=True),
+                with_loader_criteria(
+                    AccountUser,
+                    and_(
+                        AccountUser.account_id == auth_context.account.id,
+                        AccountUser.status != AccountUserStatus.DELETED,
+                    ),
+                ),
+            ],
+        )
 
 
 @router.post(
@@ -150,8 +182,11 @@ async def invite_user(
         accountuser_handler = AccountUserHandler(tx_session)
         account_user = await accountuser_handler.create(account_user)
 
-        response = from_orm(UserInvitationRead, user)
-        response.account_user = from_orm(AccountUserRead, account_user)
+        response = convert_model_to_schema(
+            UserInvitationRead,
+            user,
+            account_user=convert_model_to_schema(AccountUserRead, account_user),
+        )
         return response
 
 
@@ -256,8 +291,11 @@ async def resend_user_invitation(
         days=settings.invitation_token_expires_days
     )
     account_user = await accountuser_repository.update(account_user)
-    response = from_orm(UserInvitationRead, user)
-    response.account_user = from_orm(AccountUserRead, account_user)
+    response = convert_model_to_schema(
+        UserInvitationRead,
+        user,
+        account_user=convert_model_to_schema(AccountUserRead, account_user),
+    )
     return response
 
 
@@ -321,7 +359,7 @@ async def get_user_by_id(
             # because if the user is in
             # status DELETE then the account user will be deleted as well
             response = await user_repo.get(id=user_id)
-    return from_orm(UserRead, response)
+    return convert_model_to_schema(UserRead, response)
 
 
 @router.post(
@@ -409,7 +447,7 @@ async def accept_user_invitation(
                 "invitation_token_expires_at": None,
             },
         )
-        return from_orm(UserRead, user)
+        return convert_model_to_schema(UserRead, user)
 
 
 @router.post("/{id}/reset-password", response_model=UserRead)

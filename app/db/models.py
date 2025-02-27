@@ -185,6 +185,14 @@ class User(Actor, HumanReadablePKMixin, AuditableMixin):
     )
     accounts: Mapped[list["AccountUser"]] = relationship(back_populates="user")
 
+    @property
+    def account_user(self):
+        try:
+            return self.accounts[0]
+        except Exception:
+            # todo : improve this excepption
+            return None
+
     __mapper_args__ = {
         "polymorphic_identity": ActorType.USER.value,
         "inherit_condition": id == Actor.id,

@@ -986,7 +986,7 @@ async def test_affiliate_account_can_get_user_by_id_only_with_status_not_deleted
         assert data.get("id") == user.id
 
 
-async def test_cannot_get_user_by_id_with_affiliate_account_client_and_not_existing_user(  # noqa: E501
+async def test_cannot_get_user_by_id_with_affiliate_account_client_and_not_existing_user(
     affiliate_client: AsyncClient,
 ):
     response = await affiliate_client.get("/users/FUSR-8994-8942")
@@ -1060,3 +1060,194 @@ async def test_get_user_by_id_exception():
 
     with pytest.raises(NotFoundError, match="User with ID `123` wasn't found."):
         await mock_repo.get(id="123")
+
+
+# -------
+# List  Users
+# -------
+
+
+@pytest.mark.parametrize(
+    ("useraccount_status", "http_status"),
+    [
+        (AccountUserStatus.ACTIVE, 200),
+        (AccountUserStatus.INVITED, 200),
+        (AccountUserStatus.INVITATION_EXPIRED, 200),
+        (AccountUserStatus.DELETED, 200),
+    ],
+)
+async def test_operators_can_always_list_users(
+    operations_client: AsyncClient,
+    operations_account: Account,
+    accountuser_factory: ModelFactory[AccountUser],
+    user_factory: ModelFactory[User],
+    useraccount_status: str,
+    http_status: str,
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+    await accountuser_factory(
+        user_id=user.id, account_id=operations_account.id, status=useraccount_status
+    )
+
+    response = await operations_client.get("/users")
+    data = response.json()
+    assert response.status_code == http_status
+    assert isinstance(data.get("items"), list)
+
+
+@pytest.mark.parametrize(
+    ("user_status", "http_status"),
+    [
+        (AccountUserStatus.ACTIVE, 200),
+        (AccountUserStatus.INVITED, 200),
+        (AccountUserStatus.INVITATION_EXPIRED, 200),
+        (AccountUserStatus.DELETED, 200),
+    ],
+)
+async def test_affiliate_cannot_always_list_users(
+    affiliate_client: AsyncClient,
+    affiliate_account: Account,
+    accountuser_factory: ModelFactory[AccountUser],
+    user_factory: ModelFactory[User],
+    user_status: str,
+    http_status: str,
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+    await accountuser_factory(user_id=user.id, account_id=affiliate_account.id, status=user_status)
+
+    response = await affiliate_client.get("/users")
+    data = response.json()
+    assert response.status_code == http_status
+    assert isinstance(data.get("items"), list)
+
+
+async def test_list_users_multiple_pages(
+    operations_client: AsyncClient,
+    operations_account: Account,
+    accountuser_factory: ModelFactory[AccountUser],
+    user_factory: ModelFactory[User],
+    db_session: AsyncSession,
+):
+    users_ids = []
+    for index in range(30):
+        user = await user_factory(
+            name=f"Peter Parker_{index}",
+            email=f"peter.parker_{index}@spiderman.com",
+            status=UserStatus.ACTIVE,
+        )
+        users_ids.append(user.id)
+
+    for user_id in users_ids:
+        await accountuser_factory(
+            user_id=user_id, account_id=operations_account.id, status=AccountStatus.ACTIVE
+        )
+
+    first_page_response = await operations_client.get(
+        "/users",
+        params={"limit": 5},
+    )
+    first_page_data = first_page_response.json()
+    assert first_page_response.status_code == 200
+    assert first_page_data["total"] == 30
+    assert len(first_page_data["items"]) == 5
+    assert first_page_data["limit"] == 5
+    assert first_page_data["offset"] == 0
+    #
+    second_page_response = await operations_client.get(
+        "/users",
+        params={"limit": 3, "offset": 5},
+    )
+    second_page_data = second_page_response.json()
+
+    assert second_page_response.status_code == 200
+    assert second_page_data["total"] == 30
+    assert len(second_page_data["items"]) == 3
+    assert second_page_data["limit"] == 3
+    assert second_page_data["offset"] == 5
+
+    third_page_response = await operations_client.get(
+        "/users",
+        params={"offset": 8},
+    )
+    third_page_data = third_page_response.json()
+
+    assert third_page_response.status_code == 200
+    assert third_page_data["total"] == 30
+    assert len(third_page_data["items"]) == 22
+    assert third_page_data["limit"] > 2
+    assert third_page_data["offset"] == 8
+
+    all_items = first_page_data["items"] + second_page_data["items"] + third_page_data["items"]
+    assert len(all_items) == 30
+
+
+async def test_list_users_with_deleted_account(
+    affiliate_client: AsyncClient,
+    gcp_account: Account,
+    accountuser_factory: ModelFactory[AccountUser],
+    user_factory,
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+
+    await accountuser_factory(
+        user_id=user.id, account_id=gcp_account.id, status=AccountUserStatus.DELETED
+    )
+
+    response = await affiliate_client.get("/users")
+    assert response.status_code == 200
+    page = response.json()
+    items = page.get("items")
+    assert isinstance(items, list)
+    assert len(items) == 0
+
+
+async def test_list_users_with_2_accounts(
+    affiliate_client: AsyncClient,
+    gcp_account: Account,
+    operations_account: Account,
+    accountuser_factory: ModelFactory[AccountUser],
+    user_factory,
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+    user_2 = await user_factory(
+        name="Jerry Drake",
+        email="jerry.drake@misterno.com",
+        status=UserStatus.ACTIVE,
+    )
+    account_user_1 = await accountuser_factory(
+        user_id=user.id, account_id=gcp_account.id, status=AccountUserStatus.ACTIVE
+    )
+    await accountuser_factory(
+        user_id=user.id, account_id=operations_account.id, status=AccountUserStatus.DELETED
+    )
+    await accountuser_factory(
+        user_id=user_2.id, account_id=operations_account.id, status=AccountUserStatus.INVITED
+    )
+    response = await affiliate_client.get("/users")
+    assert response.status_code == 200
+    page = response.json()
+    items = page.get("items")
+    assert isinstance(items, list)
+    item = items[0]
+    assert isinstance(item, dict)
+    assert item.get("id") == user.id
+    assert item.get("name") == user.name
+    assert item.get("email") == user.email
+    assert item.get("status") == user.status
+    assert item.get("account_user")["id"] == account_user_1.id  # account affiliate
