@@ -223,9 +223,9 @@ async def get_user_accounts(id: str):  # pragma: no cover
 
 @router.post(
     "/{id}/disable",
-    dependencies=[Depends(authentication_required)],
+    dependencies=[Depends(check_operations_account)],
     response_model=UserRead,
-    status_code=status.HTTP_201_CREATED,
+    status_code=status.HTTP_200_OK,
 )
 async def disable_user(
     id: str,
@@ -237,11 +237,7 @@ async def disable_user(
     This endpoint allows an OPERATOR to disable a user.
     A user cannot disable itself.
     """
-    if auth_context.account.type != AccountType.OPERATIONS:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="You are not authorized to perform this action.",
-        )
+
     if user == auth_context.user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -250,9 +246,7 @@ async def disable_user(
     if user.status != UserStatus.ACTIVE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                f"User's status is '{user.status._value_}'; " "only active users can be disabled."
-            ),
+            detail=(f"User's status is '{user.status._value_}' only active users can be disabled."),
         )
     user = await user_repo.update(id_or_obj=id, data={"status": UserStatus.DISABLED})
     return convert_model_to_schema(UserRead, user)

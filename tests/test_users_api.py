@@ -1269,7 +1269,7 @@ async def test_operator_can_disable_active_user(
     )
 
     response = await operations_client.post(f"/users/{user.id}/disable")
-    assert response.status_code == 201
+    assert response.status_code == 200
     data = response.json()
     assert data["status"] == UserStatus.DISABLED
 
@@ -1286,7 +1286,7 @@ async def test_operator_cannot_disable_not_active_user(
     response = await operations_client.post(f"/users/{user.id}/disable")
     assert response.status_code == 400
     data = response.json()
-    assert data["detail"] == "User's status is 'deleted'; only active users can be disabled."
+    assert data["detail"] == "User's status is 'deleted' only active users can be disabled."
 
 
 async def test_operator_cannot_disable_itself(
@@ -1340,6 +1340,6 @@ async def test_affiliate_cannot_disable_user(
         status=user_status,
     )
     response = await affiliate_client.post(f"/users/{user.id}/disable")
-    assert response.status_code == 401
+    assert response.status_code == 403
     data = response.json()
-    assert data["detail"] == "You are not authorized to perform this action."
+    assert data["detail"] == "You've found the door, but you don't have the key."
