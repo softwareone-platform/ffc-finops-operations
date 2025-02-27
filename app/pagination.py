@@ -41,7 +41,7 @@ async def paginate[M: Base, S: BaseSchema](
     schema_cls: type[S],
     *,
     extra_conditions: list[ColumnExpressionArgument] | None = None,
-    options: list[ORMOption] | None = None,
+    page_options: list[ORMOption] | None = None,
 ) -> AbstractPage[S]:
     """
     This function queries a database model (M) using a ModelHandler.
@@ -57,7 +57,7 @@ async def paginate[M: Base, S: BaseSchema](
             limit=params.limit,
             offset=params.offset,
             extra_conditions=extra_conditions,
-            page_options=options,
+            options=page_options,
         )
     return create_page(
         [convert_model_to_schema(schema_cls, item) for item in items],

@@ -177,12 +177,12 @@ class ModelHandler[M: BaseModel]:
         limit: int = 50,
         offset: int = 0,
         extra_conditions: list[ColumnExpressionArgument] | None = None,
-        page_options: list[ORMOption] | None = None,
+        options: list[ORMOption] | None = None,
     ) -> Sequence[M]:
         query = select(self.model_cls).offset(offset).limit(limit).order_by("id")
         if extra_conditions:
             query = query.where(*extra_conditions)
-        orm_options = (self.default_options or []) + (page_options or [])
+        orm_options = (self.default_options or []) + (options or [])
         if orm_options:
             query = query.options(*orm_options)
         results = await self.session.execute(query)

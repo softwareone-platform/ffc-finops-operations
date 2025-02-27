@@ -79,7 +79,7 @@ async def get_users(user_repo: UserRepository, auth_context: CurrentAuthContext)
         return await paginate(
             user_repo,
             UserRead,
-            options=[
+            page_options=[
                 joinedload(User.accounts, innerjoin=True),
                 with_loader_criteria(
                     AccountUser,
