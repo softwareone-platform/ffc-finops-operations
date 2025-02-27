@@ -46,8 +46,8 @@ class AccountUserCreate(BaseSchema):
 class AccountUserRead(IdSchema, CommonEventsSchema, AccountUserBase):
     account: AccountReference
     user: UserReference
-    invitation_token: str
-    invitation_token_expires_at: datetime.datetime
+    invitation_token: str | None
+    invitation_token_expires_at: datetime.datetime | None
     joined_at: datetime.datetime | None = None
 
 
