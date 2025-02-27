@@ -84,7 +84,7 @@ async def get_users(user_repo: UserRepository, auth_context: CurrentAuthContext)
                 with_loader_criteria(
                     AccountUser,
                     and_(
-                        AccountUser.account_id == auth_context.account.id,
+                        AccountUser.account_id == auth_context.account.id,  # type: ignore
                         AccountUser.status != AccountUserStatus.DELETED,
                     ),
                 ),
@@ -477,5 +477,41 @@ async def accept_user_invitation(
 
 
 @router.post("/{id}/reset-password", response_model=UserRead)
-async def reset_user_password(id: str, data: UserResetPassword):  # pragma: no cover
-    pass  # not yet implemented
+async def reset_user_password(
+    id: UserId,
+    user_repo: UserRepository,
+    data: UserResetPassword,
+):
+    user = None
+    with wrap_exc_in_http_response(
+        NotFoundError,
+        status_code=status.HTTP_400_BAD_REQUEST,
+        error_msg="You have summoned the mighty Error 400! It demands a better request.",
+    ):
+        user = await user_repo.get(
+            id,
+            extra_conditions=[
+                User.status == UserStatus.ACTIVE,
+                User.pwd_reset_token == data.pwd_reset_token,
+                User.pwd_reset_token.isnot(None),
+                User.pwd_reset_token_expires_at.isnot(None),
+            ],
+        )
+
+    if user.pwd_reset_token_expires_at < datetime.now(UTC):  # type: ignore
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Your password reset token has expired."
+        )
+    if not data.password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password is required.",
+        )
+    user = await user_repo.update(
+        user.id,
+        {
+            "password": pbkdf2_sha256.hash(data.password.get_secret_value()),  # type: ignore
+        },
+    )
+
+    return convert_model_to_schema(UserRead, user)

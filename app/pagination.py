@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TypeVar
 
 from fastapi import Query
 from fastapi_pagination import create_page, resolve_params
@@ -16,8 +15,6 @@ from app.db.handlers import ModelHandler
 from app.db.models import Base
 from app.schemas.core import BaseSchema, convert_model_to_schema
 
-T = TypeVar("T")
-
 
 class LimitOffsetParams(BaseModel, AbstractParams):
     limit: int = Query(50, ge=0, le=100, description="Page size limit")
@@ -30,7 +27,7 @@ class LimitOffsetParams(BaseModel, AbstractParams):
         )
 
 
-class LimitOffsetPage[T](_LimitOffsetPage[T]):
+class LimitOffsetPage[S: BaseSchema](_LimitOffsetPage[S]):
     limit: GreaterEqualZero | None
 
     __params_type__ = LimitOffsetParams  # type: ignore
