@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import datetime
-import uuid
 from typing import Annotated
 
 from pydantic import EmailStr, Field
@@ -28,8 +27,7 @@ class UserAcceptInvitation(PasswordInputSchema):
 
 
 class UserResetPassword(PasswordInputSchema):
-    pwd_reset_token: uuid.UUID
-    user_id: str | None = None
+    pwd_reset_token: str
 
 
 class UserUpdate(BaseSchema):
