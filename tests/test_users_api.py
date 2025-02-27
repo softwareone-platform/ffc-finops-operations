@@ -1193,7 +1193,7 @@ async def test_list_users_with_deleted_account(
     affiliate_client: AsyncClient,
     gcp_account: Account,
     accountuser_factory: ModelFactory[AccountUser],
-    user_factory,
+    user_factory: ModelFactory[User],
 ):
     user = await user_factory(
         name="Peter Parker",
@@ -1218,7 +1218,7 @@ async def test_list_users_with_2_accounts(
     gcp_account: Account,
     operations_account: Account,
     accountuser_factory: ModelFactory[AccountUser],
-    user_factory,
+    user_factory: ModelFactory[User],
 ):
     user = await user_factory(
         name="Peter Parker",
@@ -1251,3 +1251,95 @@ async def test_list_users_with_2_accounts(
     assert item.get("email") == user.email
     assert item.get("status") == user.status
     assert item.get("account_user")["id"] == account_user_1.id  # account affiliate
+
+
+##
+# Disable User
+##
+
+
+async def test_operator_can_disable_active_user(
+    operations_client: AsyncClient,
+    user_factory: ModelFactory[User],
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+
+    response = await operations_client.post(f"/users/{user.id}/disable")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == UserStatus.DISABLED
+
+
+async def test_operator_cannot_disable_not_active_user(
+    operations_client: AsyncClient,
+    user_factory: ModelFactory[User],
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.DELETED,
+    )
+    response = await operations_client.post(f"/users/{user.id}/disable")
+    assert response.status_code == 400
+    data = response.json()
+    assert data["detail"] == "User's status is 'deleted' only active users can be disabled."
+
+
+async def test_operator_cannot_disable_itself(
+    operations_account: Account,
+    user_factory: ModelFactory[User],
+    api_client: AsyncClient,
+    jwt_token_factory: JWTTokenFactory,
+    test_settings: Settings,
+    accountuser_factory: ModelFactory[AccountUser],
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+    await accountuser_factory(
+        user_id=user.id, account_id=operations_account.id, status=AccountUserStatus.ACTIVE
+    )
+    jwt_token = jwt_token_factory(
+        user.id, test_settings.auth_access_jwt_secret, account_id=operations_account.id
+    )
+
+    response = await api_client.post(
+        f"/users/{user.id}/disable",
+        headers={"Authorization": f"Bearer {jwt_token}"},
+    )
+    assert response.status_code == 400
+    data = response.json()
+    assert data["detail"] == "A user cannot disable itself."
+
+
+@pytest.mark.parametrize(
+    "user_status",
+    [
+        UserStatus.DELETED,
+        UserStatus.ACTIVE,
+        UserStatus.DISABLED,
+        UserStatus.DRAFT,
+    ],
+)
+async def test_affiliate_cannot_disable_user(
+    affiliate_client: AsyncClient,
+    user_factory: ModelFactory[User],
+    test_settings: Settings,
+    accountuser_factory: ModelFactory[AccountUser],
+    user_status: str,
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=user_status,
+    )
+    response = await affiliate_client.post(f"/users/{user.id}/disable")
+    assert response.status_code == 403
+    data = response.json()
+    assert data["detail"] == "You've found the door, but you don't have the key."

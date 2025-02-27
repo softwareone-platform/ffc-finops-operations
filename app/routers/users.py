@@ -195,7 +195,11 @@ async def invite_user(
     dependencies=[Depends(authentication_required)],
     response_model=UserRead,
 )
-async def update_user(id: str, data: UserUpdate):  # pragma: no cover
+async def update_user(
+    id: str,
+    data: UserUpdate,
+    auth_context: CurrentAuthContext,
+):  # pragma: no cover
     pass  # not yet implemented
 
 
@@ -219,11 +223,33 @@ async def get_user_accounts(id: str):  # pragma: no cover
 
 @router.post(
     "/{id}/disable",
-    dependencies=[Depends(authentication_required)],
+    dependencies=[Depends(check_operations_account)],
     response_model=UserRead,
+    status_code=status.HTTP_200_OK,
 )
-async def disable_user(id: str):  # pragma: no cover
-    pass  # not yet implemented
+async def disable_user(
+    id: str,
+    user_repo: UserRepository,
+    auth_context: CurrentAuthContext,
+    user: Annotated[User, Depends(fetch_user_or_404)],
+):
+    """
+    This endpoint allows an OPERATOR to disable a user.
+    A user cannot disable itself.
+    """
+
+    if user == auth_context.user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A user cannot disable itself.",
+        )
+    if user.status != UserStatus.ACTIVE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(f"User's status is '{user.status._value_}' only active users can be disabled."),
+        )
+    user = await user_repo.update(id_or_obj=id, data={"status": UserStatus.DISABLED})
+    return convert_model_to_schema(UserRead, user)
 
 
 @router.post(
