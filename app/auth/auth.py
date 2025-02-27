@@ -59,60 +59,20 @@ async def get_authentication_context(
     credentials: Annotated[JWTCredentials | None, Depends(JWTBearer())],
 ):
     if credentials:
-        system_handler = SystemHandler(db_session)
-        user_handler = UserHandler(db_session)
-        account_user_handler = AccountUserHandler(db_session)
-        account_handler = AccountHandler(db_session)
+        # system_handler = SystemHandler(db_session)
+        # user_handler = UserHandler(db_session)
+        # account_user_handler = AccountUserHandler(db_session)
+        # account_handler = AccountHandler(db_session)
 
         actor_id = credentials.claim["sub"]
         try:
             if actor_id.startswith(System.PK_PREFIX):
-                system = await system_handler.get(
-                    actor_id,
-                    [System.status == SystemStatus.ACTIVE],
-                )
-
-                jwt.decode(
-                    credentials.credentials,
-                    system.jwt_secret,
-                    options={"require": ["exp", "nbf", "iat", "sub"]},
-                    algorithms=[JWT_ALGORITHM],
-                    leeway=JWT_LEEWAY,
-                )
-                # TODO check maximum allowed lifespan
-                context = AuthenticationContext(
-                    account=system.owner,
-                    actor_type=ActorType.SYSTEM,
-                    system=system,
+                context = await get_authentication_context_for_system(
+                    actor_id, credentials, db_session
                 )
             else:
-                jwt.decode(
-                    credentials.credentials,
-                    settings.auth_access_jwt_secret,
-                    options={"require": ["exp", "nbf", "iat", "sub"]},
-                    algorithms=[JWT_ALGORITHM],
-                    leeway=JWT_LEEWAY,
-                )
-                user = await user_handler.get(
-                    actor_id,
-                    extra_conditions=[User.status == UserStatus.ACTIVE],
-                )
-                account_id = credentials.claim.get("account_id", user.last_used_account_id)
-                account = await account_handler.get(
-                    account_id,
-                    extra_conditions=[Account.status == AccountStatus.ACTIVE],
-                )
-                account_user = await account_user_handler.get_account_user(
-                    account_id=account_id,
-                    user_id=actor_id,
-                    extra_conditions=[AccountUser.status == AccountUserStatus.ACTIVE],
-                )
-                if not account_user:
-                    raise UNAUTHORIZED_EXCEPTION
-                context = AuthenticationContext(
-                    account=account,
-                    actor_type=ActorType.USER,
-                    user=user,
+                context = await get_authentication_context_for_account_user(
+                    actor_id, credentials, settings, db_session
                 )
         except (jwt.InvalidTokenError, DatabaseError) as e:
             raise UNAUTHORIZED_EXCEPTION from e
@@ -125,6 +85,66 @@ async def get_authentication_context(
         finally:
             auth_context.reset(reset_token)
     yield
+
+
+async def get_authentication_context_for_account_user(actor_id, credentials, settings, db_session):
+    user_handler = UserHandler(db_session)
+    account_user_handler = AccountUserHandler(db_session)
+    account_handler = AccountHandler(db_session)
+    jwt.decode(
+        credentials.credentials,
+        settings.auth_access_jwt_secret,
+        options={"require": ["exp", "nbf", "iat", "sub"]},
+        algorithms=[JWT_ALGORITHM],
+        leeway=JWT_LEEWAY,
+    )
+    user = await user_handler.get(
+        actor_id,
+        extra_conditions=[User.status == UserStatus.ACTIVE],
+    )
+    account_id = credentials.claim.get("account_id", user.last_used_account_id)
+    account = await account_handler.get(
+        account_id,
+        extra_conditions=[Account.status == AccountStatus.ACTIVE],
+    )
+    account_user = await account_user_handler.get_account_user(
+        account_id=account_id,
+        user_id=actor_id,
+        extra_conditions=[AccountUser.status == AccountUserStatus.ACTIVE],
+    )
+    if not account_user:
+        raise UNAUTHORIZED_EXCEPTION
+    context = AuthenticationContext(
+        account=account,
+        actor_type=ActorType.USER,
+        user=user,
+    )
+    return context
+
+
+async def get_authentication_context_for_system(
+    actor_id: str, credentials: JWTCredentials, db_session: DBSession
+) -> AuthenticationContext:
+    system_handler = SystemHandler(db_session)
+
+    system = await system_handler.get(
+        actor_id,
+        [System.status == SystemStatus.ACTIVE],
+    )
+    jwt.decode(
+        credentials.credentials,
+        system.jwt_secret,
+        options={"require": ["exp", "nbf", "iat", "sub"]},
+        algorithms=[JWT_ALGORITHM],
+        leeway=JWT_LEEWAY,
+    )
+    # TODO check maximum allowed lifespan
+    context = AuthenticationContext(
+        account=system.owner,
+        actor_type=ActorType.SYSTEM,
+        system=system,
+    )
+    return context
 
 
 async def authentication_required(
