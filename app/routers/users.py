@@ -196,11 +196,22 @@ async def invite_user(
     response_model=UserRead,
 )
 async def update_user(
-    id: str,
     data: UserUpdate,
-    auth_context: CurrentAuthContext,
-):  # pragma: no cover
-    pass  # not yet implemented
+    user_repo: UserRepository,
+    user: Annotated[User, Depends(fetch_user_or_404)],
+):
+    """
+    This endpoint updates the name field of a user.
+    Only the name can be updated.
+    """
+    if user.status != UserStatus.ACTIVE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"The user {user.email} cannot be deleted.",
+        )
+    to_update = data.model_dump(exclude_unset=True)
+    db_user = await user_repo.update(user.id, data=to_update)
+    return convert_model_to_schema(UserRead, db_user)
 
 
 @router.delete(
@@ -228,7 +239,6 @@ async def get_user_accounts(id: str):  # pragma: no cover
     status_code=status.HTTP_200_OK,
 )
 async def disable_user(
-    id: str,
     user_repo: UserRepository,
     auth_context: CurrentAuthContext,
     user: Annotated[User, Depends(fetch_user_or_404)],
@@ -248,7 +258,7 @@ async def disable_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(f"User's status is '{user.status._value_}' only active users can be disabled."),
         )
-    user = await user_repo.update(id_or_obj=id, data={"status": UserStatus.DISABLED})
+    user = await user_repo.update(id_or_obj=user.id, data={"status": UserStatus.DISABLED})
     return convert_model_to_schema(UserRead, user)
 
 

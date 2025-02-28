@@ -31,7 +31,7 @@ class UserResetPassword(PasswordInputSchema):
 
 
 class UserUpdate(BaseSchema):
-    name: str | None = None
+    name: str
 
 
 class AccountUserBase(BaseSchema):

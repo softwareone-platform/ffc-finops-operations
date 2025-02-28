@@ -454,6 +454,143 @@ async def test_affiliate_cannot_disable_user(
     assert data["detail"] == "You've found the door, but you don't have the key."
 
 
+##
+# Update User
+##
+
+
+async def test_affiliate_can_update_user_name(
+    affiliate_client: AsyncClient, user_factory: ModelFactory[User]
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+
+    response = await affiliate_client.put(
+        f"/users/{user.id}",
+        json={"name": "Jerry Drake"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "Jerry Drake"
+
+
+async def test_affiliate_cannot_update_user_other_field(
+    affiliate_client: AsyncClient, user_factory: ModelFactory[User]
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+
+    response = await affiliate_client.put(
+        f"/users/{user.id}",
+        json={"email": "blueberries@breakfast.com"},
+    )
+    assert response.status_code == 422
+
+
+async def test_operators_cannot_update_user_other_field(
+    operations_client: AsyncClient, user_factory: ModelFactory[User]
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+
+    response = await operations_client.put(
+        f"/users/{user.id}",
+        json={"email": "blueberries@breakfast.com"},
+    )
+    assert response.status_code == 422
+
+
+async def test_operators_can_update_user_name(
+    operations_client: AsyncClient, user_factory: ModelFactory[User]
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+
+    response = await operations_client.put(
+        f"/users/{user.id}",
+        json={"name": "Daitarn3"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "Daitarn3"
+
+
+async def test_operators_cannot_update_user_with_empty_payload(
+    operations_client: AsyncClient, user_factory: ModelFactory[User]
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+
+    response = await operations_client.put(
+        f"/users/{user.id}",
+        json={},
+    )
+    assert response.status_code == 422
+
+
+async def test_operators_cannot_update_user_with_name_None(
+    operations_client: AsyncClient, user_factory: ModelFactory[User]
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+
+    response = await operations_client.put(
+        f"/users/{user.id}",
+        json={"name": None},
+    )
+    assert response.status_code == 422
+
+
+async def test_operators_cannot_update_a_deleted_user(
+    operations_client: AsyncClient, user_factory: ModelFactory[User]
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.DELETED,
+    )
+
+    response = await operations_client.put(
+        f"/users/{user.id}",
+        json={"name": "Batman"},
+    )
+    assert response.status_code == 400
+
+
+async def test_affiliates_cannot_update_user_with_empty_payload(
+    affiliate_client: AsyncClient, user_factory: ModelFactory[User]
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+
+    response = await affiliate_client.put(
+        f"/users/{user.id}",
+        json={},
+    )
+    assert response.status_code == 422
+
+
 async def test_reset_password(
     test_settings: Settings,
     user_factory: ModelFactory[User],
