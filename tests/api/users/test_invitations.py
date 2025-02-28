@@ -8,6 +8,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conf import Settings
+<<<<<<< HEAD:tests/api/users/test_invitations.py
+||||||| parent of 64395a9 (feat: More tests refactoring (MPT-6624)):tests/test_users_api.py
+from app.db.handlers import NotFoundError
+=======
+from app.db.handlers import AccountUserHandler, NotFoundError
+>>>>>>> 64395a9 (feat: More tests refactoring (MPT-6624)):tests/test_users_api.py
 from app.db.models import Account, AccountUser, System, User
 from app.enums import AccountStatus, AccountUserStatus, UserStatus
 from app.hasher import pbkdf2_sha256
