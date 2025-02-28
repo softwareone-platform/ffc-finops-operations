@@ -6,10 +6,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi_pagination import resolve_params
-from sqlalchemy import ColumnExpressionArgument, and_, select
+from sqlalchemy import ColumnExpressionArgument, and_
 from sqlalchemy.orm import joinedload, with_loader_criteria
-from sqlalchemy.sql.functions import count
 
 from app.auth.auth import authentication_required, check_operations_account
 from app.auth.constants import UNAUTHORIZED_EXCEPTION
@@ -27,7 +25,7 @@ from app.dependencies import (
 )
 from app.enums import AccountStatus, AccountType, AccountUserStatus, UserStatus
 from app.hasher import pbkdf2_sha256
-from app.pagination import LimitOffsetPage, LimitOffsetParams, paginate
+from app.pagination import LimitOffsetPage, paginate
 from app.schemas.core import convert_model_to_schema
 from app.schemas.users import (
     AccountUserCreate,
@@ -278,59 +276,23 @@ async def delete_user(
 )
 async def get_user_accounts(
     user: Annotated[User, Depends(fetch_user_or_404)],
+    accountuser_repo: AccountUserRepository,
     auth_ctx: CurrentAuthContext,
-    db_session: DBSession,
 ):
-    pagination_params: LimitOffsetParams = resolve_params()
-
-    # TODO: Add conditions for affiliate and oeprations accounts
-    # e.g. only operations can see deleted accounts etc. and affiliate can see only their own
-    # accounts
-
-    common_q = (
-        select(AccountUser)
-        .join(AccountUser.account)
-        .join(AccountUser.user)
-        .where(
-            AccountUser.user == user,
-        )
-    )
-
+    extra_conditions: list[ColumnExpressionArgument] = [
+        AccountUser.user == user,
+    ]
     if auth_ctx is not None and auth_ctx.account.type == AccountType.AFFILIATE:
-        common_q = common_q.where(
-            Account.status != AccountStatus.DELETED,
+        extra_conditions += [
+            AccountUser.account.has(Account.status != AccountStatus.DELETED),
             AccountUser.status != AccountUserStatus.DELETED,
-        )
+        ]
 
-    page_stmt = (
-        common_q.options(
-            joinedload(AccountUser.account, innerjoin=True),
-            joinedload(AccountUser.user, innerjoin=True),
-        )
-        .limit(pagination_params.limit)
-        .offset(pagination_params.offset)
+    return await paginate(
+        accountuser_repo,
+        AccountUserRead,
+        extra_conditions=extra_conditions,
     )
-
-    count_stmt = common_q.with_only_columns(count(AccountUser.id))
-
-    scalars = await db_session.scalars(page_stmt)
-    total_items = await db_session.scalar(count_stmt)
-
-    return LimitOffsetPage[AccountUserRead](
-        items=[convert_model_to_schema(AccountUserRead, scalar) for scalar in scalars],
-        limit=pagination_params.limit,
-        offset=pagination_params.offset,
-        total=total_items,
-    )
-    # return await paginate(
-    #     accountuser_repo,
-    #     AccountUserRead,
-    #     extra_conditions=[
-    #         Account.status != AccountStatus.DELETED,
-    #         AccountUser.status != AccountUserStatus.DELETED,
-    #         AccountUser.user == user,
-    #     ],
-    # )
 
 
 @router.post(
