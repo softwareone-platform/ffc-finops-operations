@@ -42,20 +42,27 @@ logger = logging.getLogger(__name__)
 
 
 async def fetch_user_or_404(
-    id: UserId, user_repo: UserRepository, auth_context: CurrentAuthContext
+    id: UserId,
+    auth_context: CurrentAuthContext,
+    user_repo: UserRepository,
 ) -> User:
     """
     If called with an Affiliate Account it will return a 404 error if the
     given user ID has been deleted
     If called with an Operations Account it will return the user with the provided id
     """
+
     with wrap_exc_in_http_response(NotFoundError, status_code=status.HTTP_404_NOT_FOUND):
         extra_conditions: list[ColumnExpressionArgument] = []
 
-        if auth_context is not None and auth_context.account.type == AccountType.AFFILIATE:
+        if (
+            auth_context is not None
+            and auth_context.account is not None
+            and auth_context.account.type == AccountType.AFFILIATE
+        ):
             extra_conditions.append(User.status != UserStatus.DELETED)
 
-        return await user_repo.get(id=id, extra_conditions=[User.status != UserStatus.DELETED])
+        return await user_repo.get(id=id, extra_conditions=extra_conditions)
 
 
 # ======
