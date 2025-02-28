@@ -1,8 +1,16 @@
 import datetime
+from contextlib import suppress
 
 import sqlalchemy as sa
-from sqlalchemy import Enum, ForeignKey, Index, String, Text
-from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, mapped_column, relationship
+from sqlalchemy import Connection, Enum, ForeignKey, Index, String, Text, event
+from sqlalchemy.orm import (
+    DeclarativeBase,
+    Mapped,
+    Mapper,
+    declared_attr,
+    mapped_column,
+    relationship,
+)
 from sqlalchemy_utils import StringEncryptedType
 from sqlalchemy_utils.types.encrypted.encrypted_type import FernetEngine
 
@@ -64,10 +72,32 @@ class Actor(Base, HumanReadablePKMixin):
     }
 
 
+def get_current_actor_id() -> str | None:
+    from app.auth.context import auth_context
+
+    with suppress(LookupError):
+        actor = auth_context.get().get_actor()
+
+        if actor is not None:
+            return actor.id
+
+
 class AuditableMixin(TimestampMixin):
-    created_by_id: Mapped[str | None] = mapped_column(ForeignKey("actors.id"), name="created_by")
-    updated_by_id: Mapped[str | None] = mapped_column(ForeignKey("actors.id"), name="updated_by")
-    deleted_by_id: Mapped[str | None] = mapped_column(ForeignKey("actors.id"), name="deleted_by")
+    created_by_id: Mapped[str | None] = mapped_column(
+        ForeignKey("actors.id"),
+        name="created_by",
+        default=get_current_actor_id,
+    )
+    updated_by_id: Mapped[str | None] = mapped_column(
+        ForeignKey("actors.id"),
+        name="updated_by",
+        default=get_current_actor_id,
+        onupdate=get_current_actor_id,
+    )
+    deleted_by_id: Mapped[str | None] = mapped_column(
+        ForeignKey("actors.id"),
+        name="deleted_by",
+    )
 
     @declared_attr
     def created_by(cls) -> Mapped["Actor"]:
@@ -92,6 +122,44 @@ class AuditableMixin(TimestampMixin):
             foreign_keys=lambda: [cls.__dict__["deleted_by_id"]],
             lazy="joined",
         )
+
+    @classmethod
+    def __declare_last__(cls):
+        event.listen(cls, "before_update", cls._receive_before_update)
+
+    @staticmethod
+    def _receive_before_update(
+        mapper: Mapper,
+        connection: Connection,
+        target: "AuditableMixin",
+    ) -> None:
+        # ref: https://stackoverflow.com/a/69645377
+        insp = sa.inspect(target, raiseerr=True)
+
+        # TODO: Add the same for TimestampMixin
+        # TODO: If deleted_at and deleted_by are explicitly set, do not override them
+        # TODO: Add the same for terminated_by and terminated_at, and redeemed_at and redeemed_by
+        #       Maybe just call call a method like "on_status_change"?
+        # We can also generalise the fuck out of this :)  (esp. with more introspection) but
+        # that'd be an overkill
+
+        try:
+            status_history = insp.attrs.status.history
+        except AttributeError:
+            # no status column
+            return
+
+        if not status_history.has_changes():
+            return
+
+        old_status, new_status = status_history.deleted[0], status_history.added[0]
+
+        if old_status == "deleted" and new_status != "deleted":
+            target.deleted_at = None
+            target.deleted_by_id = None
+        elif old_status != "deleted" and new_status == "deleted":
+            target.deleted_at = datetime.datetime.now(datetime.UTC)
+            target.deleted_by_id = get_current_actor_id()
 
 
 class Account(Base, HumanReadablePKMixin, AuditableMixin):

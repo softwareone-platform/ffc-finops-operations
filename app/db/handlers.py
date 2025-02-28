@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Sequence
-from contextlib import suppress
 from datetime import UTC, datetime
 from typing import Any
 
@@ -17,11 +16,9 @@ from app.db.base import AsyncTxSession
 from app.db.models import (
     Account,
     AccountUser,
-    AuditableMixin,
     Entitlement,
     Organization,
     System,
-    TimestampMixin,
     User,
 )
 from app.db.models import Base as BaseModel
@@ -72,15 +69,6 @@ class ModelHandler[M: BaseModel]:
         return self._get_generic_cls_args()[0]
 
     async def create(self, obj: M) -> M:
-        if isinstance(obj, AuditableMixin):  # pragma: no branch
-            if obj.created_by is None:
-                with suppress(LookupError):
-                    obj.created_by = auth_context.get().get_actor()
-
-            if obj.updated_by is None:
-                with suppress(LookupError):
-                    obj.updated_by = auth_context.get().get_actor()
-
         self.session.add(obj)
         await self._save_changes(obj)
 
@@ -90,6 +78,7 @@ class ModelHandler[M: BaseModel]:
         self, id: str, extra_conditions: list[ColumnExpressionArgument] | None = None
     ) -> M:
         query = select(self.model_cls).where(self.model_cls.id == id)
+
         if extra_conditions:
             query = query.where(*extra_conditions)
 
@@ -132,19 +121,11 @@ class ModelHandler[M: BaseModel]:
             for key, value in data.items():
                 setattr(obj, key, value)
 
-        if (
-            isinstance(obj, AuditableMixin) and data and "updated_by" not in data
-        ):  # pragma: no branch
-            with suppress(LookupError):
-                obj.updated_by = auth_context.get().get_actor()
-
         await self._save_changes(obj)
         return obj
 
     async def soft_delete(self, id_or_obj: str | M) -> None:
-        obj = await self._get_model_obj(id_or_obj)
-
-        model_inspection = sqlalchemy.inspect(obj.__class__)
+        model_inspection = sqlalchemy.inspect(self.model_cls)
         status_column = model_inspection.columns.get("status")
 
         if status_column is None:
@@ -158,19 +139,12 @@ class ModelHandler[M: BaseModel]:
                 f"{self.model_cls.__name__} status column does not have a 'deleted' value."
             )
 
+        obj = await self._get_model_obj(id_or_obj)
+
         if obj.status == "deleted":  # type: ignore[attr-defined]
             raise CannotDeleteError(f"{self.model_cls.__name__} object is already deleted.")
 
-        column_updates = {"status": "deleted"}
-
-        if isinstance(obj, TimestampMixin):
-            column_updates["deleted_at"] = datetime.now(UTC)
-
-        if isinstance(obj, AuditableMixin):
-            with suppress(LookupError):
-                column_updates["deleted_by"] = auth_context.get().get_actor()
-
-        await self.update(obj, data=column_updates)
+        await self.update(obj, data={"status": "deleted"})
 
     async def fetch_page(
         self,
