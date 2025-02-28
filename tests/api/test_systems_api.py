@@ -518,6 +518,19 @@ async def test_delete_system(
         assert system.deleted_at is not None
         assert system.deleted_by is ffc_extension
 
+        # TODO: extract me into a proper test
+
+        # Make sure that the deleted_at and deleted_by fields are not changed if the status hasn't
+        # changed
+
+        system.name = "asd"
+        db_session.add(system)
+        await db_session.commit()
+        await db_session.refresh(system)
+        assert system.deleted_at is not None
+        assert system.deleted_by is ffc_extension
+        assert system.name == "asd"
+
 
 async def test_system_cannot_delete_itself(
     system_factory: ModelFactory[System],
