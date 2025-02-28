@@ -455,6 +455,102 @@ async def test_affiliate_cannot_disable_user(
 
 
 ##
+# Enable User
+##
+
+
+async def test_operator_can_enable_disabled_user(
+    operations_client: AsyncClient,
+    user_factory: ModelFactory[User],
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.DISABLED,
+    )
+
+    response = await operations_client.post(f"/users/{user.id}/enable")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == UserStatus.ACTIVE
+
+
+@pytest.mark.parametrize(
+    "user_status",
+    [
+        UserStatus.DELETED,
+        UserStatus.DISABLED,
+        UserStatus.DRAFT,
+    ],
+)
+async def test_operator_cannot_enable_not_active_user(
+    operations_client: AsyncClient, user_factory: ModelFactory[User], user_status: str
+):
+    user = await user_factory(
+        name="Peter Parker", email="peter.parker@spiderman.com", status=user_status
+    )
+    response = await operations_client.post(f"/users/{user.id}/disable")
+    assert response.status_code == 400
+    data = response.json()
+    status = user_status.split(".")[0]
+    assert data["detail"] == f"User's status is '{status}' only active users can be disabled."
+
+
+async def test_operator_cannot_enable_itself(
+    operations_account: Account,
+    user_factory: ModelFactory[User],
+    api_client: AsyncClient,
+    jwt_token_factory: JWTTokenFactory,
+    test_settings: Settings,
+    accountuser_factory: ModelFactory[AccountUser],
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+    await accountuser_factory(
+        user_id=user.id, account_id=operations_account.id, status=AccountUserStatus.ACTIVE
+    )
+    jwt_token = jwt_token_factory(
+        user.id, test_settings.auth_access_jwt_secret, account_id=operations_account.id
+    )
+
+    response = await api_client.post(
+        f"/users/{user.id}/enable",
+        headers={"Authorization": f"Bearer {jwt_token}"},
+    )
+    assert response.status_code == 400
+    data = response.json()
+    assert data["detail"] == "A user cannot enable itself."
+
+
+@pytest.mark.parametrize(
+    "user_status",
+    [
+        UserStatus.DELETED,
+        UserStatus.ACTIVE,
+        UserStatus.DISABLED,
+        UserStatus.DRAFT,
+    ],
+)
+async def test_affiliate_cannot_enable_user(
+    affiliate_client: AsyncClient,
+    user_factory: ModelFactory[User],
+    user_status: str,
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=user_status,
+    )
+    response = await affiliate_client.post(f"/users/{user.id}/enable")
+    assert response.status_code == 403
+    data = response.json()
+    assert data["detail"] == "You've found the door, but you don't have the key."
+
+
+##
 # Update User
 ##
 
@@ -591,9 +687,9 @@ async def test_affiliates_cannot_update_user_with_empty_payload(
     assert response.status_code == 422
 
 
-#
-# DELETE USER
-#
+##
+# Delete User
+##
 
 
 async def test_affiliates_cannot_delete_user(
@@ -618,6 +714,20 @@ async def test_operators_can_delete_user(
     )
     response = await operations_client.delete(f"/users/{user.id}")
     assert response.status_code == 204
+
+
+async def test_operators_can_delete_a_delete_user(
+    operations_client: AsyncClient, user_factory: ModelFactory[User]
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.DELETED,
+    )
+    response = await operations_client.delete(f"/users/{user.id}")
+    assert response.status_code == 400
+    data = response.json()
+    assert data["detail"] == "The user peter.parker@spiderman.com cannot be deleted."
 
 
 async def test_operators_try_to_delete_user_with_wrong_id(
@@ -685,6 +795,9 @@ async def test_delete_with_multiple_accounts(
 
 
 #
+##
+# Reset Password
+##
 
 
 async def test_reset_password(
