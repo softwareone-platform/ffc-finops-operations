@@ -1,16 +1,18 @@
 from collections.abc import Callable
 from contextlib import AbstractContextManager
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from fastapi import status
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conf import Settings
-from app.db.handlers import NotFoundError
+from app.db.handlers import AccountUserHandler, NotFoundError
 from app.db.models import Account, AccountUser, User
-from app.enums import AccountStatus, AccountUserStatus, UserStatus
+from app.enums import AccountStatus, AccountType, AccountUserStatus, UserStatus
 from tests.types import JWTTokenFactory, ModelFactory
 
 # -----------
@@ -998,3 +1000,186 @@ async def test_reset_password_waek_password(
     assert detail["loc"] == ["body", "password"]
     assert detail["type"] == "value_error"
     assert detail["msg"] == f"Value error, {expected_msg}."
+
+
+# ---------------------
+# GET ACCOUNTS FOR USER
+# ---------------------
+
+
+@dataclass
+class GetAccountsForUserTestCase:
+    caller_account_type: AccountType
+    user_status: UserStatus = UserStatus.ACTIVE
+    account_user_status: AccountUserStatus = AccountUserStatus.ACTIVE
+    account_status: AccountStatus = AccountStatus.ACTIVE
+    account_type: AccountType = AccountType.AFFILIATE
+    expected_status_code: int = status.HTTP_200_OK
+    expected_items: int = 1
+
+
+TEST_CASES = {
+    "all_active_affiliate": GetAccountsForUserTestCase(caller_account_type=AccountType.AFFILIATE),
+    "deleted_user_affiliate": GetAccountsForUserTestCase(
+        caller_account_type=AccountType.AFFILIATE,
+        user_status=UserStatus.DELETED,
+        expected_status_code=status.HTTP_404_NOT_FOUND,
+    ),
+    "deleted_account_user_affiliate": GetAccountsForUserTestCase(
+        caller_account_type=AccountType.AFFILIATE,
+        account_user_status=AccountUserStatus.DELETED,
+        expected_items=0,
+    ),
+    "deleted_account_affiliate": GetAccountsForUserTestCase(
+        caller_account_type=AccountType.AFFILIATE,
+        account_status=AccountStatus.DELETED,
+        expected_items=0,
+    ),
+    "all_active_operations": GetAccountsForUserTestCase(caller_account_type=AccountType.OPERATIONS),
+    "deleted_user_operations": GetAccountsForUserTestCase(
+        caller_account_type=AccountType.OPERATIONS,
+        user_status=UserStatus.DELETED,
+        expected_status_code=status.HTTP_200_OK,
+        expected_items=1,
+    ),
+    "deleted_account_user_operations": GetAccountsForUserTestCase(
+        caller_account_type=AccountType.OPERATIONS,
+        account_user_status=AccountUserStatus.DELETED,
+        expected_items=1,
+    ),
+    "deleted_account_operations": GetAccountsForUserTestCase(
+        caller_account_type=AccountType.OPERATIONS,
+        account_status=AccountStatus.DELETED,
+        expected_items=1,
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    "test_case", [pytest.param(test_case, id=id) for id, test_case in TEST_CASES.items()]
+)
+async def test_get_accounts_for_user_single_account(
+    api_client: AsyncClient,
+    db_session: AsyncSession,
+    account_factory: ModelFactory[Account],
+    user_factory: ModelFactory[User],
+    accountuser_factory: ModelFactory[AccountUser],
+    ffc_jwt_token: str,
+    gcp_jwt_token: str,
+    test_case: GetAccountsForUserTestCase,
+):
+    account = await account_factory(
+        name="Test Account",
+        type=AccountType.AFFILIATE,
+        status=test_case.account_status,
+    )
+    user = await user_factory(
+        name="Test User",
+        email="test.user@example.com",
+        status=test_case.user_status,
+        account=account,
+        accountuser_status=test_case.account_user_status,
+    )
+    account_user = await AccountUserHandler(db_session).get_account_user(
+        user_id=user.id, account_id=account.id
+    )
+
+    assert account_user is not None
+
+    if test_case.caller_account_type == AccountType.OPERATIONS:
+        api_client.headers["Authorization"] = f"Bearer {ffc_jwt_token}"
+    elif test_case.caller_account_type == AccountType.AFFILIATE:
+        api_client.headers["Authorization"] = f"Bearer {gcp_jwt_token}"
+    else:
+        raise RuntimeError("Invalid branch")
+
+    response = await api_client.get(f"/users/{user.id}/accounts")
+    assert response.status_code == test_case.expected_status_code
+    data = response.json()
+
+    if response.status_code == 404:
+        assert data["detail"] == f"User with ID `{user.id}` wasn't found."
+        return
+
+    assert data["total"] == test_case.expected_items
+    assert len(data["items"]) == test_case.expected_items
+
+    if test_case.expected_items == 0:
+        return
+
+    response_account = data["items"][0]
+
+    assert response_account["id"] == account_user.id
+    assert response_account["status"] == account_user.status._value_
+    assert response_account["account"]["id"] == account.id
+    assert response_account["account"]["name"] == account.name
+    assert response_account["account"]["type"] == "affiliate"
+    assert response_account["user"]["name"] == user.name
+    assert response_account["user"]["email"] == user.email
+    assert response_account["user"]["id"] == user.id
+
+    assert (
+        datetime.fromisoformat(response_account["events"]["created"]["at"])
+        == account_user.created_at
+    )
+    assert (
+        datetime.fromisoformat(response_account["events"]["updated"]["at"])
+        == account_user.updated_at
+    )
+    assert response_account["events"].get("deleted") is None
+
+
+@pytest.mark.parametrize(
+    ("create_accounts_count", "limit", "offset", "expected_total", "expected_items_count"),
+    [
+        (100, None, None, 100, 50),
+        (100, 10, None, 100, 10),
+        (100, None, 95, 100, 5),
+        (100, 10, 95, 100, 5),
+        (2, 5, 1, 2, 1),
+    ],
+)
+async def test_get_accounts_for_user_multiple_accounts(
+    operations_client: AsyncClient,
+    db_session: AsyncSession,
+    create_accounts_count: int,
+    limit: int | None,
+    offset: int | None,
+    expected_total: int,
+    expected_items_count: int,
+):
+    user = User(name="Test User", email="test.user@example.com", status=UserStatus.ACTIVE)
+    db_session.add(user)
+
+    for i in range(create_accounts_count):
+        account = Account(
+            name=f"Test Account {i}",
+            type=AccountType.AFFILIATE,
+            status=AccountStatus.ACTIVE,
+            external_id=f"test-account-external-id-{i}",
+        )
+        account_user = AccountUser(
+            account=account,
+            user=user,
+            status=AccountUserStatus.ACTIVE,
+        )
+        db_session.add(account_user)
+        db_session.add(account)
+
+    await db_session.commit()
+
+    params = {}
+
+    if limit is not None:
+        params["limit"] = limit
+
+    if offset is not None:
+        params["offset"] = offset
+
+    response = await operations_client.get(f"/users/{user.id}/accounts", params=params)
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["total"] == expected_total
+    assert len(data["items"]) == expected_items_count
