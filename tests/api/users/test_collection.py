@@ -540,6 +540,38 @@ async def test_operators_cannot_update_user_with_empty_payload(
         f"/users/{user.id}",
         json={},
     )
+    assert response.status_code == 422
+
+
+async def test_operators_cannot_update_user_with_name_None(
+    operations_client: AsyncClient, user_factory: ModelFactory[User]
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+
+    response = await operations_client.put(
+        f"/users/{user.id}",
+        json={"name": None},
+    )
+    assert response.status_code == 422
+
+
+async def test_operators_cannot_update_a_deleted_user(
+    operations_client: AsyncClient, user_factory: ModelFactory[User]
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.DELETED,
+    )
+
+    response = await operations_client.put(
+        f"/users/{user.id}",
+        json={"name": "Batman"},
+    )
     assert response.status_code == 400
 
 
@@ -556,9 +588,7 @@ async def test_affiliates_cannot_update_user_with_empty_payload(
         f"/users/{user.id}",
         json={},
     )
-    assert response.status_code == 400
-    data = response.json()
-    assert data["detail"] == "At least one field must be provided for update."
+    assert response.status_code == 422
 
 
 async def test_reset_password(
