@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import and_
+from sqlalchemy import ColumnExpressionArgument, and_
 from sqlalchemy.orm import joinedload, with_loader_criteria
 
 from app.auth.auth import authentication_required, check_operations_account
@@ -41,9 +41,22 @@ from app.utils import wrap_exc_in_http_response
 logger = logging.getLogger(__name__)
 
 
-async def fetch_user_or_404(id: UserId, user_repo: UserRepository) -> User:
+async def fetch_user_or_404(
+    id: UserId,
+    auth_context: CurrentAuthContext,
+    user_repo: UserRepository,
+) -> User:
     with wrap_exc_in_http_response(NotFoundError, status_code=status.HTTP_404_NOT_FOUND):
-        return await user_repo.get(id=id)
+        extra_conditions: list[ColumnExpressionArgument] = []
+
+        if (
+            auth_context is not None
+            and auth_context.account is not None
+            and auth_context.account.type == AccountType.AFFILIATE
+        ):
+            extra_conditions.append(User.status != UserStatus.DELETED)
+
+        return await user_repo.get(id=id, extra_conditions=extra_conditions)
 
 
 # ======
@@ -226,10 +239,27 @@ async def delete_user(id: str):  # pragma: no cover
 @router.get(
     "/{id}/accounts",
     dependencies=[Depends(authentication_required)],
-    response_model=list[AccountUserRead],
+    response_model=LimitOffsetPage[AccountUserRead],
 )
-async def get_user_accounts(id: str):  # pragma: no cover
-    pass  # not yet implemented
+async def get_user_accounts(
+    user: Annotated[User, Depends(fetch_user_or_404)],
+    accountuser_repo: AccountUserRepository,
+    auth_ctx: CurrentAuthContext,
+):
+    extra_conditions: list[ColumnExpressionArgument] = [
+        AccountUser.user == user,
+    ]
+    if auth_ctx is not None and auth_ctx.account.type == AccountType.AFFILIATE:
+        extra_conditions += [
+            AccountUser.account.has(Account.status != AccountStatus.DELETED),
+            AccountUser.status != AccountUserStatus.DELETED,
+        ]
+
+    return await paginate(
+        accountuser_repo,
+        AccountUserRead,
+        extra_conditions=extra_conditions,
+    )
 
 
 @router.post(
@@ -284,12 +314,6 @@ async def resend_user_invitation(
     account_repository: AccountRepository,
     accountuser_repository: AccountUserRepository,
 ):
-    if user.status == UserStatus.DELETED:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"User with ID `{user.id}` wasn't found.",
-        )
-
     account = await account_repository.first(
         Account.id == account_id, Account.status != AccountStatus.DELETED
     )
