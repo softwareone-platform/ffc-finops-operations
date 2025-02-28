@@ -211,8 +211,8 @@ async def update_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="At least one field must be provided for update.",
         )
-    db_account = await user_repo.update(user.id, data=to_update)
-    return convert_model_to_schema(UserRead, db_account)
+    db_user = await user_repo.update(user.id, data=to_update)
+    return convert_model_to_schema(UserRead, db_user)
 
 
 @router.delete(
