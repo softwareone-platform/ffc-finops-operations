@@ -219,8 +219,22 @@ async def update_user(
     dependencies=[Depends(check_operations_account)],
     status_code=status.HTTP_204_NO_CONTENT,
 )
-async def delete_user(id: str):  # pragma: no cover
-    pass  # not yet implemented
+async def delete_user(
+    user_repo: UserRepository,
+    auth_context: CurrentAuthContext,
+    user: Annotated[User, Depends(fetch_user_or_404)],
+):
+    if user.status != UserStatus.ACTIVE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"The user {user.email} cannot be deleted.",
+        )
+    if user == auth_context.user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A user cannot delete itself.",
+        )
+    await user_repo.soft_delete(id_or_obj=user)
 
 
 @router.get(
