@@ -206,7 +206,6 @@ async def update_user(
     """
 
     to_update = data.model_dump(exclude_unset=True)
-    print("to_update", to_update)
     if not to_update:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
