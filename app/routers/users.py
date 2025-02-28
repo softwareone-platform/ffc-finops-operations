@@ -198,9 +198,22 @@ async def invite_user(
 async def update_user(
     id: str,
     data: UserUpdate,
-    auth_context: CurrentAuthContext,
-):  # pragma: no cover
-    pass  # not yet implemented
+    user_repo: UserRepository,
+):
+    """
+    This endpoint updates the name field of a user.
+    Only the name can be updated.
+    """
+
+    to_update = data.model_dump(exclude_unset=True)
+    print("to_update", to_update)
+    if not to_update:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one field must be provided for update.",
+        )
+    db_account = await user_repo.update(id, data=to_update)
+    return convert_model_to_schema(UserRead, db_account)
 
 
 @router.delete(
