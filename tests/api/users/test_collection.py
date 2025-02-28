@@ -479,7 +479,7 @@ async def test_operator_can_enable_disabled_user(
     "user_status",
     [
         UserStatus.DELETED,
-        UserStatus.DISABLED,
+        UserStatus.ACTIVE,
         UserStatus.DRAFT,
     ],
 )
@@ -489,11 +489,11 @@ async def test_operator_cannot_enable_not_active_user(
     user = await user_factory(
         name="Peter Parker", email="peter.parker@spiderman.com", status=user_status
     )
-    response = await operations_client.post(f"/users/{user.id}/disable")
+    response = await operations_client.post(f"/users/{user.id}/enable")
     assert response.status_code == 400
     data = response.json()
     status = user_status.split(".")[0]
-    assert data["detail"] == f"User's status is '{status}' only active users can be disabled."
+    assert data["detail"] == f"User's status is '{status}' only disabled users can be enabled."
 
 
 async def test_operator_cannot_enable_itself(
