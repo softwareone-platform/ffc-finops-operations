@@ -592,6 +592,8 @@ async def test_affiliates_cannot_update_user_with_empty_payload(
 
 
 #
+# DELETE USER
+#
 
 
 async def test_affiliates_cannot_delete_user(
@@ -616,20 +618,6 @@ async def test_operators_can_delete_user(
     )
     response = await operations_client.delete(f"/users/{user.id}")
     assert response.status_code == 204
-
-
-async def test_operators_can_delete_a_delete_user(
-    operations_client: AsyncClient, user_factory: ModelFactory[User]
-):
-    user = await user_factory(
-        name="Peter Parker",
-        email="peter.parker@spiderman.com",
-        status=UserStatus.DELETED,
-    )
-    response = await operations_client.delete(f"/users/{user.id}")
-    assert response.status_code == 400
-    data = response.json()
-    assert data["detail"] == "The user peter.parker@spiderman.com cannot be deleted."
 
 
 async def test_operators_try_to_delete_user_with_wrong_id(
@@ -666,6 +654,34 @@ async def test_operator_cannot_delete_itself(
     assert response.status_code == 400
     data = response.json()
     assert data["detail"] == "A user cannot delete itself."
+
+
+async def test_delete_with_multiple_accounts(
+    operations_client: AsyncClient,
+    operations_account: Account,
+    accountuser_factory: ModelFactory[AccountUser],
+    user_factory: ModelFactory[User],
+    db_session: AsyncSession,
+):
+    accountusers = []
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+
+    for _ in range(30):
+        accountuser = await accountuser_factory(
+            user_id=user.id, account_id=operations_account.id, status=AccountStatus.ACTIVE
+        )
+        accountusers.append(accountuser)
+    response = await operations_client.delete(f"/users/{user.id}")
+    assert response.status_code == 204
+    await db_session.refresh(user)
+    assert user.status == UserStatus.DELETED
+    for accountuser in accountusers:
+        await db_session.refresh(accountuser)
+        assert accountuser.status == AccountUserStatus.DELETED
 
 
 #

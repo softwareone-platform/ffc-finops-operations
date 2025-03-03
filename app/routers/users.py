@@ -207,7 +207,7 @@ async def update_user(
     if user.status != UserStatus.ACTIVE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"The user {user.email} cannot be deleted.",
+            detail="The user cannot be updated.",
         )
     to_update = data.model_dump(exclude_unset=True)
     db_user = await user_repo.update(user.id, data=to_update)
@@ -221,20 +221,31 @@ async def update_user(
 )
 async def delete_user(
     user_repo: UserRepository,
+    accountuser_repo: AccountUserRepository,
     auth_context: CurrentAuthContext,
+    db_engine: DBEngine,
+    db_session: DBSession,
     user: Annotated[User, Depends(fetch_user_or_404)],
 ):
-    if user.status != UserStatus.ACTIVE:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"The user {user.email} cannot be deleted.",
-        )
     if user == auth_context.user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="A user cannot delete itself.",
         )
-    await user_repo.soft_delete(id_or_obj=user)
+    account_users = await accountuser_repo.filter(
+        AccountUser.status != AccountUserStatus.DELETED, AccountUser.user_id == user.id
+    )
+    db_session.expunge_all()  # detach the previous session
+    async with get_tx_db_session(db_engine) as tx_session:
+        user_handler = UserHandler(tx_session)  # this is needed to delete the user
+        accountuser_handler = AccountUserHandler(
+            tx_session
+        )  # this is needed to delete the linked account's users
+        await user_handler.soft_delete(id_or_obj=user.id)
+        logger.info(f"The user {user.id} has been deleted.")
+        for accountuser in account_users:
+            await accountuser_handler.soft_delete(id_or_obj=accountuser.id)
+        logger.info("All the account users have been deleted.")
 
 
 @router.get(
