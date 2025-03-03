@@ -171,7 +171,7 @@ async def authentication_required(
     settings: AppSettings,
     db_session: DBSession,
     credentials: Annotated[JWTCredentials | None, Depends(JWTBearer())],
-):
+) -> AuthenticationContext:
     async with asynccontextmanager(get_authentication_context)(
         settings, db_session, credentials
     ) as auth_context:
