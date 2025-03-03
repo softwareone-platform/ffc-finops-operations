@@ -1,3 +1,4 @@
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
 
@@ -58,61 +59,25 @@ async def get_authentication_context(
     db_session: DBSession,
     credentials: Annotated[JWTCredentials | None, Depends(JWTBearer())],
 ):
-    if credentials:
-        system_handler = SystemHandler(db_session)
-        user_handler = UserHandler(db_session)
-        account_user_handler = AccountUserHandler(db_session)
-        account_handler = AccountHandler(db_session)
+    """
+    This function gets the authentication context from a JWT bearer token.
+    It manages System and User actors and return the related authentication context.
+    If no  credentials are provided, it returns a default unauthenticated context.
 
+    """
+    if credentials:
         actor_id = credentials.claim["sub"]
         try:
             if actor_id.startswith(System.PK_PREFIX):
-                system = await system_handler.get(
-                    actor_id,
-                    [System.status == SystemStatus.ACTIVE],
-                )
-
-                jwt.decode(
-                    credentials.credentials,
-                    system.jwt_secret,
-                    options={"require": ["exp", "nbf", "iat", "sub"]},
-                    algorithms=[JWT_ALGORITHM],
-                    leeway=JWT_LEEWAY,
-                )
-                # TODO check maximum allowed lifespan
-                context = AuthenticationContext(
-                    account=system.owner,
-                    actor_type=ActorType.SYSTEM,
-                    system=system,
+                context = await get_authentication_context_for_system(
+                    db_session=db_session, credentials=credentials, system_id=actor_id
                 )
             else:
-                jwt.decode(
-                    credentials.credentials,
-                    settings.auth_access_jwt_secret,
-                    options={"require": ["exp", "nbf", "iat", "sub"]},
-                    algorithms=[JWT_ALGORITHM],
-                    leeway=JWT_LEEWAY,
-                )
-                user = await user_handler.get(
-                    actor_id,
-                    extra_conditions=[User.status == UserStatus.ACTIVE],
-                )
-                account_id = credentials.claim.get("account_id", user.last_used_account_id)
-                account = await account_handler.get(
-                    account_id,
-                    extra_conditions=[Account.status == AccountStatus.ACTIVE],
-                )
-                account_user = await account_user_handler.get_account_user(
-                    account_id=account_id,
+                context = await get_authentication_context_for_account_user(
+                    settings=settings,
+                    db_session=db_session,
+                    credentials=credentials,
                     user_id=actor_id,
-                    extra_conditions=[AccountUser.status == AccountUserStatus.ACTIVE],
-                )
-                if not account_user:
-                    raise UNAUTHORIZED_EXCEPTION
-                context = AuthenticationContext(
-                    account=account,
-                    actor_type=ActorType.USER,
-                    user=user,
                 )
         except (jwt.InvalidTokenError, DatabaseError) as e:
             raise UNAUTHORIZED_EXCEPTION from e
@@ -127,11 +92,87 @@ async def get_authentication_context(
     yield
 
 
+async def get_authentication_context_for_account_user(
+    settings: AppSettings,
+    db_session: DBSession,
+    credentials: JWTCredentials,
+    user_id: str,
+) -> AuthenticationContext:
+    """
+    This functions retrieves the authentication context from a specific account user
+    identified by a JWT bearer token.
+    """
+
+    user_handler = UserHandler(db_session)
+    account_user_handler = AccountUserHandler(db_session)
+    account_handler = AccountHandler(db_session)
+    jwt.decode(
+        credentials.credentials,
+        settings.auth_access_jwt_secret,
+        options={"require": ["exp", "nbf", "iat", "sub"]},
+        algorithms=[JWT_ALGORITHM],
+        leeway=JWT_LEEWAY,
+    )
+    user = await user_handler.get(
+        user_id,
+        extra_conditions=[User.status == UserStatus.ACTIVE],
+    )
+    account_id = credentials.claim.get("account_id", user.last_used_account_id)
+    account = await account_handler.get(
+        account_id,
+        extra_conditions=[Account.status == AccountStatus.ACTIVE],
+    )
+    account_user = await account_user_handler.get_account_user(
+        account_id=account_id,
+        user_id=user_id,
+        extra_conditions=[AccountUser.status == AccountUserStatus.ACTIVE],
+    )
+    if not account_user:
+        raise UNAUTHORIZED_EXCEPTION
+    context = AuthenticationContext(
+        account=account,
+        actor_type=ActorType.USER,
+        user=user,
+    )
+    return context
+
+
+async def get_authentication_context_for_system(
+    db_session: DBSession,
+    credentials: JWTCredentials,
+    system_id: str,
+) -> AuthenticationContext:
+    """
+    This functions retrieves the authentication context from a specific system account
+    identified by a JWT bearer token.
+    """
+    system_handler = SystemHandler(db_session)
+
+    system = await system_handler.get(
+        system_id,
+        [System.status == SystemStatus.ACTIVE],
+    )
+    jwt.decode(
+        credentials.credentials,
+        system.jwt_secret,
+        options={"require": ["exp", "nbf", "iat", "sub"]},
+        algorithms=[JWT_ALGORITHM],
+        leeway=JWT_LEEWAY,
+    )
+    # TODO check maximum allowed lifespan
+    context = AuthenticationContext(
+        account=system.owner,
+        actor_type=ActorType.SYSTEM,
+        system=system,
+    )
+    return context
+
+
 async def authentication_required(
     settings: AppSettings,
     db_session: DBSession,
     credentials: Annotated[JWTCredentials | None, Depends(JWTBearer())],
-):
+) -> AsyncGenerator[None]:
     async with asynccontextmanager(get_authentication_context)(
         settings, db_session, credentials
     ) as auth_context:
@@ -142,7 +183,7 @@ async def authentication_required(
 
 def check_operations_account(
     context: Annotated[AuthenticationContext | None, Depends(get_authentication_context)],
-):
+) -> None:
     """
     This function ensures that the account type is of type OPERATIONS
     """
