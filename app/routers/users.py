@@ -220,13 +220,16 @@ async def update_user(
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def delete_user(
-    user_repo: UserRepository,
     accountuser_repo: AccountUserRepository,
     auth_context: CurrentAuthContext,
     db_engine: DBEngine,
     db_session: DBSession,
     user: Annotated[User, Depends(fetch_user_or_404)],
 ):
+    """
+    This endpoint allows an OPERATOR to delete a user.
+    A user cannot delete itself.
+    """
     if user == auth_context.user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -289,11 +292,32 @@ async def disable_user(
 
 @router.post(
     "/{id}/enable",
-    dependencies=[Depends(authentication_required)],
+    dependencies=[Depends(check_operations_account)],
     response_model=UserRead,
 )
-async def enable_user(id: str):  # pragma: no cover
-    pass  # not yet implemented
+async def enable_user(
+    user_repo: UserRepository,
+    auth_context: CurrentAuthContext,
+    user: Annotated[User, Depends(fetch_user_or_404)],
+):
+    """
+    This endpoint allows an OPERATOR to enable a user.
+    A user cannot enable itself.
+    """
+    if user == auth_context.user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A user cannot enable itself.",
+        )
+    if user.status != UserStatus.DISABLED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"User's status is '{user.status._value_}' only disabled users can be enabled."
+            ),
+        )
+    user = await user_repo.update(id_or_obj=user.id, data={"status": UserStatus.ACTIVE})
+    return convert_model_to_schema(UserRead, user)
 
 
 @router.post(
