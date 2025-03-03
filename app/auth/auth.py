@@ -96,7 +96,7 @@ async def get_authentication_context_for_account_user(
     db_session: DBSession,
     credentials: JWTCredentials,
     user_id: str,
-):
+) -> Authentication Context:
     """
     This functions retrieves the authentication context from a specific account user
     identified by a JWT bearer token.
