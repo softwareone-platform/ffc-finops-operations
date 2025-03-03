@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
 
@@ -59,11 +61,6 @@ async def get_authentication_context(
     credentials: Annotated[JWTCredentials | None, Depends(JWTBearer())],
 ):
     if credentials:
-        # system_handler = SystemHandler(db_session)
-        # user_handler = UserHandler(db_session)
-        # account_user_handler = AccountUserHandler(db_session)
-        # account_handler = AccountHandler(db_session)
-
         actor_id = credentials.claim["sub"]
         try:
             if actor_id.startswith(System.PK_PREFIX):
