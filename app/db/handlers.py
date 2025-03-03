@@ -170,7 +170,7 @@ class ModelHandler[M: BaseModel]:
             with suppress(LookupError):
                 column_updates["deleted_by"] = auth_context.get().get_actor()
 
-        await self.update(obj, data=column_updates)
+        return await self.update(obj, data=column_updates)
 
     async def fetch_page(
         self,

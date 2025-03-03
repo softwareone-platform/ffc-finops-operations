@@ -591,6 +591,102 @@ async def test_affiliates_cannot_update_user_with_empty_payload(
     assert response.status_code == 422
 
 
+#
+# DELETE USER
+#
+
+
+async def test_affiliates_cannot_delete_user(
+    affiliate_client: AsyncClient, user_factory: ModelFactory[User]
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+    response = await affiliate_client.delete(f"/users/{user.id}")
+    assert response.status_code == 403
+
+
+async def test_operators_can_delete_user(
+    operations_client: AsyncClient, user_factory: ModelFactory[User]
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+    response = await operations_client.delete(f"/users/{user.id}")
+    assert response.status_code == 204
+
+
+async def test_operators_try_to_delete_user_with_wrong_id(
+    operations_client: AsyncClient, user_factory: ModelFactory[User]
+):
+    response = await operations_client.delete("/users/FUSR-4209-7117")
+    assert response.status_code == 404
+
+
+async def test_operator_cannot_delete_itself(
+    operations_account: Account,
+    user_factory: ModelFactory[User],
+    api_client: AsyncClient,
+    jwt_token_factory: JWTTokenFactory,
+    test_settings: Settings,
+    accountuser_factory: ModelFactory[AccountUser],
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+    await accountuser_factory(
+        user_id=user.id, account_id=operations_account.id, status=AccountUserStatus.ACTIVE
+    )
+    jwt_token = jwt_token_factory(
+        user.id, test_settings.auth_access_jwt_secret, account_id=operations_account.id
+    )
+
+    response = await api_client.delete(
+        f"/users/{user.id}",
+        headers={"Authorization": f"Bearer {jwt_token}"},
+    )
+    assert response.status_code == 400
+    data = response.json()
+    assert data["detail"] == "A user cannot delete itself."
+
+
+async def test_delete_with_multiple_accounts(
+    operations_client: AsyncClient,
+    operations_account: Account,
+    accountuser_factory: ModelFactory[AccountUser],
+    user_factory: ModelFactory[User],
+    db_session: AsyncSession,
+):
+    accountusers = []
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+
+    for _ in range(30):
+        accountuser = await accountuser_factory(
+            user_id=user.id, account_id=operations_account.id, status=AccountStatus.ACTIVE
+        )
+        accountusers.append(accountuser)
+    response = await operations_client.delete(f"/users/{user.id}")
+    assert response.status_code == 204
+    await db_session.refresh(user)
+    assert user.status == UserStatus.DELETED
+    for accountuser in accountusers:
+        await db_session.refresh(accountuser)
+        assert accountuser.status == AccountUserStatus.DELETED
+
+
+#
+
+
 async def test_reset_password(
     test_settings: Settings,
     user_factory: ModelFactory[User],
