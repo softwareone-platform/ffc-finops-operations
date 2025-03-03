@@ -1,3 +1,4 @@
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
 
@@ -96,7 +97,7 @@ async def get_authentication_context_for_account_user(
     db_session: DBSession,
     credentials: JWTCredentials,
     user_id: str,
-) -> Authentication Context:
+) -> AuthenticationContext:
     """
     This functions retrieves the authentication context from a specific account user
     identified by a JWT bearer token.
@@ -171,7 +172,7 @@ async def authentication_required(
     settings: AppSettings,
     db_session: DBSession,
     credentials: Annotated[JWTCredentials | None, Depends(JWTBearer())],
-) -> None:
+) -> AsyncGenerator[None]:
     async with asynccontextmanager(get_authentication_context)(
         settings, db_session, credentials
     ) as auth_context:
@@ -182,7 +183,7 @@ async def authentication_required(
 
 def check_operations_account(
     context: Annotated[AuthenticationContext | None, Depends(get_authentication_context)],
-):
+) -> None:
     """
     This function ensures that the account type is of type OPERATIONS
     """
