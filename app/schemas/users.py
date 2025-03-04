@@ -46,15 +46,22 @@ class AccountUserCreate(BaseSchema):
 class AccountUserRead(IdSchema, CommonEventsSchema, AccountUserBase):
     account: AccountReference
     user: UserReference
-    invitation_token: str
-    invitation_token_expires_at: datetime.datetime
+    invitation_token: str | None
+    invitation_token_expires_at: datetime.datetime | None
     joined_at: datetime.datetime | None = None
 
 
 class AccountUserReference(IdSchema, AccountUserBase):
-    account: AccountReference
     created_at: datetime.datetime | None = None
     joined_at: datetime.datetime | None = None
+
+
+class AccountUserReferenceWithUser(AccountUserReference):
+    user: UserReference
+
+
+class AccountUserReferenceWithAccount(AccountUserReference):
+    account: AccountReference
 
 
 class UserInvitationRead(IdSchema, CommonEventsSchema, UserCreate):
@@ -66,4 +73,4 @@ class UserRead(IdSchema, CommonEventsSchema, UserCreate):
     status: UserStatus
     last_login_at: datetime.datetime | None
     last_used_account: AccountReference | None
-    account_user: AccountUserReference | None
+    account_user: AccountUserReferenceWithAccount | None

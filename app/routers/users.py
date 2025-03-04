@@ -26,6 +26,7 @@ from app.dependencies import (
 from app.enums import AccountStatus, AccountType, AccountUserStatus, UserStatus
 from app.hasher import pbkdf2_sha256
 from app.pagination import LimitOffsetPage, paginate
+from app.schemas.accounts import AccountRead
 from app.schemas.core import convert_model_to_schema
 from app.schemas.users import (
     AccountUserCreate,
@@ -42,17 +43,24 @@ logger = logging.getLogger(__name__)
 
 
 async def fetch_user_or_404(
-    id: UserId, user_repo: UserRepository, auth_context: CurrentAuthContext
+    id: UserId,
+    auth_context: CurrentAuthContext,
+    user_repo: UserRepository,
 ) -> User:
     """
     If called with an Affiliate Account it will return a 404 error if the
     given user ID has been deleted
     If called with an Operations Account it will return the user with the provided id
     """
+
     with wrap_exc_in_http_response(NotFoundError, status_code=status.HTTP_404_NOT_FOUND):
         extra_conditions: list[ColumnExpressionArgument] = []
 
-        if auth_context is not None and auth_context.account.type == AccountType.AFFILIATE:
+        if (
+            auth_context is not None
+            and auth_context.account is not None
+            and auth_context.account.type == AccountType.AFFILIATE
+        ):
             extra_conditions.append(User.status != UserStatus.DELETED)
 
         return await user_repo.get(id=id, extra_conditions=extra_conditions)
@@ -264,10 +272,27 @@ async def delete_user(
 @router.get(
     "/{id}/accounts",
     dependencies=[Depends(authentication_required)],
-    response_model=list[AccountUserRead],
+    response_model=LimitOffsetPage[AccountRead],
 )
-async def get_user_accounts(id: str):  # pragma: no cover
-    pass  # not yet implemented
+async def get_user_accounts(
+    user: Annotated[User, Depends(fetch_user_or_404)],
+    account_repo: AccountRepository,
+    auth_ctx: CurrentAuthContext,
+):
+    extra_conditions: list[ColumnExpressionArgument] = [
+        Account.users.any(AccountUser.user == user),
+    ]
+    if auth_ctx is not None and auth_ctx.account.type == AccountType.AFFILIATE:
+        extra_conditions.append(
+            Account.users.any(AccountUser.status != AccountUserStatus.DELETED),
+        )
+
+    return await paginate(
+        account_repo,
+        AccountRead,
+        extra_conditions=extra_conditions,
+        page_options=[joinedload(Account.users)],
+    )
 
 
 @router.post(
@@ -343,12 +368,6 @@ async def resend_user_invitation(
     account_repository: AccountRepository,
     accountuser_repository: AccountUserRepository,
 ):
-    if user.status == UserStatus.DELETED:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"User with ID `{user.id}` wasn't found.",
-        )
-
     account = await account_repository.first(
         Account.id == account_id, Account.status != AccountStatus.DELETED
     )
