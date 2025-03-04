@@ -119,6 +119,10 @@ class Account(Base, HumanReadablePKMixin, AuditableMixin):
     external_id: Mapped[str] = mapped_column(String(255), nullable=False)
     users: Mapped[list["AccountUser"]] = relationship(back_populates="account", lazy="noload")
 
+    @property
+    def account_user(self):
+        return self.users[0]
+
 
 class System(Actor, AuditableMixin):
     __tablename__ = "systems"

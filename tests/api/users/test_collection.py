@@ -1109,11 +1109,11 @@ async def test_list_user_accounts_single_account(
     assert response_account["status"] == account.status
     assert response_account["external_id"] == account.external_id
     assert response_account["type"] == account.type
-    assert response_account["user"]["id"] == user.id
-    assert response_account["user"]["email"] == user.email
-    assert response_account["user"]["name"] == user.name
     assert response_account["account_user"]["id"] == account_user.id
     assert response_account["account_user"]["status"] == account_user.status
+    assert response_account["account_user"]["user"]["id"] == user.id
+    assert response_account["account_user"]["user"]["email"] == user.email
+    assert response_account["account_user"]["user"]["name"] == user.name
 
     assert datetime.fromisoformat(response_account["events"]["created"]["at"]) == account.created_at
     assert datetime.fromisoformat(response_account["events"]["updated"]["at"]) == account.updated_at

@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import logging
 import secrets
-from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi_pagination import create_page, resolve_params
 from sqlalchemy import ColumnExpressionArgument, and_
 from sqlalchemy.orm import joinedload, with_loader_criteria
 
@@ -27,17 +25,15 @@ from app.dependencies import (
 )
 from app.enums import AccountStatus, AccountType, AccountUserStatus, UserStatus
 from app.hasher import pbkdf2_sha256
-from app.pagination import LimitOffsetPage, LimitOffsetParams, paginate
-from app.schemas.core import AuditEventsSchema, convert_model_to_schema, extract_events
+from app.pagination import LimitOffsetPage, paginate
+from app.schemas.accounts import AccountRead
+from app.schemas.core import convert_model_to_schema
 from app.schemas.users import (
-    AccountForUser,
     AccountUserCreate,
     AccountUserRead,
-    AccountUserReference,
     UserAcceptInvitation,
     UserInvitationRead,
     UserRead,
-    UserReference,
     UserResetPassword,
     UserUpdate,
 )
@@ -284,7 +280,7 @@ async def delete_user(
 @router.get(
     "/{id}/accounts",
     dependencies=[Depends(authentication_required)],
-    response_model=LimitOffsetPage[AccountForUser],
+    response_model=LimitOffsetPage[AccountRead],
 )
 async def get_user_accounts(
     user: Annotated[User, Depends(fetch_user_or_404)],
@@ -299,38 +295,12 @@ async def get_user_accounts(
             Account.users.any(AccountUser.status != AccountUserStatus.DELETED),
         )
 
-    params: LimitOffsetParams = resolve_params()
-    total = await account_repo.count(*extra_conditions)
-
-    items: Sequence[Account] = []
-    if params.limit > 0:
-        items = await account_repo.fetch_page(
-            limit=params.limit,
-            offset=params.offset,
-            extra_conditions=extra_conditions,
-            options=[joinedload(Account.users)],
-        )
-
-    pages: list[AccountForUser] = []
-    for account in items:
-        if len(account.users) != 1:
-            raise RuntimeError("invalid branch")
-
-        account_user = account.users[0]
-        page = AccountForUser(
-            id=account.id,
-            name=account.name,
-            type=account.type,
-            status=account.status,
-            external_id=account.external_id,
-            user=convert_model_to_schema(UserReference, account_user.user),
-            account_user=convert_model_to_schema(AccountUserReference, account_user),
-            events=extract_events(account, AuditEventsSchema),
-        )
-
-        pages.append(page)
-
-    return create_page(pages, params=params, total=total)
+    return await paginate(
+        account_repo,
+        AccountRead,
+        extra_conditions=extra_conditions,
+        page_options=[joinedload(Account.users)],
+    )
 
 
 @router.post(
