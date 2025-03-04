@@ -329,7 +329,7 @@ async def test_list_users_with_2_accounts(
     gcp_account: Account,
     operations_account: Account,
     accountuser_factory: ModelFactory[AccountUser],
-    user_factory,
+    user_factory: ModelFactory[User],
 ):
     user = await user_factory(
         name="Peter Parker",

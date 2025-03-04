@@ -91,6 +91,14 @@ async def get_users(user_repo: UserRepository, auth_context: CurrentAuthContext)
         return await paginate(
             user_repo,
             UserRead,
+            extra_conditions=[
+                User.accounts.any(
+                    and_(
+                        AccountUser.account_id == auth_context.account.id,  # type: ignore
+                        AccountUser.status != AccountUserStatus.DELETED,
+                    ),
+                ),
+            ],
             page_options=[
                 joinedload(User.accounts, innerjoin=True),
                 with_loader_criteria(
