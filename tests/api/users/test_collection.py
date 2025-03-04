@@ -1030,11 +1030,6 @@ TEST_CASES = {
         account_user_status=AccountUserStatus.DELETED,
         expected_items=0,
     ),
-    "deleted_account_affiliate": GetAccountsForUserTestCase(
-        caller_account_type=AccountType.AFFILIATE,
-        account_status=AccountStatus.DELETED,
-        expected_items=0,
-    ),
     "all_active_operations": GetAccountsForUserTestCase(caller_account_type=AccountType.OPERATIONS),
     "deleted_user_operations": GetAccountsForUserTestCase(
         caller_account_type=AccountType.OPERATIONS,

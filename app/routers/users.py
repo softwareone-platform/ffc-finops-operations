@@ -295,10 +295,9 @@ async def get_user_accounts(
         Account.users.any(AccountUser.user == user),
     ]
     if auth_ctx is not None and auth_ctx.account.type == AccountType.AFFILIATE:
-        extra_conditions += [
-            Account.status != AccountStatus.DELETED,
+        extra_conditions.append(
             Account.users.any(AccountUser.status != AccountUserStatus.DELETED),
-        ]
+        )
 
     params: LimitOffsetParams = resolve_params()
     total = await account_repo.count(*extra_conditions)
