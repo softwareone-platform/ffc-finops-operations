@@ -6,7 +6,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conf import Settings
-from app.db.handlers import CannotDeleteError, NotFoundError
+from app.db.handlers import NotFoundError
 from app.db.models import Account, AccountUser, User
 from app.enums import AccountStatus, AccountUserStatus, UserStatus
 from tests.types import JWTTokenFactory, ModelFactory
@@ -692,6 +692,20 @@ async def test_affiliates_cannot_update_user_with_empty_payload(
 ##
 
 
+async def test_try_to_delete_with_a_deleted_user(
+    operations_client: AsyncClient, user_factory: ModelFactory[User]
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.DELETED,
+    )
+    response = await operations_client.delete(f"/users/{user.id}")
+    data = response.json()
+    assert response.status_code == 400
+    assert data["detail"] == "The user has already been deleted."
+
+
 async def test_affiliates_cannot_delete_user(
     affiliate_client: AsyncClient, user_factory: ModelFactory[User]
 ):
@@ -714,18 +728,6 @@ async def test_operators_can_delete_user(
     )
     response = await operations_client.delete(f"/users/{user.id}")
     assert response.status_code == 204
-
-
-async def test_operators_cannot_delete_a_deleted_user(
-    operations_client: AsyncClient, user_factory: ModelFactory[User]
-):
-    user = await user_factory(
-        name="Peter Parker",
-        email="peter.parker@spiderman.com",
-        status=UserStatus.DELETED,
-    )
-    with pytest.raises(CannotDeleteError):
-        await operations_client.delete(f"/users/{user.id}")
 
 
 async def test_operators_try_to_delete_user_with_wrong_id(
