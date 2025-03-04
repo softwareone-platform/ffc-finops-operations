@@ -1058,7 +1058,7 @@ TEST_CASES = {
 @pytest.mark.parametrize(
     "test_case", [pytest.param(test_case, id=id) for id, test_case in TEST_CASES.items()]
 )
-async def test_get_accounts_for_user_single_account(
+async def test_list_user_accounts_single_account(
     api_client: AsyncClient,
     db_session: AsyncSession,
     account_factory: ModelFactory[Account],
@@ -1072,6 +1072,7 @@ async def test_get_accounts_for_user_single_account(
         name="Test Account",
         type=AccountType.AFFILIATE,
         status=test_case.account_status,
+        external_id="test_account_external_id",
     )
     user = await user_factory(
         name="Test User",
@@ -1109,23 +1110,18 @@ async def test_get_accounts_for_user_single_account(
 
     response_account = data["items"][0]
 
-    assert response_account["id"] == account_user.id
-    assert response_account["status"] == account_user.status._value_
-    assert response_account["account"]["id"] == account.id
-    assert response_account["account"]["name"] == account.name
-    assert response_account["account"]["type"] == "affiliate"
-    assert response_account["user"]["name"] == user.name
-    assert response_account["user"]["email"] == user.email
+    assert response_account["id"] == account.id
+    assert response_account["status"] == account.status
+    assert response_account["external_id"] == account.external_id
+    assert response_account["type"] == account.type
     assert response_account["user"]["id"] == user.id
+    assert response_account["user"]["email"] == user.email
+    assert response_account["user"]["name"] == user.name
+    assert response_account["account_user"]["id"] == account_user.id
+    assert response_account["account_user"]["status"] == account_user.status
 
-    assert (
-        datetime.fromisoformat(response_account["events"]["created"]["at"])
-        == account_user.created_at
-    )
-    assert (
-        datetime.fromisoformat(response_account["events"]["updated"]["at"])
-        == account_user.updated_at
-    )
+    assert datetime.fromisoformat(response_account["events"]["created"]["at"]) == account.created_at
+    assert datetime.fromisoformat(response_account["events"]["updated"]["at"]) == account.updated_at
     assert response_account["events"].get("deleted") is None
 
 
@@ -1139,7 +1135,7 @@ async def test_get_accounts_for_user_single_account(
         (2, 5, 1, 2, 1),
     ],
 )
-async def test_get_accounts_for_user_multiple_accounts(
+async def test_list_user_accounts_multiple_accounts(
     operations_client: AsyncClient,
     db_session: AsyncSession,
     create_accounts_count: int,

@@ -6,7 +6,7 @@ from typing import Annotated
 from pydantic import EmailStr, Field
 
 from app.enums import AccountUserStatus, UserStatus
-from app.schemas.accounts import AccountReference
+from app.schemas.accounts import AccountRead, AccountReference
 from app.schemas.core import BaseSchema, CommonEventsSchema, IdSchema, PasswordInputSchema
 
 
@@ -67,3 +67,8 @@ class UserRead(IdSchema, CommonEventsSchema, UserCreate):
     last_login_at: datetime.datetime | None
     last_used_account: AccountReference | None
     account_user: AccountUserReference | None
+
+
+class AccountForUser(AccountRead):
+    user: UserReference
+    account_user: AccountUserReference
