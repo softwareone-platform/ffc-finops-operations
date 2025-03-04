@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import and_
+from sqlalchemy import ColumnExpressionArgument, and_
 from sqlalchemy.orm import joinedload, with_loader_criteria
 
 from app.auth.auth import authentication_required, check_operations_account
@@ -41,9 +41,21 @@ from app.utils import wrap_exc_in_http_response
 logger = logging.getLogger(__name__)
 
 
-async def fetch_user_or_404(id: UserId, user_repo: UserRepository) -> User:
+async def fetch_user_or_404(
+    id: UserId, user_repo: UserRepository, auth_context: CurrentAuthContext
+) -> User:
+    """
+    If called with an Affiliate Account it will return a 404 error if the
+    given user ID has been deleted
+    If called with an Operations Account it will return the user with the provided id
+    """
     with wrap_exc_in_http_response(NotFoundError, status_code=status.HTTP_404_NOT_FOUND):
-        return await user_repo.get(id=id)
+        extra_conditions: list[ColumnExpressionArgument] = []
+
+        if auth_context is not None and auth_context.account.type == AccountType.AFFILIATE:
+            extra_conditions.append(User.status != UserStatus.DELETED)
+
+        return await user_repo.get(id=id, extra_conditions=extra_conditions)
 
 
 # ======
@@ -220,11 +232,10 @@ async def update_user(
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def delete_user(
-    accountuser_repo: AccountUserRepository,
     auth_context: CurrentAuthContext,
-    db_engine: DBEngine,
-    db_session: DBSession,
     user: Annotated[User, Depends(fetch_user_or_404)],
+    accountuser_repo: AccountUserRepository,
+    user_repo: UserRepository,
 ):
     """
     This endpoint allows an OPERATOR to delete a user.
@@ -235,20 +246,19 @@ async def delete_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="A user cannot delete itself.",
         )
+    if user.status == UserStatus.DELETED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The user has already been deleted.",
+        )
     account_users = await accountuser_repo.filter(
         AccountUser.status != AccountUserStatus.DELETED, AccountUser.user_id == user.id
     )
-    db_session.expunge_all()  # detach the previous session
-    async with get_tx_db_session(db_engine) as tx_session:
-        user_handler = UserHandler(tx_session)  # this is needed to delete the user
-        accountuser_handler = AccountUserHandler(
-            tx_session
-        )  # this is needed to delete the linked account's users
-        await user_handler.soft_delete(id_or_obj=user.id)
-        logger.info(f"The user {user.id} has been deleted.")
-        for accountuser in account_users:
-            await accountuser_handler.soft_delete(id_or_obj=accountuser.id)
-        logger.info("All the account users have been deleted.")
+    await user_repo.soft_delete(id_or_obj=user.id)
+    logger.info(f"The user {user.id} has been deleted.")
+    for accountuser in account_users:
+        await accountuser_repo.soft_delete(id_or_obj=accountuser.id)
+    logger.info("All the account users have been deleted.")
 
 
 @router.get(
