@@ -141,7 +141,7 @@ class ModelHandler[M: BaseModel]:
         await self._save_changes(obj)
         return obj
 
-    async def soft_delete(self, id_or_obj: str | M) -> None:
+    async def soft_delete(self, id_or_obj: str | M) -> M:
         obj = await self._get_model_obj(id_or_obj)
 
         model_inspection = sqlalchemy.inspect(obj.__class__)
@@ -167,6 +167,7 @@ class ModelHandler[M: BaseModel]:
             column_updates["deleted_at"] = datetime.now(UTC)
 
         if isinstance(obj, AuditableMixin):
+            column_updates["updated_by"] = obj.updated_by
             with suppress(LookupError):
                 column_updates["deleted_by"] = auth_context.get().get_actor()
 

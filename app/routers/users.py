@@ -249,7 +249,7 @@ async def delete_user(
     This endpoint allows an OPERATOR to delete a user.
     A user cannot delete itself.
     """
-    if user == auth_context.user:
+    if user == auth_context.user:  #  type: ignore
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="A user cannot delete itself.",
@@ -294,7 +294,7 @@ async def disable_user(
     A user cannot disable itself.
     """
 
-    if user == auth_context.user:
+    if user == auth_context.user:  #  type: ignore
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="A user cannot disable itself.",
@@ -322,7 +322,7 @@ async def enable_user(
     This endpoint allows an OPERATOR to enable a user.
     A user cannot enable itself.
     """
-    if user == auth_context.user:
+    if user == auth_context.user:  #  type: ignore
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="A user cannot enable itself.",

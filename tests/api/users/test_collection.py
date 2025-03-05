@@ -1,3 +1,5 @@
+from collections.abc import Callable
+from contextlib import AbstractContextManager
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
@@ -32,6 +34,7 @@ async def test_operations_account_can_always_get_user_by_id(
     operations_client: AsyncClient,
     test_settings: Settings,
     account_status: str,
+    assert_num_queries: Callable[[int], AbstractContextManager[None]],
 ):
     user = await user_factory(
         name="Invited User",
@@ -48,6 +51,7 @@ async def test_operations_account_can_always_get_user_by_id(
     )
 
     response = await operations_client.get(f"/users/{user.id}")
+
     assert response.status_code == 200
     data = response.json()
     assert data is not None
@@ -556,16 +560,48 @@ async def test_affiliate_cannot_enable_user(
 
 
 async def test_affiliate_can_update_user_name(
-    affiliate_client: AsyncClient, user_factory: ModelFactory[User]
+    affiliate_client: AsyncClient,
+    user_factory: ModelFactory[User],
+    assert_num_queries: Callable[[int], AbstractContextManager[None]],
 ):
     user = await user_factory(
         name="Peter Parker",
         email="peter.parker@spiderman.com",
         status=UserStatus.ACTIVE,
     )
-
     response = await affiliate_client.put(
         f"/users/{user.id}",
+        json={"name": "Jerry Drake"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "Jerry Drake"
+
+
+async def test_user_can_update_its_name(
+    test_settings: Settings,
+    user_factory: ModelFactory[User],
+    accountuser_factory: ModelFactory[AccountUser],
+    affiliate_account: Account,
+    jwt_token_factory: JWTTokenFactory,
+    api_client: AsyncClient,
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+    await accountuser_factory(user_id=user.id, account_id=affiliate_account.id)
+
+    token = jwt_token_factory(
+        user.id,
+        test_settings.auth_access_jwt_secret,
+        account_id=affiliate_account.id,
+    )
+
+    response = await api_client.put(
+        f"/users/{user.id}",
+        headers={"Authorization": f"Bearer {token}"},
         json={"name": "Jerry Drake"},
     )
     assert response.status_code == 200

@@ -11,7 +11,12 @@ from faker import Faker
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from pytest_asyncio import is_async_test
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from app.conf import Settings, get_settings
 from app.db import get_db_engine
@@ -55,14 +60,19 @@ def test_settings() -> Settings:
 
 @pytest.fixture(scope="session")
 def db_engine(test_settings: Settings) -> AsyncEngine:
-    return get_db_engine(test_settings)
+    return create_async_engine(
+        str(test_settings.postgres_async_url),
+        echo=test_settings.debug,
+        future=True,
+    )
 
 
 @pytest.fixture(scope="session")
-def fastapi_app(test_settings: Settings) -> FastAPI:
+def fastapi_app(test_settings: Settings, db_engine: AsyncEngine) -> FastAPI:
     from app.main import app
 
     app.dependency_overrides[get_settings] = lambda: test_settings
+    app.dependency_overrides[get_db_engine] = lambda: db_engine
     return app
 
 
@@ -84,7 +94,9 @@ def assert_num_queries(capsql: SQLAlchemyCapturer) -> Callable[[int], AbstractCo
         with capsql:
             yield
         executed = len(capsql.queries)
-        assert executed == num, f"The number of executed is {executed} not {num}"
+        assert (
+            executed == num
+        ), f"The number of executed is {executed} not {num}:\n {"\n".join(capsql.queries)}"
 
     return _assert_num_queries
 
