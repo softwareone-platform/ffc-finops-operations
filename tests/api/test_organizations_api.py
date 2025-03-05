@@ -129,6 +129,7 @@ async def test_can_create_organizations(
             "operations_external_id": "ACC-1234-5678",
             "user_id": "UUID-xxxx-xxxx-xxxx-xxxx",
             "currency": "USD",
+            "billing_currency": "EUR",
         },
     )
 
@@ -137,6 +138,8 @@ async def test_can_create_organizations(
 
     assert data["id"] is not None
     assert data["name"] == "My Organization"
+    assert data["currency"] == "USD"
+    assert data["billing_currency"] == "EUR"
     assert data["operations_external_id"] == "ACC-1234-5678"
     assert data["linked_organization_id"] == "UUID-yyyy-yyyy-yyyy-yyyy"
     assert data["events"]["created"]["at"] is not None
@@ -152,7 +155,9 @@ async def test_can_create_organizations(
     assert result.one_or_none() is not None
 
 
-@pytest.mark.parametrize("missing_field", ["name", "operations_external_id", "user_id", "currency"])
+@pytest.mark.parametrize(
+    "missing_field", ["name", "operations_external_id", "user_id", "currency", "billing_currency"]
+)
 async def test_create_organization_with_incomplete_data(
     api_client: AsyncClient, missing_field: str, ffc_jwt_token: str
 ):
@@ -161,6 +166,7 @@ async def test_create_organization_with_incomplete_data(
         "operations_external_id": "ACC-1234-5678",
         "user_id": "UUID-xxxx-xxxx-xxxx-xxxx",
         "currency": "USD",
+        "billing_currency": "USD",
     }
     payload.pop(missing_field)
 
@@ -192,6 +198,7 @@ async def test_create_organization_with_existing_db_organization(
         "operations_external_id": "ACC-1234-5678",
         "user_id": "UUID-xxxx-xxxx-xxxx-xxxx",
         "currency": "USD",
+        "billing_currency": "USD",
     }
 
     httpx_mock.add_response(
@@ -233,6 +240,7 @@ async def test_create_organization_with_existing_db_organization_name_mismatch(
         "operations_external_id": "ACC-1234-5678",
         "user_id": "UUID-xxxx-xxxx-xxxx-xxxx",
         "currency": "USD",
+        "billing_currency": "USD",
     }
 
     response = await api_client.post(
@@ -258,6 +266,7 @@ async def test_create_organization_already_created(
         "operations_external_id": "ACC-1234-5678",
         "user_id": "UUID-xxxx-xxxx-xxxx-xxxx",
         "currency": "USD",
+        "billing_currency": "USD",
     }
 
     await organization_factory(
@@ -296,6 +305,7 @@ async def test_create_organization_api_modifier_error(
             "operations_external_id": "ACC-1234-5678",
             "user_id": "UUID-xxxx-xxxx-xxxx-xxxx",
             "currency": "USD",
+            "billing_currency": "AUD",
         },
         headers={"Authorization": f"Bearer {ffc_jwt_token}"},
     )
@@ -317,6 +327,7 @@ async def test_create_employee_affiliate_forbidden(
             "operations_external_id": "ACC-1234-5678",
             "user_id": "UUID-xxxx-xxxx-xxxx-xxxx",
             "currency": "USD",
+            "billing_currency": "GBP",
         },
         headers={"Authorization": f"Bearer {gcp_jwt_token}"},
     )
