@@ -85,6 +85,7 @@ class AuditableMixin(TimestampMixin):
             "Actor",
             foreign_keys=lambda: [cls.__dict__["updated_by_id"]],
             lazy="joined",
+            post_update=True,
         )
 
     @declared_attr
@@ -116,7 +117,7 @@ class Account(Base, HumanReadablePKMixin, AuditableMixin):
         server_default=AccountStatus.ACTIVE.value,
     )
     external_id: Mapped[str] = mapped_column(String(255), nullable=False)
-    users: Mapped[list["AccountUser"]] = relationship(back_populates="account")
+    users: Mapped[list["AccountUser"]] = relationship(back_populates="account", lazy="noload")
 
 
 class System(Actor, AuditableMixin):
@@ -185,7 +186,7 @@ class User(Actor, HumanReadablePKMixin, AuditableMixin):
         default=UserStatus.DRAFT,
         server_default=UserStatus.DRAFT.value,
     )
-    accounts: Mapped[list["AccountUser"]] = relationship(back_populates="user")
+    accounts: Mapped[list["AccountUser"]] = relationship(back_populates="user", lazy="noload")
 
     @property
     def account_user(self):
