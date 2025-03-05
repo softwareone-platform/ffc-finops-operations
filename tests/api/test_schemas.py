@@ -2,12 +2,18 @@ import secrets
 from datetime import UTC, datetime
 
 import pytest
+from pydantic import ValidationError
 
 from app.db.models import Account, Actor, Entitlement, Organization, System
 from app.enums import AccountType, ActorType, EntitlementStatus, OrganizationStatus, SystemStatus
 from app.schemas.core import ActorRead, convert_model_to_schema, convert_schema_to_model
 from app.schemas.entitlements import EntitlementCreate, EntitlementRead, EntitlementUpdate
-from app.schemas.organizations import OrganizationCreate, OrganizationRead, OrganizationUpdate
+from app.schemas.organizations import (
+    OrganizationBase,
+    OrganizationCreate,
+    OrganizationRead,
+    OrganizationUpdate,
+)
 from app.schemas.systems import SystemCreate, SystemRead
 
 
@@ -94,7 +100,6 @@ def test_entitlement_create_convert_schema_to_model():
 def test_entitlement_read_convert_model_to_schema(
     gcp_extension: System,
     affiliate_account: Account,
-    organization_factory: Organization,
     set_terminated: bool,
     set_redeemed: bool,
 ):
@@ -121,6 +126,7 @@ def test_entitlement_read_convert_model_to_schema(
             id="FORG-1234-5678-9012",
             name="Test Org",
             currency="EUR",
+            billing_currency="EUR",
             linked_organization_id="ORG-123",
             operations_external_id="FFC-123",
             status=OrganizationStatus.ACTIVE,
@@ -192,6 +198,7 @@ def test_organization_create_convert_schema_to_model():
         "operations_external_id": "ORG-123",
         "user_id": "user-123",
         "currency": "USD",
+        "billing_currency": "EUR",
     }
 
     org_create = OrganizationCreate(**data)
@@ -209,6 +216,7 @@ def test_organization_read_convert_model_to_schema(ffc_extension: System):
         id="FORG-1234-5678-9012",
         name="Test Org",
         currency="EUR",
+        billing_currency="EUR",
         operations_external_id="ORG-123",
         linked_organization_id="FFC-123",
         status=OrganizationStatus.ACTIVE,
@@ -251,3 +259,51 @@ def test_organization_update_partial():
     assert len(data) == 2
     assert data["name"] == update_data["name"]
     assert data["operations_external_id"] == update_data["operations_external_id"]
+
+
+@pytest.mark.parametrize("currency", ["XTS", "XXX", "XYZ"])
+def test_organization_invalid_currencies(currency):
+    with pytest.raises(ValidationError) as ce:
+        OrganizationBase(
+            name="My Org",
+            currency=currency,
+            billing_currency="USD",
+            operations_external_id="EXT-ID",
+        )
+    errors = ce.value.errors()
+    assert len(errors) == 1
+    assert errors[0]["loc"] == ("currency",)
+    assert str(errors[0]["ctx"]["error"]) == f"Invalid iso4217 currency code: {currency}."
+
+
+@pytest.mark.parametrize(
+    "currency",
+    [
+        "XAU",  # gold
+        "XAG",  # silver
+        "XPD",  # palladium
+        "XPT",  # platinum
+        "XBA",  # European Composite Unit (EURCO) (bond market unit)
+        "XBB",  # European Monetary Unit (E.M.U.-6) (bond market unit)
+        "XBC",  # European Unit of Account 9 (E.U.A.-9) (bond market unit)
+        "XBD",  # European Unit of Account 17 (E.U.A.-17) (bond market unit)
+        "XDR",  # Special drawing rights (International Monetary Fund)
+        "XSU",  # Unified System for Regional Compensation (SUCRE)
+        "XTS",  # reserved for testign
+        "XXX",  # No currency
+        "XUX",  # doesn't exist,
+        "XYZ",  # also doesn't exit :)
+    ],
+)
+def test_organization_invalid_billing_currencies(currency):
+    with pytest.raises(ValidationError) as ce:
+        OrganizationBase(
+            name="My Org",
+            currency="EUR",
+            billing_currency=currency,
+            operations_external_id="EXT-ID",
+        )
+    errors = ce.value.errors()
+    assert len(errors) == 1
+    assert errors[0]["loc"] == ("billing_currency",)
+    assert str(errors[0]["ctx"]["error"]) == f"Invalid iso4217 currency code: {currency}."

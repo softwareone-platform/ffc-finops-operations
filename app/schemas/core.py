@@ -141,7 +141,7 @@ def extract_fields_from_model[M: Base, S: BaseModel](
     return {
         field_name: getattr(db_model, field_name)
         for field_name in schema_cls.model_fields.keys()
-        if field_name not in excluded_fields and hasattr(db_model, field_name)  # noqa: W291
+        if field_name not in excluded_fields and hasattr(db_model, field_name)
     }
 
 

@@ -188,6 +188,7 @@ def organization_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory
     async def _organization(
         name: str | None = None,
         currency: str | None = None,
+        billing_currency: str | None = None,
         operations_external_id: str | None = None,
         linked_organization_id: str | None = None,
         created_by: Actor | None = None,
@@ -197,6 +198,7 @@ def organization_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory
         organization = Organization(
             name=name or faker.company(),
             currency=currency or "EUR",
+            billing_currency=billing_currency or "USD",
             operations_external_id=operations_external_id or "AGR-1234-5678-9012",
             linked_organization_id=linked_organization_id,
             created_by=created_by,

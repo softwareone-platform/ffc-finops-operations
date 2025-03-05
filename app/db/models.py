@@ -234,6 +234,7 @@ class Organization(Base, AuditableMixin, HumanReadablePKMixin):
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    billing_currency: Mapped[str] = mapped_column(String(3), nullable=True)
     operations_external_id: Mapped[str] = mapped_column(String(255), nullable=False)
     linked_organization_id: Mapped[str | None] = mapped_column(
         String(255), nullable=True, index=True
