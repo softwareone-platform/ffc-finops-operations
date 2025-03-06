@@ -680,6 +680,27 @@ async def test_update_system(
     assert system.external_id == expected_external_id
 
 
+async def test_update_system_deleted(
+    ffc_jwt_token: str,
+    system_factory: ModelFactory[System],
+    api_client: AsyncClient,
+):
+    system = await system_factory(
+        name="initial_name",
+        external_id="initial_external_id",
+        status=SystemStatus.DELETED,
+    )
+
+    response = await api_client.put(
+        f"/systems/{system.id}",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+        json={"name": "new name"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "You cannot update a deleted system."
+
+
 @pytest.mark.parametrize(
     ("system_to_update_status", "existing_system_status", "expected_status_code"),
     [
@@ -687,8 +708,6 @@ async def test_update_system(
         pytest.param(SystemStatus.ACTIVE, SystemStatus.DISABLED, status.HTTP_400_BAD_REQUEST),
         pytest.param(SystemStatus.DISABLED, SystemStatus.DISABLED, status.HTTP_400_BAD_REQUEST),
         pytest.param(SystemStatus.ACTIVE, SystemStatus.DELETED, status.HTTP_200_OK),
-        pytest.param(SystemStatus.DELETED, SystemStatus.ACTIVE, status.HTTP_200_OK),
-        pytest.param(SystemStatus.DELETED, SystemStatus.DELETED, status.HTTP_200_OK),
     ],
 )
 async def test_system_external_id_is_unique_for_non_deleted_objects(
