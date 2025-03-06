@@ -352,10 +352,14 @@ async def resend_user_invitation(
     accountuser_repository: AccountUserRepository,
 ):
     if user.status == UserStatus.DELETED:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"User with ID `{user.id}` wasn't found.",
-        )
+        status_code = status.HTTP_404_NOT_FOUND
+        detail = f"User with ID `{user.id}` wasn't found."
+
+        if auth_context.account.type == AccountType.OPERATIONS:  # type: ignore
+            status_code = status.HTTP_400_BAD_REQUEST
+            detail = f"Cannot resend invitation: user with ID `{user.id}` is deleted."
+
+        raise HTTPException(status_code=status_code, detail=detail)
 
     account = await account_repository.first(
         Account.id == account_id, Account.status != AccountStatus.DELETED

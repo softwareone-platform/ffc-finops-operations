@@ -793,7 +793,7 @@ async def test_resend_invitation_user_not_found(
     assert response.status_code == 404
 
 
-async def test_resend_invitation_user_deleted(
+async def test_resend_invitation_user_deleted_affiliate(
     gcp_jwt_token: str,
     api_client: AsyncClient,
     user_factory: ModelFactory[User],
@@ -806,6 +806,25 @@ async def test_resend_invitation_user_deleted(
         headers={"Authorization": f"Bearer {gcp_jwt_token}"},
     )
     assert response.status_code == 404
+
+
+async def test_resend_invitation_user_deleted_operations(
+    ffc_jwt_token: str,
+    api_client: AsyncClient,
+    user_factory: ModelFactory[User],
+):
+    user = await user_factory(
+        status=UserStatus.DELETED,
+    )
+    response = await api_client.post(
+        f"/users/{user.id}/accounts/FACC-1234-5678/resend-invitation",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+    )
+    assert response.status_code == 400
+    assert (
+        response.json()["detail"]
+        == f"Cannot resend invitation: user with ID `{user.id}` is deleted."
+    )
 
 
 async def test_resend_invitation_account_not_found(
