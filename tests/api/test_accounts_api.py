@@ -376,6 +376,20 @@ async def test_can_update_accounts_name(
     assert result.one_or_none() is not None
 
 
+async def test_update_account_empty_body(
+    operations_client: AsyncClient,
+    ffc_extension: System,
+    affiliate_account: Account,
+    db_session: AsyncSession,
+):
+    response = await operations_client.put(
+        f"/accounts/{affiliate_account.id}",
+        json={},
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == "At least one field must be sent for update."
+
+
 async def test_can_update_accounts_external_id(
     operations_client: AsyncClient,
     ffc_extension: System,
@@ -519,6 +533,27 @@ async def test_can_list_account_users(
     data = response.json()
     assert response.status_code == 200
     assert isinstance(data.get("items"), list)
+
+
+async def test_list_account_users_deleted_not_included_for_affiliate(
+    affiliate_client: AsyncClient,
+    gcp_account: Account,
+    accountuser_factory: ModelFactory[AccountUser],
+    user_factory: ModelFactory[User],
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+    await accountuser_factory(
+        user_id=user.id, account_id=gcp_account.id, status=AccountStatus.DELETED
+    )
+
+    response = await affiliate_client.get(f"/accounts/{gcp_account.id}/users")
+    data = response.json()
+    assert response.status_code == 200
+    assert len(data["items"]) == 0
 
 
 async def test_list_not_existing_account_id(
