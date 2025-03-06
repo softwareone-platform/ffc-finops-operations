@@ -8,7 +8,7 @@ from fastapi_pagination.bases import AbstractPage, AbstractParams, RawParams
 from fastapi_pagination.limit_offset import LimitOffsetPage as _LimitOffsetPage
 from fastapi_pagination.types import GreaterEqualZero
 from pydantic import BaseModel
-from sqlalchemy import ColumnExpressionArgument
+from sqlalchemy import ColumnExpressionArgument, Exists
 from sqlalchemy.orm.interfaces import ORMOption
 
 from app.db.handlers import ModelHandler
@@ -37,7 +37,7 @@ async def paginate[M: Base, S: BaseSchema](
     handler: ModelHandler[M],
     schema_cls: type[S],
     *,
-    extra_conditions: list[ColumnExpressionArgument] | None = None,
+    extra_conditions: Sequence[ColumnExpressionArgument | Exists] | None = None,
     page_options: list[ORMOption] | None = None,
 ) -> AbstractPage[S]:
     """

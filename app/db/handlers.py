@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import sqlalchemy
-from sqlalchemy import ColumnExpressionArgument, func, select
+from sqlalchemy import ColumnExpressionArgument, Exists, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -177,7 +177,7 @@ class ModelHandler[M: BaseModel]:
         self,
         limit: int = 50,
         offset: int = 0,
-        extra_conditions: list[ColumnExpressionArgument] | None = None,
+        extra_conditions: Sequence[ColumnExpressionArgument | Exists] | None = None,
         options: list[ORMOption] | None = None,
     ) -> Sequence[M]:
         query = select(self.model_cls).offset(offset).limit(limit).order_by("id")

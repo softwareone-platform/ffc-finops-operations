@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import exists
+from sqlalchemy import and_, exists
 
 from app.auth.auth import check_operations_account
 from app.db.handlers import NotFoundError
@@ -16,7 +16,7 @@ from app.dependencies import (
     UserId,
     UserRepository,
 )
-from app.enums import AccountStatus, AccountType, AccountUserStatus
+from app.enums import AccountStatus, AccountType, AccountUserStatus, UserStatus
 from app.pagination import LimitOffsetPage, paginate
 from app.schemas.accounts import AccountCreate, AccountRead, AccountUpdate
 from app.schemas.core import convert_model_to_schema, convert_schema_to_model
@@ -54,7 +54,7 @@ async def update_data_and_format_response(
     if not to_update:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You can't update whatever you want.",
+            detail="At least one field must be sent for update.",
         )
     db_account = await account_repo.update(id, data=to_update)
     return convert_model_to_schema(AccountRead, db_account)
@@ -206,12 +206,30 @@ async def list_account_users(
         - HTTPException with status 404 if the given account is different from the context account
     Returns a list of accounts if any.
     """
-
-    if auth_context.account.type == AccountType.AFFILIATE and auth_context.account != account:  # type: ignore
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Account with ID `{account.id}` wasn't found.",
+    extra_conditions = []
+    if auth_context.account.type == AccountType.AFFILIATE:  # type: ignore
+        if auth_context.account != account:  # type: ignore
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Account with ID `{account.id}` wasn't found.",
+            )
+        extra_conditions.extend(
+            [
+                exists().where(
+                    and_(
+                        AccountUser.account_id == account.id,
+                        User.id == AccountUser.user_id,
+                        AccountUser.status != AccountUserStatus.DELETED,
+                    ),
+                ),
+                User.status != UserStatus.DELETED,
+            ]
         )
+    else:
+        extra_conditions.append(
+            exists().where(AccountUser.account_id == account.id, User.id == AccountUser.user_id)
+        )
+
     # This runs a JOIN like
     # stmt = (
     #    select(User)
@@ -222,9 +240,7 @@ async def list_account_users(
     return await paginate(
         user_repo,
         UserRead,
-        extra_conditions=[
-            exists().where(AccountUser.account_id == account.id, User.id == AccountUser.user_id)
-        ],
+        extra_conditions=extra_conditions,
     )
 
 
