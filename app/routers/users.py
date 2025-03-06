@@ -56,11 +56,7 @@ async def fetch_user_or_404(
     with wrap_exc_in_http_response(NotFoundError, status_code=status.HTTP_404_NOT_FOUND):
         extra_conditions: list[ColumnExpressionArgument] = []
 
-        if (
-            auth_context is not None
-            and auth_context.account is not None
-            and auth_context.account.type == AccountType.AFFILIATE
-        ):
+        if auth_context is not None and auth_context.account.type == AccountType.AFFILIATE:
             extra_conditions.append(User.status != UserStatus.DELETED)
 
         return await user_repo.get(id=id, extra_conditions=extra_conditions)
@@ -287,19 +283,18 @@ async def get_user_accounts(
     account_repo: AccountRepository,
     auth_ctx: CurrentAuthContext,
 ):
-    extra_conditions: list[ColumnExpressionArgument] = [
-        Account.users.any(AccountUser.user == user),
-    ]
+    account_user_filter = AccountUser.user_id == user.id
     if auth_ctx is not None and auth_ctx.account.type == AccountType.AFFILIATE:
-        extra_conditions.append(
-            Account.users.any(AccountUser.status != AccountUserStatus.DELETED),
-        )
+        account_user_filter &= AccountUser.status != AccountUserStatus.DELETED
 
     return await paginate(
         account_repo,
         AccountRead,
-        extra_conditions=extra_conditions,
-        page_options=[joinedload(Account.users)],
+        extra_conditions=[Account.users.any(account_user_filter)],
+        page_options=[
+            joinedload(Account.users).joinedload(AccountUser.user),
+            with_loader_criteria(AccountUser, account_user_filter),
+        ],
     )
 
 

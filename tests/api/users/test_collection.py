@@ -1174,3 +1174,74 @@ async def test_list_user_accounts_multiple_accounts(
 
     assert data["total"] == expected_total
     assert len(data["items"]) == expected_items_count
+
+
+async def test_list_user_accounts_multiple_users(
+    operations_client: AsyncClient,
+    db_session: AsyncSession,
+):
+    first_account = Account(name="First Account", external_id="test_account_1_external_id")
+    second_account = Account(name="Second Account", external_id="test_account_2_external_id")
+
+    first_user = User(name="First User", email="first.user@example.com")
+    second_user = User(name="Second User", email="second.user@example.com")
+    third_user = User(name="Third User", email="third.user@example.com")
+
+    db_session.add_all([first_account, second_account, first_user, second_user, third_user])
+    await db_session.commit()
+
+    first_user_in_first_account = AccountUser(user_id=first_user.id, account_id=first_account.id)
+    first_user_in_second_account = AccountUser(user_id=first_user.id, account_id=second_account.id)
+    second_user_in_second_account = AccountUser(
+        user_id=second_user.id, account_id=second_account.id
+    )
+
+    db_session.add_all(
+        [
+            first_user_in_first_account,
+            first_user_in_second_account,
+            second_user_in_second_account,
+        ]
+    )
+    await db_session.commit()
+
+    first_user_accounts_response = await operations_client.get(f"/users/{first_user.id}/accounts")
+    assert first_user_accounts_response.status_code == status.HTTP_200_OK
+    first_user_accounts_data = first_user_accounts_response.json()
+
+    assert first_user_accounts_data["total"] == 2
+    assert len(first_user_accounts_data["items"]) == 2
+
+    response_account_ids = {account["id"] for account in first_user_accounts_data["items"]}
+    response_useraccount_ids = {
+        account["account_user"]["id"] for account in first_user_accounts_data["items"]
+    }
+    response_user_ids = {
+        account["account_user"]["user"]["id"] for account in first_user_accounts_data["items"]
+    }
+
+    assert response_account_ids == {first_account.id, second_account.id}
+    assert response_useraccount_ids == {
+        first_user_in_first_account.id,
+        first_user_in_second_account.id,
+    }
+    assert response_user_ids == {first_user.id}
+
+    second_user_accounts_response = await operations_client.get(f"/users/{second_user.id}/accounts")
+    assert second_user_accounts_response.status_code == status.HTTP_200_OK
+    second_user_accounts_data = second_user_accounts_response.json()
+
+    assert second_user_accounts_data["total"] == 1
+    assert len(second_user_accounts_data["items"]) == 1
+
+    response_account = second_user_accounts_data["items"][0]
+    assert response_account["id"] == second_account.id
+    assert response_account["account_user"]["id"] == second_user_in_second_account.id
+    assert response_account["account_user"]["user"]["id"] == second_user.id
+
+    third_user_accounts_response = await operations_client.get(f"/users/{third_user.id}/accounts")
+    assert third_user_accounts_response.status_code == status.HTTP_200_OK
+    third_user_accounts_data = third_user_accounts_response.json()
+
+    assert third_user_accounts_data["total"] == 0
+    assert third_user_accounts_data["items"] == []
