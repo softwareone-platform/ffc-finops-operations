@@ -22,6 +22,7 @@ def common_extra_conditions(auth_ctx: CurrentAuthContext) -> list[ColumnExpressi
 
     if auth_ctx.account.type == AccountType.AFFILIATE:  # type: ignore
         conditions.append(System.owner == auth_ctx.account)  # type: ignore
+        conditions.append(System.status != SystemStatus.DELETED)
 
     return conditions
 
@@ -49,7 +50,6 @@ router = APIRouter()
 @router.get("", response_model=LimitOffsetPage[SystemRead])
 async def get_systems(
     system_repo: SystemRepository,
-    auth_ctx: CurrentAuthContext,
     extra_conditions: CommonConditions,
 ):
     return await paginate(
