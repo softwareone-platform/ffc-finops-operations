@@ -114,6 +114,12 @@ async def update_system(
 ):
     update_fields = data.model_dump(exclude_unset=True)
 
+    if system.status == SystemStatus.DELETED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot update a deleted system.",
+        )
+
     if not update_fields:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
