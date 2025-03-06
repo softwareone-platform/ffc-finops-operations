@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 from decimal import Decimal
 
@@ -72,7 +74,7 @@ class AuditableMixin(TimestampMixin):
     deleted_by_id: Mapped[str | None] = mapped_column(ForeignKey("actors.id"), name="deleted_by")
 
     @declared_attr
-    def created_by(cls) -> Mapped["Actor"]:
+    def created_by(cls) -> Mapped[Actor]:
         return relationship(
             "Actor",
             foreign_keys=lambda: [cls.__dict__["created_by_id"]],
@@ -80,7 +82,7 @@ class AuditableMixin(TimestampMixin):
         )
 
     @declared_attr
-    def updated_by(cls) -> Mapped["Actor"]:
+    def updated_by(cls) -> Mapped[Actor]:
         return relationship(
             "Actor",
             foreign_keys=lambda: [cls.__dict__["updated_by_id"]],
@@ -89,7 +91,7 @@ class AuditableMixin(TimestampMixin):
         )
 
     @declared_attr
-    def deleted_by(cls) -> Mapped["Actor"]:
+    def deleted_by(cls) -> Mapped[Actor]:
         return relationship(
             "Actor",
             foreign_keys=lambda: [cls.__dict__["deleted_by_id"]],
@@ -117,7 +119,14 @@ class Account(Base, HumanReadablePKMixin, AuditableMixin):
         server_default=AccountStatus.ACTIVE.value,
     )
     external_id: Mapped[str] = mapped_column(String(255), nullable=False)
-    users: Mapped[list["AccountUser"]] = relationship(back_populates="account", lazy="noload")
+    users: Mapped[list[AccountUser]] = relationship(back_populates="account")
+
+    @property
+    def account_user(self) -> AccountUser | None:
+        try:
+            return self.users[0]
+        except Exception:
+            return None
 
 
 class System(Actor, AuditableMixin):
@@ -186,10 +195,10 @@ class User(Actor, HumanReadablePKMixin, AuditableMixin):
         default=UserStatus.DRAFT,
         server_default=UserStatus.DRAFT.value,
     )
-    accounts: Mapped[list["AccountUser"]] = relationship(back_populates="user", lazy="noload")
+    accounts: Mapped[list[AccountUser]] = relationship(back_populates="user", lazy="noload")
 
     @property
-    def account_user(self):
+    def account_user(self) -> AccountUser | None:
         try:
             return self.accounts[0]
         except Exception:
@@ -211,8 +220,8 @@ class AccountUser(Base, AuditableMixin, HumanReadablePKMixin):
 
     account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"))
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
-    account: Mapped["Account"] = relationship(back_populates="users", foreign_keys=[account_id])
-    user: Mapped["User"] = relationship(back_populates="accounts", foreign_keys=[user_id])
+    account: Mapped[Account] = relationship(back_populates="users", foreign_keys=[account_id])
+    user: Mapped[User] = relationship(back_populates="accounts", foreign_keys=[user_id])
     invitation_token: Mapped[str | None] = mapped_column(String(255), nullable=True)
     invitation_token_expires_at: Mapped[datetime.datetime | None] = mapped_column(
         sa.DateTime(timezone=True), nullable=True

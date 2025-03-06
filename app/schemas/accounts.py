@@ -35,12 +35,17 @@ class AccountUpdate(BaseSchema):
     external_id: Annotated[str | None, Field(max_length=255, examples=["ACC-9044-8753"])] = None
 
 
-class AccountRead(IdSchema, CommonEventsSchema, AccountBase):
-    entitlements_stats: AccountEntitlementsStats | None = None
-    status: AccountStatus
+class AccountReference(IdSchema):
+    name: Annotated[str, Field(max_length=255, examples=["Microsoft"])]
     type: AccountType
 
 
-class AccountReference(IdSchema):
-    name: Annotated[str, Field(max_length=255, examples=["Microsoft"])]
+# Importing here to avoid circular imports
+from app.schemas.users import AccountUserReferenceWithUser  # noqa: E402
+
+
+class AccountRead(IdSchema, CommonEventsSchema, AccountBase):
+    entitlements_stats: AccountEntitlementsStats | None = None
+    account_user: AccountUserReferenceWithUser | None
+    status: AccountStatus
     type: AccountType
