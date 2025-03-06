@@ -57,11 +57,9 @@ async def get_user(user_handler: UserHandler, email: str, name: str) -> User:
 
 
 async def invite_user(
-    settings: Settings,
-    email: str,
-    name: str,
-    account_id: str | None,
+    settings: Settings, email: str, name: str, account_id: str | None, force: bool = False
 ):
+    """ """
     engine = get_db_engine(settings)
     async with get_tx_db_session(engine) as session:
         account_handler = AccountHandler(session)
@@ -87,19 +85,24 @@ async def invite_user(
             )
             action = "invited successfully!"
             color = "green"
+        if not force and account_user.id:
+            action = "has already been invited!"
 
+            print(f"""
+[{color}]User [bold]{user.id} - {user.name} ({user.email})[/bold] {action}[/{color}]
+
+Account: [blue][bold]{account.id}[/bold] - {account.name} ({account.type.value.capitalize()})[/blue]
+""")
+            return
         account_user.invitation_token = secrets.token_urlsafe(settings.invitation_token_length)
         account_user.invitation_token_expires_at = datetime.now(UTC) + timedelta(
             days=settings.invitation_token_expires_days
         )
-
         if not account_user.id:
             account_user = await accountuser_handler.create(account_user)
-        else:
+        elif force:  # pragma no branch
             account_user = await accountuser_handler.update(account_user)
-
         formatted_expires = account_user.invitation_token_expires_at.strftime("%c")  # type: ignore
-
         print(f"""
 [{color}]User [bold]{user.id} - {user.name} ({user.email})[/bold] {action}[/{color}]
 
@@ -121,6 +124,9 @@ def command(
             help="Account ID (Default to SoftwareOne Account)",
         ),
     ] = None,
+    force: Annotated[
+        bool, typer.Option("--force", "-f", help="Force regeneration of the invitation token")
+    ] = False,  # noqa: E501
 ):
     """Invite a User to join an Account."""
-    asyncio.run(invite_user(ctx.obj, email, name, account_id))
+    asyncio.run(invite_user(ctx.obj, email, name, account_id, force))
