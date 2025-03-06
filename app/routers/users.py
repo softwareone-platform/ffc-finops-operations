@@ -224,7 +224,7 @@ async def update_user(
     This endpoint updates the name field of a user.
     Only the name can be updated.
     """
-    if user.status != UserStatus.ACTIVE:
+    if user.status == UserStatus.DELETED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="The user cannot be updated.",
