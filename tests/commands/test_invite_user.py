@@ -47,7 +47,7 @@ async def test_invite_user(
 
 
 @time_machine.travel("2025-03-07T10:00:00Z", tick=False)
-async def test_invite_user_already_invited(
+async def test_invite_user_already_invited_force(
     test_settings: Settings,
     db_session: AsyncSession,
     operations_account: Account,
@@ -68,7 +68,7 @@ async def test_invite_user_already_invited(
         invitation_token_expires_at=datetime(2025, 3, 7, 9, 0, 0, tzinfo=UTC),
     )
 
-    await invite_user(test_settings, "test@example.com", "Test User", None)
+    await invite_user(test_settings, "test@example.com", "Test User", None, True)
 
     captured = capsys.readouterr()
 
@@ -92,6 +92,51 @@ async def test_invite_user_already_invited(
     assert db_account_user.invitation_token_expires_at == (
         datetime.now(UTC) + timedelta(days=test_settings.invitation_token_expires_days)
     )
+
+
+@time_machine.travel("2025-03-07T10:00:00Z", tick=False)
+async def test_invite_user_already_invited(
+    test_settings: Settings,
+    db_session: AsyncSession,
+    operations_account: Account,
+    user_factory: ModelFactory[User],
+    accountuser_factory: ModelFactory[AccountUser],
+    capsys: pytest.CaptureFixture,
+):
+    user = await user_factory(
+        email="test@example.com",
+        name="Test User",
+        status=UserStatus.DRAFT,
+    )
+    account_user = await accountuser_factory(
+        user_id=user.id,
+        account_id=operations_account.id,
+        status=AccountUserStatus.INVITED,
+        invitation_token="an invitation token",
+        invitation_token_expires_at=datetime(2025, 3, 7, 9, 0, 0, tzinfo=UTC),
+    )
+
+    await invite_user(test_settings, "test@example.com", "Test User", None, False)
+
+    captured = capsys.readouterr()
+
+    assert "has already been invited!" in captured.out.replace("\n", "")
+
+    db_session.expunge_all()
+
+    user_handler = UserHandler(db_session)
+    db_user = await user_handler.first(
+        User.email == "test@example.com",
+    )
+    assert db_user is not None
+    assert db_user.status == UserStatus.DRAFT
+    assert db_user.name == "Test User"
+    accountuser_handler = AccountUserHandler(db_session)
+    db_account_user = await accountuser_handler.get_account_user(operations_account.id, user.id)
+    assert db_account_user is not None
+    assert db_account_user.status == AccountUserStatus.INVITED
+    assert db_account_user.invitation_token == account_user.invitation_token
+    assert db_account_user.invitation_token_expires_at == account_user.invitation_token_expires_at
 
 
 async def test_invite_user_user_disabled(
@@ -202,5 +247,30 @@ def test_invite_user_command(
     mock_run.assert_called_once_with(mock_invite_coro)
 
     mock_invite_user.assert_called_once_with(
-        test_settings, "test@example.com", "Test User", "FACC-1234"
+        test_settings, "test@example.com", "Test User", "FACC-1234", False
+    )
+
+
+def test_invite_user_command_with_update(
+    mocker: MockerFixture,
+    test_settings: Settings,
+):
+    mocker.patch("app.cli.get_settings", return_value=test_settings)
+    mock_invite_coro = mocker.MagicMock()
+    mock_invite_user = mocker.MagicMock(return_value=mock_invite_coro)
+
+    mocker.patch("app.commands.invite_user.invite_user", mock_invite_user)
+    mock_run = mocker.patch("app.commands.invite_user.asyncio.run")
+    runner = CliRunner()
+
+    # Run the command
+    result = runner.invoke(
+        app,
+        ["invite-user", "test@example.com", "Test User", "-a", "FACC-1234", "--force"],
+    )
+    assert result.exit_code == 0
+    mock_run.assert_called_once_with(mock_invite_coro)
+
+    mock_invite_user.assert_called_once_with(
+        test_settings, "test@example.com", "Test User", "FACC-1234", True
     )
