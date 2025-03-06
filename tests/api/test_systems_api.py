@@ -56,13 +56,13 @@ async def test_get_system_by_id_no_auth(
     assert response.json()["detail"] == "Unauthorized."
 
 
-async def test_get_system_with_deleted_status(
+async def test_get_system_with_deleted_status_operations(
     api_client: AsyncClient,
     account_factory: ModelFactory[Account],
     system_factory: ModelFactory[System],
     system_jwt_token_factory: Callable[[System], str],
 ):
-    account = await account_factory()
+    account = await account_factory(type=AccountType.OPERATIONS)
     first_active_system = await system_factory(owner=account, external_id="first-active-system")
     second_active_system = await system_factory(owner=account, external_id="second-active-system")
     deleted_system = await system_factory(
@@ -98,6 +98,26 @@ async def test_get_system_with_deleted_status(
     assert data["status"] == "deleted"
 
     assert "jwt_secret" not in data
+
+
+async def test_get_system_with_deleted_status_affiliate(
+    api_client: AsyncClient,
+    account_factory: ModelFactory[Account],
+    system_factory: ModelFactory[System],
+    system_jwt_token_factory: Callable[[System], str],
+):
+    account = await account_factory(type=AccountType.AFFILIATE)
+    active_system = await system_factory(owner=account, external_id="active-system")
+    deleted_system = await system_factory(
+        owner=account, status=SystemStatus.DELETED, external_id="deleted-system"
+    )
+
+    response = await api_client.get(
+        f"/systems/{deleted_system.id}",
+        headers={"Authorization": f"Bearer {system_jwt_token_factory(active_system)}"},
+    )
+
+    assert response.status_code == 404
 
 
 async def test_get_system_by_id_auth_different_account(
@@ -169,13 +189,13 @@ async def test_get_all_systems_single_active_record(
     assert "jwt_secret" not in data["items"][0]
 
 
-async def test_get_all_systems_multiple_systems_single_account(
+async def test_get_all_systems_multiple_systems_single_account_affiliate(
     api_client: AsyncClient,
     account_factory: ModelFactory[Account],
     system_factory: ModelFactory[System],
     system_jwt_token_factory: Callable[[System], str],
 ):
-    account = await account_factory()
+    account = await account_factory(type=AccountType.AFFILIATE)
     expected_systems = [
         await system_factory(owner=account),
         await system_factory(owner=account),
@@ -191,10 +211,42 @@ async def test_get_all_systems_multiple_systems_single_account(
     )
 
     assert response.status_code == 200
-    assert response.json()["total"] == len(expected_systems)
+    expected_ids = {
+        system.id for system in expected_systems if system.status != SystemStatus.DELETED
+    }
+    assert response.json()["total"] == len(expected_ids)
 
     ids = {system["id"] for system in response.json()["items"]}
-    assert ids == {system.id for system in expected_systems}
+    assert ids == expected_ids
+
+
+async def test_get_all_systems_multiple_systems_single_account_operations(
+    api_client: AsyncClient,
+    account_factory: ModelFactory[Account],
+    system_factory: ModelFactory[System],
+    system_jwt_token_factory: Callable[[System], str],
+):
+    account = await account_factory(type=AccountType.OPERATIONS)
+    expected_systems = [
+        await system_factory(owner=account),
+        await system_factory(owner=account),
+        await system_factory(owner=account, status=SystemStatus.DISABLED),
+        await system_factory(owner=account, status=SystemStatus.DISABLED),
+        await system_factory(owner=account),
+        await system_factory(owner=account, status=SystemStatus.DELETED),
+    ]
+
+    response = await api_client.get(
+        "/systems",
+        headers={"Authorization": f"Bearer {system_jwt_token_factory(expected_systems[0])}"},
+    )
+
+    assert response.status_code == 200
+    expected_ids = {system.id for system in expected_systems}
+    assert response.json()["total"] == len(expected_ids)
+
+    ids = {system["id"] for system in response.json()["items"]}
+    assert ids == expected_ids
 
 
 async def test_get_all_systems_multiple_systems_in_different_accounts(
@@ -225,10 +277,13 @@ async def test_get_all_systems_multiple_systems_in_different_accounts(
     )
 
     assert response.status_code == 200
-    assert response.json()["total"] == len(expected_systems)
+    expected_ids = {
+        system.id for system in expected_systems if system.status != SystemStatus.DELETED
+    }
+    assert response.json()["total"] == len(expected_ids)
 
     ids = {system["id"] for system in response.json()["items"]}
-    assert ids == {system.id for system in expected_systems}
+    assert ids == expected_ids
 
 
 @pytest.mark.parametrize(
