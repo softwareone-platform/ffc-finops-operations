@@ -699,7 +699,7 @@ async def test_operators_cannot_update_a_deleted_user(
     user = await user_factory(
         name="Peter Parker",
         email="peter.parker@spiderman.com",
-        status=UserStatus.DISABLED,
+        status=UserStatus.DELETED,
     )
 
     response = await operations_client.put(

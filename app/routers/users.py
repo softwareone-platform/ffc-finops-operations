@@ -228,10 +228,10 @@ async def update_user(
     This endpoint updates the name field of a user.
     Only the name can be updated.
     """
-    if user.status != UserStatus.ACTIVE:
+    if user.status == UserStatus.DELETED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="The user cannot be updated.",
+            detail="You cannot update a deleted user.",
         )
     to_update = data.model_dump(exclude_unset=True)
     db_user = await user_repo.update(user.id, data=to_update)
