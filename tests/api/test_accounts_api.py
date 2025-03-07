@@ -198,6 +198,17 @@ async def test_get_account_by_id(
     assert data["events"]["updated"]["by"]["name"] == ffc_extension.name
 
 
+async def test_get_account_by_id_no_auth(
+    affiliate_account: Account,
+    api_client: AsyncClient,
+    ffc_extension: System,
+):
+    response = await api_client.get(
+        f"/accounts/{affiliate_account.id}",
+    )
+    assert response.status_code == 401
+
+
 async def test_get_invalid_account(operations_client: AsyncClient, ffc_jwt_token: str):
     id = "FACC-1369-9180"
     response = await operations_client.get(f"/accounts/{id}")
@@ -683,6 +694,25 @@ async def test_can_remove_user_from_account(
     assert response.status_code == 204
 
 
+async def test_cannot_remove_user_from_account_without_auth(
+    api_client: AsyncClient,
+    operations_account: Account,
+    accountuser_factory: ModelFactory[AccountUser],
+    user_factory: ModelFactory[User],
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+    await accountuser_factory(
+        user_id=user.id, account_id=operations_account.id, status=AccountStatus.ACTIVE
+    )
+
+    response = await api_client.delete(f"/accounts/{operations_account.id}/users/{user.id}")
+    assert response.status_code == 401
+
+
 async def test_remove_with_not_existing_user_id(
     operations_client: AsyncClient,
     operations_account: Account,
@@ -730,4 +760,4 @@ async def test_cannot_remove_deleted_user_from_account(
     assert (
         data.get("detail")
         == f"The User `{user.id}` does not belong to the Account with ID `{operations_account.id}`."
-    )  # noqa: E501
+    )

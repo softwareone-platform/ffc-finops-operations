@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import and_, exists
 
-from app.auth.auth import check_operations_account
+from app.auth.auth import authentication_required, check_operations_account
 from app.db.handlers import NotFoundError
 from app.db.models import Account, AccountUser, User
 from app.dependencies import (
@@ -193,7 +193,11 @@ async def update_account(
     )
 
 
-@router.get("/{id}/users", response_model=LimitOffsetPage[UserRead])
+@router.get(
+    "/{id}/users",
+    response_model=LimitOffsetPage[UserRead],
+    dependencies=[Depends(authentication_required)],
+)
 async def list_account_users(
     account: Annotated[Account, Depends(fetch_account_or_404)],
     auth_context: CurrentAuthContext,
@@ -244,7 +248,11 @@ async def list_account_users(
     )
 
 
-@router.delete("/{id}/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{id}/users/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(authentication_required)],
+)
 async def remove_user_from_account(
     account: Annotated[Account, Depends(fetch_account_or_404)],
     user_id: UserId,
