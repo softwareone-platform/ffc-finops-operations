@@ -43,10 +43,6 @@ class CannotDeleteError(DatabaseError):
     pass
 
 
-class CannotUpdateStatusError(DatabaseError):
-    pass
-
-
 class ConstraintViolationError(DatabaseError):
     pass
 
