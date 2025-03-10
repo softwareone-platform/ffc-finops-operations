@@ -1,14 +1,18 @@
 import pytest
+from pytest_mock import MockerFixture
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from app.auth.context import AuthenticationContext
 from app.db.handlers import (
+    AccountUserHandler,
     CannotDeleteError,
     ConstraintViolationError,
     ModelHandler,
     NotFoundError,
 )
-from app.db.models import Base
+from app.db.models import Account, AccountUser, Base, User
+from app.enums import AccountStatus, AccountUserStatus, UserStatus
 from tests.db.models import (
     DeletableAuditModelForTests,
     DeletableModelForTests,
@@ -17,6 +21,7 @@ from tests.db.models import (
     NonDeletableModelWithEnumStatusForTests,
     ParentModelForTests,
 )
+from tests.types import ModelFactory
 
 
 class ModelForTestsHandler(ModelHandler[ModelForTests]):
@@ -284,7 +289,7 @@ async def test_get_or_create_with_default_load_options(db_session: AsyncSession)
         ),
     ],
 )
-async def test_soft_delete(
+async def test_delete(
     db_session: AsyncSession,
     model_cls: type[Base],
     handler_cls: type[ModelHandler],
@@ -307,3 +312,42 @@ async def test_soft_delete(
     else:
         with pytest.raises(exception.__class__, match=str(exception)):
             await handler.soft_delete(test_obj)
+
+
+async def test_deleted_by_user_id(
+    db_session: AsyncSession,
+    operations_account: Account,
+    accountuser_factory: ModelFactory[AccountUser],
+    user_factory: ModelFactory[User],
+    mocker: MockerFixture,
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+    user_actor = await user_factory()
+    account_user = await accountuser_factory(
+        user_id=user.id, account_id=operations_account.id, status=AccountStatus.ACTIVE
+    )
+
+    db_session.add(account_user)
+    await db_session.commit()
+    mock_actor = mocker.AsyncMock()
+    mock_actor.id = account_user.id
+    handler = AccountUserHandler(db_session)
+    mock_actor = mocker.AsyncMock()
+    mock_actor.id = user_actor.id
+    mock_auth_context = mocker.AsyncMock(spec=AuthenticationContext)
+    mock_auth_context.get_actor.return_value = mock_actor
+    mock_context_var = mocker.MagicMock()
+    mock_context_var.get.return_value = mock_auth_context
+
+    mocker.patch("app.db.handlers.auth_context", mock_context_var)
+
+    await handler.delete_by_user(user_id=user.id)
+    result = await db_session.get(AccountUser, account_user.id)
+    assert result is not None
+    assert result.status == AccountUserStatus.DELETED
+    assert result.deleted_at is not None
+    assert result.deleted_by_id == user_actor.id
