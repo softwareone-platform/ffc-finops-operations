@@ -13,7 +13,12 @@ from app.auth.auth import authentication_required, check_operations_account
 from app.auth.constants import UNAUTHORIZED_EXCEPTION
 from app.conf import AppSettings
 from app.db import DBEngine, DBSession, get_tx_db_session
-from app.db.handlers import AccountHandler, AccountUserHandler, NotFoundError, UserHandler
+from app.db.handlers import (
+    AccountHandler,
+    AccountUserHandler,
+    NotFoundError,
+    UserHandler,
+)
 from app.db.models import Account, AccountUser, User
 from app.dependencies import (
     AccountId,
@@ -238,6 +243,31 @@ async def update_user(
     return convert_model_to_schema(UserRead, db_user)
 
 
+@router.get(
+    "/{id}/accounts",
+    dependencies=[Depends(authentication_required)],
+    response_model=LimitOffsetPage[AccountRead],
+)
+async def get_user_accounts(
+    user: Annotated[User, Depends(fetch_user_or_404)],
+    account_repo: AccountRepository,
+    auth_ctx: CurrentAuthContext,
+):
+    account_user_filter = AccountUser.user_id == user.id
+    if auth_ctx is not None and auth_ctx.account.type == AccountType.AFFILIATE:
+        account_user_filter &= AccountUser.status != AccountUserStatus.DELETED
+
+    return await paginate(
+        account_repo,
+        AccountRead,
+        extra_conditions=[Account.users.any(account_user_filter)],
+        page_options=[
+            joinedload(Account.users).joinedload(AccountUser.user),
+            with_loader_criteria(AccountUser, account_user_filter),
+        ],
+    )
+
+
 @router.delete(
     "/{id}",
     dependencies=[Depends(check_operations_account)],
@@ -263,39 +293,8 @@ async def delete_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="The user has already been deleted.",
         )
-    account_users = await accountuser_repo.filter(
-        AccountUser.status != AccountUserStatus.DELETED, AccountUser.user_id == user.id
-    )
     await user_repo.soft_delete(id_or_obj=user.id)
-    logger.info(f"The user {user.id} has been deleted.")
-    for accountuser in account_users:
-        await accountuser_repo.soft_delete(id_or_obj=accountuser.id)
-    logger.info("All the account users have been deleted.")
-
-
-@router.get(
-    "/{id}/accounts",
-    dependencies=[Depends(authentication_required)],
-    response_model=LimitOffsetPage[AccountRead],
-)
-async def get_user_accounts(
-    user: Annotated[User, Depends(fetch_user_or_404)],
-    account_repo: AccountRepository,
-    auth_ctx: CurrentAuthContext,
-):
-    account_user_filter = AccountUser.user_id == user.id
-    if auth_ctx is not None and auth_ctx.account.type == AccountType.AFFILIATE:
-        account_user_filter &= AccountUser.status != AccountUserStatus.DELETED
-
-    return await paginate(
-        account_repo,
-        AccountRead,
-        extra_conditions=[Account.users.any(account_user_filter)],
-        page_options=[
-            joinedload(Account.users).joinedload(AccountUser.user),
-            with_loader_criteria(AccountUser, account_user_filter),
-        ],
-    )
+    await accountuser_repo.delete_by_user(user_id=user.id)
 
 
 @router.post(

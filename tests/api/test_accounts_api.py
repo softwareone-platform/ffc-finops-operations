@@ -730,4 +730,4 @@ async def test_cannot_remove_deleted_user_from_account(
     assert (
         data.get("detail")
         == f"The User `{user.id}` does not belong to the Account with ID `{operations_account.id}`."
-    )  # noqa: E501
+    )

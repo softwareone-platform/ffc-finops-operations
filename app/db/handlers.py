@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import sqlalchemy
-from sqlalchemy import ColumnExpressionArgument, Exists, func, select
+from sqlalchemy import ColumnExpressionArgument, Exists, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -26,6 +26,7 @@ from app.db.models import (
 )
 from app.db.models import Base as BaseModel
 from app.enums import (
+    AccountUserStatus,
     EntitlementStatus,
 )
 
@@ -39,6 +40,10 @@ class NotFoundError(DatabaseError):
 
 
 class CannotDeleteError(DatabaseError):
+    pass
+
+
+class CannotUpdateStatusError(DatabaseError):
     pass
 
 
@@ -280,7 +285,12 @@ class OrganizationHandler(ModelHandler[Organization]):
 class SystemHandler(ModelHandler[System]):
     def __init__(self, session):
         super().__init__(session)
-        self.default_options = [joinedload(System.owner)]
+        self.default_options = [
+            joinedload(System.owner),
+            joinedload(System.created_by),
+            joinedload(System.updated_by),
+            joinedload(System.deleted_by),
+        ]
 
 
 class AccountHandler(ModelHandler[Account]):
@@ -305,6 +315,29 @@ class AccountUserHandler(ModelHandler[AccountUser]):
             joinedload(AccountUser.account),
             joinedload(AccountUser.user),
         ]
+
+    async def delete_by_user(self, user_id: str):
+        """
+        Updates the status of the AccountUser that belongs to the user
+        identified by the given user_id, to DELETE.
+        """
+        actor_obj = auth_context.get().get_actor() if auth_context.get() else None
+        actor_id = getattr(actor_obj, "id", None)
+        stmt = (
+            update(AccountUser)
+            .where(AccountUser.status != AccountUserStatus.DELETED, AccountUser.user_id == user_id)
+            .values(
+                status=AccountUserStatus.DELETED,
+                deleted_at=datetime.now(UTC),
+                deleted_by_id=actor_id,
+                # Explicitly set the relationship key
+                # value instead of setting the expected `deleted_at` field. Setting the deleted_by
+                # causes an error due to a misinterpreted query that puts the deleted_at field
+                # expecting a boolean value
+            )
+        )
+        await self.session.execute(stmt)
+        await self.session.commit()
 
     async def get_account_user(
         self,
