@@ -179,7 +179,7 @@ class ModelHandler[M: BaseModel]:
     def _apply_conditions_to_the_query(
         self,
         query: Select,
-        extra_conditions: ColumnExpressionArgument | list[ColumnExpressionArgument] | None = None,
+        where_clauses: ColumnExpressionArgument | list[ColumnExpressionArgument] | None = None,
         options: list[ColumnExpressionArgument] | None = None,
         order_by: list[ColumnExpressionArgument] | str | None = None,
     ) -> Select:
@@ -188,13 +188,13 @@ class ModelHandler[M: BaseModel]:
 
         Args:
             query (Select): The query to modify.
-            extra_conditions (list[ColumnExpressionArgument] | None): Additional query conditions.
+            where_clauses (list[ColumnExpressionArgument] | None): Additional query conditions.
 
         Returns:
             Select: The modified query.
         """
-        if extra_conditions:
-            query = query.where(*extra_conditions)
+        if where_clauses:
+            query = query.where(*where_clauses)
         orm_options = (self.default_options or []) + (options or [])
         if order_by:
             if isinstance(order_by, str):
@@ -212,7 +212,7 @@ class ModelHandler[M: BaseModel]:
 
     async def query_db(
         self,
-        extra_conditions: Sequence[ColumnExpressionArgument | Exists] | None = None,
+        where_clauses: Sequence[ColumnExpressionArgument | Exists] | None = None,
         limit: int | None = 50,
         offset: int = 0,
         all_results: bool | None = False,
@@ -230,7 +230,7 @@ class ModelHandler[M: BaseModel]:
                 - Positional filtering conditions applied using `.where()`.
                 - Example: `User.status == "active"`, `User.age > 18`.
 
-            extra_conditions (Sequence[ColumnExpressionArgument | Exists] | None, optional):
+            where_clauses (Sequence[ColumnExpressionArgument | Exists] | None, optional):
                 - Additional conditions applied using `.where()`.
                 - Useful for combining multiple filters dynamically.
                 - Default is `None`.
@@ -269,14 +269,11 @@ class ModelHandler[M: BaseModel]:
         query = select(self.model_cls)
         # add the default options, if any
         query = self._apply_conditions_to_the_query(
-            query=query, extra_conditions=extra_conditions, options=options, order_by=order_by
+            query=query, where_clauses=where_clauses, options=options, order_by=order_by
         )
         if not all_results:
             # apply limit and offset
             query = query.offset(offset).limit(limit)
-        # orm_options = (self.default_options or []) + (options or [])
-        # if orm_options:
-        #     query = query.options(*orm_options)
         results = await self.session.execute(query)
         return results.scalars().unique().all()
 
@@ -288,7 +285,7 @@ class ModelHandler[M: BaseModel]:
     ) -> AsyncGenerator[M, None]:
         query = select(self.model_cls)
         query = self._apply_conditions_to_the_query(
-            query=query, extra_conditions=extra_conditions, order_by=order_by
+            query=query, where_clauses=extra_conditions, order_by=order_by
         )
         result = await self.session.stream_scalars(
             query,
@@ -300,25 +297,28 @@ class ModelHandler[M: BaseModel]:
 
     async def count(
         self,
-        extra_conditions: list[ColumnExpressionArgument] | None = None,
+        where_clauses: list[ColumnExpressionArgument] | None = None,
     ) -> int:
         """
         Counts the number of objects matching the given conditions.
 
         Args:
-            *extra_conditions (ColumnExpressionArgument): Filtering conditions.
+            *where_clauses (ColumnExpressionArgument): Filtering conditions.
 
         Returns:
             int: The count of matching records.
         """
         query = select(func.count(self.model_cls.id))
-        if extra_conditions:
-            query = query.where(*extra_conditions)
+        if where_clauses:
+            query = query.where(*where_clauses)
         result = await self.session.execute(query)
         return result.scalars().one()
 
-    async def first(self, *conditions: Any) -> M | None:
-        query = select(self.model_cls).where(*conditions)
+    async def first(
+        self,
+        where_clauses: list[ColumnExpressionArgument] | None = None,
+    ) -> M | None:
+        query = select(self.model_cls).where(*where_clauses)
         query = self._apply_conditions_to_the_query(query=query)
 
         result = await self.session.execute(query)

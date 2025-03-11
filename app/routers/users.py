@@ -100,7 +100,7 @@ async def get_users(user_repo: UserRepository, auth_context: CurrentAuthContext)
         return await paginate(
             user_repo,
             UserRead,
-            extra_conditions=[
+            where_clauses=[
                 User.accounts.any(
                     and_(
                         AccountUser.account_id == auth_context.account.id,  # type: ignore
@@ -317,7 +317,7 @@ async def get_user_accounts(
     return await paginate(
         account_repo,
         AccountRead,
-        extra_conditions=[Account.users.any(account_user_filter)],
+        where_clauses=[Account.users.any(account_user_filter)],
         page_options=[
             joinedload(Account.users).joinedload(AccountUser.user),
             with_loader_criteria(AccountUser, account_user_filter),

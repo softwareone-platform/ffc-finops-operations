@@ -58,7 +58,7 @@ router = APIRouter()
 async def get_entitlements(
     entitlement_repo: EntitlementRepository, extra_conditions: CommonConditions
 ):
-    return await paginate(entitlement_repo, EntitlementRead, extra_conditions=extra_conditions)
+    return await paginate(entitlement_repo, EntitlementRead, where_clauses=extra_conditions)
 
 
 @router.post("", response_model=EntitlementRead, status_code=status.HTTP_201_CREATED)

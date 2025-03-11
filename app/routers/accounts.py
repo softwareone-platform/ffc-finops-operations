@@ -244,7 +244,7 @@ async def list_account_users(
     return await paginate(
         user_repo,
         UserRead,
-        extra_conditions=extra_conditions,
+        where_clauses=extra_conditions,
     )
 
 

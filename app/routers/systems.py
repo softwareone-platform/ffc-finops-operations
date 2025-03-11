@@ -55,7 +55,7 @@ async def get_systems(
     return await paginate(
         system_repo,
         SystemRead,
-        extra_conditions=extra_conditions,
+        where_clauses=extra_conditions,
     )
 
 

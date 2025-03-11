@@ -37,7 +37,7 @@ async def paginate[M: Base, S: BaseSchema](
     handler: ModelHandler[M],
     schema_cls: type[S],
     *,
-    extra_conditions: Sequence[ColumnExpressionArgument | Exists] | None = None,
+    where_clauses: Sequence[ColumnExpressionArgument | Exists] | None = None,
     page_options: list[ORMOption] | None = None,
 ) -> AbstractPage[S]:
     """
@@ -47,13 +47,13 @@ async def paginate[M: Base, S: BaseSchema](
     a paginated response in the form of AbstractPage[S].
     """
     params: LimitOffsetParams = resolve_params()
-    total = await handler.count(extra_conditions=extra_conditions)
+    total = await handler.count(where_clauses=where_clauses)
     items: Sequence[M] = []
     if params.limit > 0:
         items = await handler.query_db(
             limit=params.limit,
             offset=params.offset,
-            extra_conditions=extra_conditions,
+            where_clauses=where_clauses,
             options=page_options,
             order_by="id",
         )

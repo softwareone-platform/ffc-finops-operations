@@ -132,7 +132,7 @@ async def test_fetch_page_extra_conditions(db_session: AsyncSession):
     await handler.create(test_obj2)
 
     # Fetch with extra condition to only get active status
-    results = await handler.query_db(extra_conditions=[ModelForTests.status == "active"])
+    results = await handler.query_db(where_clauses=[ModelForTests.status == "active"])
     assert len(results) == 1
     assert results[0].name == "Condition Test 2"
 
@@ -171,7 +171,7 @@ async def test_count_with_extra_conditions(db_session: AsyncSession):
     await handler.create(ModelForTests(name="Object 1", status="inactive"))
     await handler.create(ModelForTests(name="Object 2", status="active"))
 
-    count_active = await handler.count(extra_conditions=[ModelForTests.status == "active"])
+    count_active = await handler.count(where_clauses=[ModelForTests.status == "active"])
     assert count_active == 1
 
 
