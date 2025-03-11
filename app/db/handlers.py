@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import sqlalchemy
-from sqlalchemy import ColumnExpressionArgument, Exists, func, select, update
+from sqlalchemy import ColumnExpressionArgument, Exists, Select, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -31,6 +31,10 @@ from app.enums import (
 
 
 class DatabaseError(Exception):
+    pass
+
+
+class InvalidParameters(Exception):
     pass
 
 
@@ -172,19 +176,107 @@ class ModelHandler[M: BaseModel]:
 
         return await self.update(obj, data=column_updates)
 
-    async def fetch_page(
+    def _apply_conditions_to_the_query(
         self,
-        limit: int = 50,
-        offset: int = 0,
-        extra_conditions: Sequence[ColumnExpressionArgument | Exists] | None = None,
-        options: list[ORMOption] | None = None,
-    ) -> Sequence[M]:
-        query = select(self.model_cls).offset(offset).limit(limit).order_by("id")
+        query: Select,
+        extra_conditions: ColumnExpressionArgument | list[ColumnExpressionArgument] | None = None,
+        options: list[ColumnExpressionArgument] | None = None,
+        order_by: list[ColumnExpressionArgument] | str | None = None,
+    ) -> Select:
+        """
+        Applies default options and extra conditions to the query.
+
+        Args:
+            query (Select): The query to modify.
+            extra_conditions (list[ColumnExpressionArgument] | None): Additional query conditions.
+
+        Returns:
+            Select: The modified query.
+        """
         if extra_conditions:
             query = query.where(*extra_conditions)
         orm_options = (self.default_options or []) + (options or [])
+        if order_by:
+            if isinstance(order_by, str):
+                if hasattr(self.model_cls, order_by):
+                    query = query.order_by(getattr(self.model_cls, order_by))
+                else:
+                    raise ValueError(f"Invalid column name: {order_by}")
+            elif isinstance(order_by, list):
+                query = query.order_by(*order_by)
+            else:
+                raise TypeError("order_by must be a string or a list of ColumnExpressionArgument.")
         if orm_options:
             query = query.options(*orm_options)
+        return query
+
+    async def query_db(
+        self,
+        extra_conditions: Sequence[ColumnExpressionArgument | Exists] | None = None,
+        limit: int | None = 50,
+        offset: int = 0,
+        all_results: bool | None = False,
+        order_by: str | None = None,
+        options: list[ORMOption] | None = None,
+    ) -> Sequence[M]:
+        """
+                Executes a database query with filtering, pagination, ordering, and options.
+
+        This method allows for querying the database with conditions, applying additional
+        filters, controlling pagination, ordering results, and enabling optional query options.
+
+        Args:
+            conditions (Any):
+                - Positional filtering conditions applied using `.where()`.
+                - Example: `User.status == "active"`, `User.age > 18`.
+
+            extra_conditions (Sequence[ColumnExpressionArgument | Exists] | None, optional):
+                - Additional conditions applied using `.where()`.
+                - Useful for combining multiple filters dynamically.
+                - Default is `None`.
+
+            limit (int | None, optional):
+                - Maximum number of results to return.
+                - If `None`, retrieves all results.
+                - Default is `50`.
+
+            offset (int, optional):
+                - Number of records to skip for pagination.
+                - Default is `0`.
+
+            all_results (bool | None, optional):
+                - If `True`, overrides `limit` and fetches all results.
+                - Default is `False`.
+
+            order_by (str | None, optional):
+                - Column name used to order the results.
+                - Default is `"id"`.
+
+            options (list[ORMOption] | None, optional):
+                - SQLAlchemy ORM options to modify query behavior
+                (e.g., `joinedload` for relationships).
+                - Default is `None`.
+
+        Returns:
+            Sequence[M]:
+                - A list of objects matching the query.
+                - If no records are found, returns an empty list.
+
+        """
+        if (limit or offset) and all_results:
+            raise InvalidParameters("Please specify either limit or offset, or all_results.")
+        # default query
+        query = select(self.model_cls)
+        # add the default options, if any
+        query = self._apply_conditions_to_the_query(
+            query=query, extra_conditions=extra_conditions, options=options, order_by=order_by
+        )
+        if not all_results:
+            # apply limit and offset
+            query = query.offset(offset).limit(limit)
+        # orm_options = (self.default_options or []) + (options or [])
+        # if orm_options:
+        #     query = query.options(*orm_options)
         results = await self.session.execute(query)
         return results.scalars().unique().all()
 
@@ -195,12 +287,9 @@ class ModelHandler[M: BaseModel]:
         batch_size: int = 100,
     ) -> AsyncGenerator[M, None]:
         query = select(self.model_cls)
-        if extra_conditions:
-            query = query.where(*extra_conditions)
-        if self.default_options:
-            query = query.options(*self.default_options)
-        if order_by:
-            query = query.order_by(*order_by)
+        query = self._apply_conditions_to_the_query(
+            query=query, extra_conditions=extra_conditions, order_by=order_by
+        )
         result = await self.session.stream_scalars(
             query,
             execution_options={"yield_per": batch_size},
@@ -209,25 +298,28 @@ class ModelHandler[M: BaseModel]:
             yield row
         await result.close()
 
-    async def count(self, *extra_conditions: ColumnExpressionArgument) -> int:
+    async def count(
+        self,
+        extra_conditions: list[ColumnExpressionArgument] | None = None,
+    ) -> int:
+        """
+        Counts the number of objects matching the given conditions.
+
+        Args:
+            *extra_conditions (ColumnExpressionArgument): Filtering conditions.
+
+        Returns:
+            int: The count of matching records.
+        """
         query = select(func.count(self.model_cls.id))
         if extra_conditions:
             query = query.where(*extra_conditions)
         result = await self.session.execute(query)
         return result.scalars().one()
 
-    async def filter(self, *conditions: Any) -> Sequence[M]:
-        query = select(self.model_cls).where(*conditions)
-        if self.default_options:
-            query = query.options(*self.default_options)
-
-        results = await self.session.execute(query)
-        return results.scalars().all()
-
     async def first(self, *conditions: Any) -> M | None:
         query = select(self.model_cls).where(*conditions)
-        if self.default_options:
-            query = query.options(*self.default_options)
+        query = self._apply_conditions_to_the_query(query=query)
 
         result = await self.session.execute(query)
         return result.scalars().first()

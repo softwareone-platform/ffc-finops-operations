@@ -101,7 +101,7 @@ async def test_fetch_page(db_session: AsyncSession):
     for i in range(5):
         await handler.create(ModelForTests(name=f"Object {i}"))
 
-    results = await handler.fetch_page(limit=3, offset=1)
+    results = await handler.query_db(limit=3, offset=1)
     assert len(results) == 3
 
 
@@ -111,15 +111,6 @@ async def test_count(db_session: AsyncSession):
         await handler.create(ModelForTests(name=f"Object {i}"))
     count = await handler.count()
     assert count == 5
-
-
-async def test_filter(db_session: AsyncSession):
-    handler = ModelForTestsHandler(db_session)
-    for i in range(5):
-        await handler.create(ModelForTests(name=f"Object {i}"))
-    results = await handler.filter(ModelForTests.name.like("Object%"))
-
-    assert len(results) == 5
 
 
 async def test_first(db_session: AsyncSession):
@@ -141,7 +132,7 @@ async def test_fetch_page_extra_conditions(db_session: AsyncSession):
     await handler.create(test_obj2)
 
     # Fetch with extra condition to only get active status
-    results = await handler.fetch_page(extra_conditions=[ModelForTests.status == "active"])
+    results = await handler.query_db(extra_conditions=[ModelForTests.status == "active"])
     assert len(results) == 1
     assert results[0].name == "Condition Test 2"
 
@@ -180,7 +171,7 @@ async def test_count_with_extra_conditions(db_session: AsyncSession):
     await handler.create(ModelForTests(name="Object 1", status="inactive"))
     await handler.create(ModelForTests(name="Object 2", status="active"))
 
-    count_active = await handler.count(ModelForTests.status == "active")
+    count_active = await handler.count(extra_conditions=[ModelForTests.status == "active"])
     assert count_active == 1
 
 
@@ -195,7 +186,7 @@ async def test_filter_with_default_load_options(db_session: AsyncSession):
     await handler.create(model)
 
     handler.default_options = [joinedload(ModelForTests.parent)]
-    results = await handler.filter(ModelForTests.name == "Test Object")
+    results = await handler.query_db(ModelForTests.name == "Test Object")
     assert len(results) == 1
     assert results[0].parent.description == "Parent Description"
 

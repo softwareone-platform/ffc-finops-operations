@@ -47,14 +47,15 @@ async def paginate[M: Base, S: BaseSchema](
     a paginated response in the form of AbstractPage[S].
     """
     params: LimitOffsetParams = resolve_params()
-    total = await handler.count(*(extra_conditions or []))
+    total = await handler.count(extra_conditions=extra_conditions)
     items: Sequence[M] = []
     if params.limit > 0:
-        items = await handler.fetch_page(
+        items = await handler.query_db(
             limit=params.limit,
             offset=params.offset,
             extra_conditions=extra_conditions,
             options=page_options,
+            order_by="id",
         )
 
     return create_page(
