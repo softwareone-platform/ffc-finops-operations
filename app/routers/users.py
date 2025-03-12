@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import EmailStr
 from sqlalchemy import ColumnExpressionArgument, and_
 from sqlalchemy.orm import joinedload, with_loader_criteria
 
@@ -134,67 +135,32 @@ async def invite_user(
     db_session: DBSession,
     data: AccountUserCreate,
 ):
-    user_handler = UserHandler(db_session)
-    account_handler = AccountHandler(db_session)
-    accountuser_handler = AccountUserHandler(db_session)
+    """
+    This method is responsible for inviting the provided user.
+    If an account ID is provided with the payload, and its type is AFFILIATE,
+    an HTTP Status 400 will be raised due to the fact that an AFFILIATE account
+    can only invite users to the same Account.
+    If the provided account ID is AFFILIATE, but it's not provided in the payload,
+    the account object that will be used is the one from the auth_context.
+
+    Raises:
+     - HTTP STATUS 400 if the user status is DISABLED.
+     - HTTP STATUS 400 if the provided user already belongs to the fetched account
+     - HTTP STATUS 400 if the account type from the auth_context is AFFILIATE and
+        an account ID is provided
+    - HTTP STATUS 400 if the auth_context is OPERATIONS but an account_object is not provided.
+    - HTTP STATUS 400 if the auth_context is OPERATIONS, an account_object is provided but, for
+        some reason, the provided account_object's ID  is not found in the DB.
+    """
+
     account = None
-
-    if auth_context.account.type == AccountType.AFFILIATE:  # type: ignore
-        if data.account:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Affiliate accounts can only invite users to the same Account.",
-            )
-        account = auth_context.account  # type: ignore
-    else:
-        if not data.account:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Operations accounts must provide an account to invite a User.",
-            )
-        try:
-            account = await account_handler.get(
-                data.account.id,
-                [Account.status == AccountStatus.ACTIVE],
-            )
-        except NotFoundError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"No Active Account has been found with ID {data.account.id}.",
-            )
-
-    user = await user_handler.first(
-        User.email == data.user.email,
-        User.status != UserStatus.DELETED,
+    account = await get_account_object(
+        db_session=db_session, auth_context=auth_context, account_object=data.account
     )
-    if not user:
-        user = User(
-            email=data.user.email,
-            name=data.user.name,
-            status=UserStatus.DRAFT,
-        )
 
-    if user.status == UserStatus.DISABLED:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(f"The user {user.email} cannot be invited " "because it is disabled."),
-        )
-    if user.id:
-        account_user = await accountuser_handler.get_account_user(
-            account_id=account.id,
-            user_id=user.id,
-            extra_conditions=[AccountUser.status != AccountUserStatus.DELETED],
-        )
-        if account_user:
-            msg = (
-                "already belong"
-                if account_user.status == AccountUserStatus.ACTIVE
-                else "has already been invited"
-            )
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"The user {user.email} {msg} to the account: {account.id}.",
-            )
+    user = await get_or_create_user_object(
+        account=account, db_session=db_session, email=data.email, name=data.name
+    )
     account_user = AccountUser(
         user=user,
         account=account,
@@ -217,6 +183,104 @@ async def invite_user(
             account_user=convert_model_to_schema(AccountUserRead, account_user),
         )
         return response
+
+
+async def get_or_create_user_object(
+    account: AccountUser, db_session: DBSession, email: EmailStr, name: str
+) -> User:
+    """
+    This function is responsible for getting the user object from the DB.
+    If a user is not found, it will be created with the provided email and name and
+    its status set to DRAFT.
+    Once a user object is created or fetched, it will be used to query the db to
+    check if an account linked to it has been already invited.
+
+    Returns: the user object
+
+    Raises:
+     - HTTP STATUS 400 if the user status is DISABLED.
+     - HTTP STATUS 400 if the provided user already belongs to the fetched account
+    """
+
+    user_handler = UserHandler(db_session)
+    accountuser_handler = AccountUserHandler(db_session)
+
+    # let's fetch the first occurrence of the user with the provided email address.
+    user = await user_handler.first(
+        User.email == email,
+        User.status != UserStatus.DELETED,
+    )
+    if not user:
+        user = User(
+            email=str(email),
+            name=name,
+            status=UserStatus.DRAFT,
+        )
+    if user.status == UserStatus.DISABLED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(f"The user {user.email} cannot be invited " "because it is disabled."),
+        )
+    if user.id:
+        account_user = await accountuser_handler.get_account_user(
+            account_id=account.id,
+            user_id=user.id,
+            extra_conditions=[AccountUser.status != AccountUserStatus.DELETED],
+        )
+        if account_user:
+            msg = (
+                "already belong"
+                if account_user.status == AccountUserStatus.ACTIVE
+                else "has already been invited"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"The user {user.email} {msg} to the account: {account.id}.",
+            )
+    return user
+
+
+async def get_account_object(
+    auth_context: CurrentAuthContext, db_session: DBSession, account_object
+) -> Account:
+    """
+    This function returns the account object for the auth_context if the account is AFFILIATE.
+    Otherwise, if the account is OPERATIONS it will return the account object with ACTIVE status
+    fetched form the DB.
+
+    Raises:
+        - HTTP STATUS 400 if the account type from the auth_context is AFFILIATE and
+        an account ID is provided
+        - HTTP STATUS 400 if the auth_context is OPERATIONS but an account_object is not provided.
+        - HTTP STATUS 400 if the auth_context is OPERATIONS, an account_object is provided but, for
+        some reason, the provided account_object's ID  is not found in the DB.
+
+    """
+    account_handler = AccountHandler(db_session)
+    if auth_context.account.type == AccountType.AFFILIATE:  # type: ignore
+        if account_object:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Affiliate accounts can only invite users to the same Account.",
+            )
+        account = auth_context.account  # type: ignore
+    else:
+        if not account_object:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Operations accounts must provide an account to invite a User.",
+            )
+        try:
+            account = await account_handler.get(
+                account_object.id,
+                [Account.status == AccountStatus.ACTIVE],
+            )
+        except NotFoundError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"No Active Account has been found with ID {account_object.id}.",
+            )
+    return account
 
 
 @router.put(

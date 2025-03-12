@@ -33,10 +33,8 @@ async def test_invite_user(
         "/users",
         headers={"Authorization": f"Bearer {token}"},
         json={
-            "user": {
-                "name": "Invited User",
-                "email": "invited@user.ops",
-            },
+            "name": "Invited User",
+            "email": "invited@user.ops",
         },
     )
     assert response.status_code == 201
@@ -91,10 +89,8 @@ async def test_invite_user_to_second_account(
         "/users",
         headers={"Authorization": f"Bearer {token}"},
         json={
-            "user": {
-                "name": "Invited User",
-                "email": "invited@user.ops",
-            },
+            "name": "Invited User",
+            "email": "invited@user.ops",
         },
     )
     assert response.status_code == 201
@@ -141,10 +137,8 @@ async def test_invite_by_operations_account(
         "/users",
         headers={"Authorization": f"Bearer {token}"},
         json={
-            "user": {
-                "name": "Invited User",
-                "email": "invited@user.ops",
-            },
+            "name": "Invited User",
+            "email": "invited@user.ops",
             "account": {"id": gcp_account.id},
         },
     )
@@ -190,10 +184,8 @@ async def test_invite_by_operations_account_without_target_account(
         "/users",
         headers={"Authorization": f"Bearer {token}"},
         json={
-            "user": {
-                "name": "Invited User",
-                "email": "invited@user.ops",
-            },
+            "name": "Invited User",
+            "email": "invited@user.ops",
         },
     )
     assert response.status_code == 400
@@ -225,10 +217,8 @@ async def test_invite_by_operations_account_target_account_not_found(
         "/users",
         headers={"Authorization": f"Bearer {token}"},
         json={
-            "user": {
-                "name": "Invited User",
-                "email": "invited@user.ops",
-            },
+            "name": "Invited User",
+            "email": "invited@user.ops",
             "account": {"id": "not-found"},
         },
     )
@@ -255,10 +245,8 @@ async def test_invite_by_operations_account_target_account_invalid_status(
         "/users",
         headers={"Authorization": f"Bearer {token}"},
         json={
-            "user": {
-                "name": "Invited User",
-                "email": "invited@user.ops",
-            },
+            "name": "Invited User",
+            "email": "invited@user.ops",
             "account": {"id": account.id},
         },
     )
@@ -283,10 +271,8 @@ async def test_invite_user_by_affiliate_to_other_account(
         "/users",
         headers={"Authorization": f"Bearer {token}"},
         json={
-            "user": {
-                "name": "Invited User",
-                "email": "invited@user.ops",
-            },
+            "name": "Invited User",
+            "email": "invited@user.ops",
             "account": {"id": aws_account.id},
         },
     )
@@ -313,10 +299,8 @@ async def test_invite_by_operations_account_user_disabled(
         "/users",
         headers={"Authorization": f"Bearer {token}"},
         json={
-            "user": {
-                "name": "Invited User",
-                "email": "invited@user.ops",
-            },
+            "name": "Invited User",
+            "email": "invited@user.ops",
             "account": {"id": operations_account.id},
         },
     )
@@ -354,10 +338,8 @@ async def test_invite_by_operations_account_already_invited(
         "/users",
         headers={"Authorization": f"Bearer {token}"},
         json={
-            "user": {
-                "name": "Invited User",
-                "email": "invited@user.ops",
-            },
+            "name": "Invited User",
+            "email": "invited@user.ops",
             "account": {"id": affiliate_account.id},
         },
     )
@@ -393,10 +375,8 @@ async def test_invite_by_operations_already_belong_to_account(
         "/users",
         headers={"Authorization": f"Bearer {token}"},
         json={
-            "user": {
-                "name": "Invited User",
-                "email": "invited@user.ops",
-            },
+            "name": "Invited User",
+            "email": "invited@user.ops",
             "account": {"id": affiliate_account.id},
         },
     )
