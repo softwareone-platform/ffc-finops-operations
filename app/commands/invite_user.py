@@ -30,11 +30,14 @@ async def get_account(account_handler: AccountHandler, account_id: str | None) -
     account = None
     if account_id:
         account = await account_handler.first(
-            Account.id == account_id, Account.status == AccountStatus.ACTIVE
+            where_clauses=[Account.id == account_id, Account.status == AccountStatus.ACTIVE]
         )
     else:
         account = await account_handler.first(
-            Account.type == AccountType.OPERATIONS, Account.status == AccountStatus.ACTIVE
+            where_clauses=[
+                Account.type == AccountType.OPERATIONS,
+                Account.status == AccountStatus.ACTIVE,
+            ]
         )
 
     if not account:
@@ -47,7 +50,9 @@ async def get_account(account_handler: AccountHandler, account_id: str | None) -
 
 
 async def get_user(user_handler: UserHandler, email: str, name: str) -> User:
-    user = await user_handler.first(User.email == email, User.status != UserStatus.DELETED)
+    user = await user_handler.first(
+        where_clauses=[User.email == email, User.status != UserStatus.DELETED]
+    )
     if not user:
         user = User(name=name, email=email, status=UserStatus.DRAFT)
         user = await user_handler.create(user)
@@ -70,9 +75,11 @@ async def invite_user(
         user = await get_user(user_handler, email, name)
 
         account_user = await accountuser_handler.first(
-            AccountUser.account == account,
-            AccountUser.user == user,
-            AccountUser.status != AccountUserStatus.DELETED,
+            where_clauses=[
+                AccountUser.account == account,
+                AccountUser.user == user,
+                AccountUser.status != AccountUserStatus.DELETED,
+            ]
         )
 
         action = "invitation token regenerated successfully!"

@@ -83,8 +83,10 @@ async def redeem_entitlements(
                         continue
                 try:
                     instance = await entitlement_handler.first(
-                        Entitlement.datasource_id == datasource_id,
-                        Entitlement.status == EntitlementStatus.NEW,
+                        where_clauses=[
+                            Entitlement.datasource_id == datasource_id,
+                            Entitlement.status == EntitlementStatus.NEW,
+                        ]
                     )
                     if instance:
                         await entitlement_handler.update(

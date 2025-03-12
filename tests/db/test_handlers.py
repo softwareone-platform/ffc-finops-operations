@@ -117,7 +117,7 @@ async def test_first(db_session: AsyncSession):
     handler = ModelForTestsHandler(db_session)
     for i in range(5):
         await handler.create(ModelForTests(name=f"Object {i}"))
-    first_result = await handler.first(ModelForTests.name.like("Object%"))
+    first_result = await handler.first(where_clauses=[ModelForTests.name.like("Object%")])
 
     assert first_result is not None
     assert first_result.name.startswith("Object")
@@ -202,7 +202,7 @@ async def test_first_with_default_load_options(db_session: AsyncSession):
     await handler.create(model)
 
     handler.default_options = [joinedload(ModelForTests.parent)]
-    first_result = await handler.first(ModelForTests.name == "First Test Object")
+    first_result = await handler.first(where_clauses=[ModelForTests.name == "First Test Object"])
     assert first_result is not None
     assert first_result.parent.description == "First Parent Description"
 

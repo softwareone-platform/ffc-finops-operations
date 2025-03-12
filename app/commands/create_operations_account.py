@@ -19,8 +19,10 @@ async def create_operations_account(
     async with asynccontextmanager(get_db_session)(engine) as session:
         account_handler = AccountHandler(session)
         instance = await account_handler.first(
-            Account.type == AccountType.OPERATIONS,
-            Account.status != AccountStatus.DELETED,
+            where_clauses=[
+                Account.type == AccountType.OPERATIONS,
+                Account.status != AccountStatus.DELETED,
+            ]
         )
         if instance:
             print(

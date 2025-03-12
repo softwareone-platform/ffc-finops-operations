@@ -34,10 +34,6 @@ class DatabaseError(Exception):
     pass
 
 
-class InvalidParameters(Exception):
-    pass
-
-
 class NotFoundError(DatabaseError):
     pass
 
@@ -176,48 +172,15 @@ class ModelHandler[M: BaseModel]:
 
         return await self.update(obj, data=column_updates)
 
-    def _apply_conditions_to_the_query(
-        self,
-        query: Select,
-        where_clauses: ColumnExpressionArgument | list[ColumnExpressionArgument] | None = None,
-        options: list[ColumnExpressionArgument] | None = None,
-        order_by: list[ColumnExpressionArgument] | str | None = None,
-    ) -> Select:
-        """
-        Applies default options and extra conditions to the query.
-
-        Args:
-            query (Select): The query to modify.
-            where_clauses (list[ColumnExpressionArgument] | None): Additional query conditions.
-
-        Returns:
-            Select: The modified query.
-        """
-        if where_clauses:
-            query = query.where(*where_clauses)
-        orm_options = (self.default_options or []) + (options or [])
-        if order_by:
-            if isinstance(order_by, str):
-                if hasattr(self.model_cls, order_by):
-                    query = query.order_by(getattr(self.model_cls, order_by))
-                else:
-                    raise ValueError(f"Invalid column name: {order_by}")
-            elif isinstance(order_by, list):
-                query = query.order_by(*order_by)
-            else:
-                raise TypeError("order_by must be a string or a list of ColumnExpressionArgument.")
-        if orm_options:
-            query = query.options(*orm_options)
-        return query
-
     async def query_db(
         self,
         where_clauses: Sequence[ColumnExpressionArgument | Exists] | None = None,
         limit: int | None = 50,
         offset: int = 0,
         all_results: bool | None = False,
-        order_by: str | None = None,
-        options: list[ORMOption] | None = None,
+        order_by: ColumnExpressionArgument | Sequence[ColumnExpressionArgument] | None = None,
+        options: Sequence[ORMOption] | None = None,
+        unique: bool = False,
     ) -> Sequence[M]:
         """
                 Executes a database query with filtering, pagination, ordering, and options.
@@ -261,7 +224,7 @@ class ModelHandler[M: BaseModel]:
 
         """
         if (limit or offset) and all_results:
-            raise InvalidParameters("Please specify either limit or offset, or all_results.")
+            raise ValueError("Please specify either limit or offset, or all_results.")
         # default query
         query = select(self.model_cls)
         # add the default options, if any
@@ -272,7 +235,9 @@ class ModelHandler[M: BaseModel]:
             # apply limit and offset
             query = query.offset(offset).limit(limit)
         results = await self.session.execute(query)
-        return results.scalars().unique().all()
+        if unique:
+            return results.scalars().unique().all()
+        return results.scalars().all()
 
     async def stream_scalars(
         self,
@@ -335,6 +300,40 @@ class ModelHandler[M: BaseModel]:
                 f"Failed to save changes to {self.model_cls.__name__}: {e}."
             ) from e
         await self.session.refresh(obj)
+
+    def _apply_conditions_to_the_query(
+        self,
+        query: Select,
+        where_clauses: ColumnExpressionArgument | Sequence[ColumnExpressionArgument] | None = None,
+        options: Sequence[ColumnExpressionArgument] | None = None,
+        order_by: ColumnExpressionArgument | Sequence[ColumnExpressionArgument] | None = None,
+    ) -> Select:
+        """
+        Applies default options and extra conditions to the query.
+
+        Args:
+            query (Select): The query to modify.
+            where_clauses (list[ColumnExpressionArgument] | None): Additional query conditions.
+
+        Returns:
+            Select: The modified query.
+        """
+        if where_clauses:
+            query = query.where(*where_clauses)
+        orm_options = (self.default_options or []) + (options or [])
+        if order_by:
+            if isinstance(order_by, str):
+                if hasattr(self.model_cls, order_by):
+                    query = query.order_by(getattr(self.model_cls, order_by))
+                else:
+                    raise ValueError(f"Invalid column name: {order_by}")
+            elif isinstance(order_by, list):
+                query = query.order_by(*order_by)
+            else:
+                raise TypeError("order_by must be a string or a list of ColumnExpressionArgument.")
+        if orm_options:
+            query = query.options(*orm_options)
+        return query
 
 
 class EntitlementHandler(ModelHandler[Entitlement]):

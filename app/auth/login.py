@@ -105,8 +105,7 @@ async def get_tokens_from_credentials(
     account_handler = AccountHandler(db_session)
     try:
         user = await user_handler.first(
-            User.status == UserStatus.ACTIVE,
-            User.email == login_data.email,
+            where_clauses=[User.status == UserStatus.ACTIVE, User.email == login_data.email]
         )
         if not user:
             raise UNAUTHORIZED_EXCEPTION
