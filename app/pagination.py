@@ -12,7 +12,7 @@ from sqlalchemy import ColumnExpressionArgument, Exists
 from sqlalchemy.orm.interfaces import ORMOption
 
 from app.db.handlers import ModelHandler
-from app.db.models import Base
+from app.db.models import Base, TimestampMixin
 from app.schemas.core import BaseSchema, convert_model_to_schema
 
 
@@ -39,6 +39,7 @@ async def paginate[M: Base, S: BaseSchema](
     *,
     where_clauses: Sequence[ColumnExpressionArgument | Exists] | None = None,
     page_options: list[ORMOption] | None = None,
+    unique: bool = False,
 ) -> AbstractPage[S]:
     """
     This function queries a database model (M) using a ModelHandler.
@@ -50,12 +51,18 @@ async def paginate[M: Base, S: BaseSchema](
     total = await handler.count(where_clauses=where_clauses)
     items: Sequence[M] = []
     if params.limit > 0:
+        order_by = [
+            handler.model_cls.id
+            if not issubclass(handler.model_cls, TimestampMixin)
+            else handler.model_cls.updated_at.desc()
+        ]
         items = await handler.query_db(
             limit=params.limit,
             offset=params.offset,
             where_clauses=where_clauses,
             options=page_options,
-            order_by="id",
+            order_by=order_by,
+            unique=unique,
         )
 
     return create_page(

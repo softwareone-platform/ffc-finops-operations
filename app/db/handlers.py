@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import sqlalchemy
-from sqlalchemy import ColumnExpressionArgument, Exists, Select, func, select, update
+from sqlalchemy import ColumnExpressionArgument, Select, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -174,11 +174,10 @@ class ModelHandler[M: BaseModel]:
 
     async def query_db(
         self,
-        where_clauses: Sequence[ColumnExpressionArgument | Exists] | None = None,
-        limit: int | None = 50,
-        offset: int = 0,
-        all_results: bool | None = False,
-        order_by: ColumnExpressionArgument | Sequence[ColumnExpressionArgument] | None = None,
+        where_clauses: Sequence[ColumnExpressionArgument] | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+        order_by: Sequence[ColumnExpressionArgument] | None = None,
         options: Sequence[ORMOption] | None = None,
         unique: bool = False,
     ) -> Sequence[M]:
@@ -204,9 +203,6 @@ class ModelHandler[M: BaseModel]:
                 - Number of records to skip for pagination.
                 - Default is `0`.
 
-            all_results (bool | None, optional):
-                - If `True`, overrides `limit` and fetches all results.
-                - Default is `False`.
 
             order_by (str | None, optional):
                 - Column name used to order the results.
@@ -217,27 +213,29 @@ class ModelHandler[M: BaseModel]:
                 (e.g., `joinedload` for relationships).
                 - Default is `None`.
 
+            unique: Boolean (`True`) or `False` (`False`).
         Returns:
             Sequence[M]:
                 - A list of objects matching the query.
                 - If no records are found, returns an empty list.
 
         """
-        if (limit or offset) and all_results:
-            raise ValueError("Please specify either limit or offset, or all_results.")
         # default query
         query = select(self.model_cls)
         # add the default options, if any
         query = self._apply_conditions_to_the_query(
             query=query, where_clauses=where_clauses, options=options, order_by=order_by
         )
-        if not all_results:
-            # apply limit and offset
-            query = query.offset(offset).limit(limit)
-        results = await self.session.execute(query)
+        if limit:
+            # apply limit
+            query = query.limit(limit)
+        if offset:
+            # apply offset
+            query = query.offset(offset)
+        results = await self.session.scalars(query)
         if unique:
-            return results.scalars().unique().all()
-        return results.scalars().all()
+            return results.unique().all()
+        return results.all()
 
     async def stream_scalars(
         self,
