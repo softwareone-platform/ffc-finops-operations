@@ -226,9 +226,6 @@ class ModelHandler[M: BaseModel]:
         filters, controlling pagination, ordering results, and enabling optional query options.
 
         Args:
-            conditions (Any):
-                - Positional filtering conditions applied using `.where()`.
-                - Example: `User.status == "active"`, `User.age > 18`.
 
             where_clauses (Sequence[ColumnExpressionArgument | Exists] | None, optional):
                 - Additional conditions applied using `.where()`.
