@@ -4,6 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import and_, exists
+from sqlalchemy.sql.selectable import Select
 
 from app.auth.auth import authentication_required, check_operations_account
 from app.db.handlers import NotFoundError
@@ -18,6 +19,7 @@ from app.dependencies import (
 )
 from app.enums import AccountStatus, AccountType, AccountUserStatus, UserStatus
 from app.pagination import LimitOffsetPage, paginate
+from app.rql import AccountRules, RQLQuery
 from app.schemas.accounts import AccountCreate, AccountRead, AccountUpdate
 from app.schemas.core import convert_model_to_schema, convert_schema_to_model
 from app.schemas.users import UserRead
@@ -105,7 +107,7 @@ async def validate_account_type_and_required_conditions(
     ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="An Account with external ID " f"`{data.external_id}` already exists.",
+            detail=f"An Account with external ID `{data.external_id}` already exists.",
         )
 
 
@@ -161,8 +163,11 @@ async def get_account_by_id(
     response_model=LimitOffsetPage[AccountRead],
     dependencies=[Depends(check_operations_account)],
 )
-async def get_accounts(account_repo: AccountRepository):
-    return await paginate(account_repo, AccountRead)
+async def get_accounts(
+    account_repo: AccountRepository,
+    base_query: Select = Depends(RQLQuery(AccountRules())),
+):
+    return await paginate(account_repo, AccountRead, base_query=base_query)
 
 
 @router.put(

@@ -29,6 +29,7 @@ dependencies = [
     "typer==0.13.*",
     "email-validator==2.2.*",
     "pycountry>=24.6.1,<24.7",
+    "requela==0.1.*",
 ]
 
 [dependency-groups]

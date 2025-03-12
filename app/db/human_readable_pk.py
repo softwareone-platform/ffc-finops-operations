@@ -26,7 +26,9 @@ class HumanReadablePKMixin:
         :return: A formatted primary key string.
         """
 
-        random_number = f"{random.randint(10**(cls.PK_NUM_LENGTH-1), 10**cls.PK_NUM_LENGTH - 1)}"  # nosec: B311
+        random_number = (
+            f"{random.randint(10 ** (cls.PK_NUM_LENGTH - 1), 10**cls.PK_NUM_LENGTH - 1)}"  # nosec: B311
+        )
         grouped_number = "-".join(
             random_number[i : i + cls.PK_GROUP_SIZE]
             for i in range(0, len(random_number), cls.PK_GROUP_SIZE)

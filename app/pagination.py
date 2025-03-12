@@ -8,8 +8,9 @@ from fastapi_pagination.bases import AbstractPage, AbstractParams, RawParams
 from fastapi_pagination.limit_offset import LimitOffsetPage as _LimitOffsetPage
 from fastapi_pagination.types import GreaterEqualZero
 from pydantic import BaseModel
-from sqlalchemy import ColumnExpressionArgument, Exists
+from sqlalchemy import ColumnExpressionArgument
 from sqlalchemy.orm.interfaces import ORMOption
+from sqlalchemy.sql.selectable import Select
 
 from app.db.handlers import ModelHandler
 from app.db.models import Base, TimestampMixin
@@ -37,7 +38,8 @@ async def paginate[M: Base, S: BaseSchema](
     handler: ModelHandler[M],
     schema_cls: type[S],
     *,
-    where_clauses: Sequence[ColumnExpressionArgument | Exists] | None = None,
+    base_query: Select | None = None,
+    where_clauses: Sequence[ColumnExpressionArgument] | None = None,
     page_options: list[ORMOption] | None = None,
     unique: bool = False,
 ) -> AbstractPage[S]:
@@ -48,15 +50,16 @@ async def paginate[M: Base, S: BaseSchema](
     a paginated response in the form of AbstractPage[S].
     """
     params: LimitOffsetParams = resolve_params()
-    total = await handler.count(where_clauses=where_clauses)
+    total = await handler.count(base_query=base_query, where_clauses=where_clauses)
     items: Sequence[M] = []
     if params.limit > 0:
         order_by = [
             handler.model_cls.id
             if not issubclass(handler.model_cls, TimestampMixin)
-            else handler.model_cls.updated_at.desc()
+            else handler.model_cls.updated_at.desc()  # type: ignore
         ]
         items = await handler.query_db(
+            base_query=base_query,
             limit=params.limit,
             offset=params.offset,
             where_clauses=where_clauses,

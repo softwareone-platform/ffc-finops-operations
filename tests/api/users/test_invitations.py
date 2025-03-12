@@ -383,7 +383,7 @@ async def test_invite_by_operations_already_belong_to_account(
     assert response.status_code == 400
     error = response.json()["detail"]
     assert error == (
-        "The user invited@user.ops already " f"belong to the account: {affiliate_account.id}."
+        f"The user invited@user.ops already belong to the account: {affiliate_account.id}."
     )
 
 

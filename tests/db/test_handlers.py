@@ -186,7 +186,7 @@ async def test_filter_with_default_load_options(db_session: AsyncSession):
     await handler.create(model)
 
     handler.default_options = [joinedload(ModelForTests.parent)]
-    results = await handler.query_db(ModelForTests.name == "Test Object")
+    results = await handler.query_db(where_clauses=[ModelForTests.name == "Test Object"])
     assert len(results) == 1
     assert results[0].parent.description == "Parent Description"
 
