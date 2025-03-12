@@ -55,6 +55,7 @@ class TimestampMixin:
 class Actor(Base, HumanReadablePKMixin):
     __tablename__ = "actors"
 
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
     type: Mapped[ActorType] = mapped_column(
         Enum(ActorType, values_callable=lambda obj: [e.value for e in obj]),
         nullable=False,
@@ -136,7 +137,6 @@ class System(Actor, AuditableMixin):
     PK_NUM_LENGTH = 8
 
     id: Mapped[str] = mapped_column(ForeignKey("actors.id"), primary_key=True)
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text(), nullable=True)
     external_id: Mapped[str] = mapped_column(String(255), nullable=False)
     jwt_secret: Mapped[str] = mapped_column(
@@ -177,7 +177,6 @@ class User(Actor, HumanReadablePKMixin, AuditableMixin):
     PK_NUM_LENGTH = 8
 
     id: Mapped[str] = mapped_column(ForeignKey("actors.id"), primary_key=True)
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str] = mapped_column(String(255), nullable=False)
     password: Mapped[str | None] = mapped_column(String(255), nullable=True)
     last_login_at: Mapped[datetime.datetime | None] = mapped_column(
