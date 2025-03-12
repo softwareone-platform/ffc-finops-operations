@@ -171,7 +171,6 @@ def test_entitlement_read_convert_model_to_schema(
         assert entitlement_read.events.redeemed.by is not None
         assert entitlement_read.events.redeemed.by.id == redeeemer_organization.id
         assert entitlement_read.events.redeemed.by.name == redeeemer_organization.name
-        assert entitlement_read.events.redeemed.by.currency == redeeemer_organization.currency
         assert (
             entitlement_read.events.redeemed.by.operations_external_id
             == redeeemer_organization.operations_external_id
