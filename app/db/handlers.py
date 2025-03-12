@@ -320,15 +320,7 @@ class ModelHandler[M: BaseModel]:
             query = query.where(*where_clauses)
         orm_options = (self.default_options or []) + (options or [])
         if order_by:
-            if isinstance(order_by, str):
-                if hasattr(self.model_cls, order_by):
-                    query = query.order_by(getattr(self.model_cls, order_by))
-                else:
-                    raise ValueError(f"Invalid column name: {order_by}")
-            elif isinstance(order_by, list):
-                query = query.order_by(*order_by)
-            else:
-                raise TypeError("order_by must be a string or a list of ColumnExpressionArgument.")
+            query = query.order_by(*order_by)
         if orm_options:
             query = query.options(*orm_options)
         return query
