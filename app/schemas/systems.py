@@ -10,9 +10,14 @@ from app.schemas.core import BaseSchema, CommonEventsSchema, IdSchema
 
 class SystemBase(BaseSchema):
     name: Annotated[
-        str, Field(max_length=255, examples=["FinOps For Cloud Marketplace Fulfillment Extension"])
+        str,
+        Field(
+            min_length=1,
+            max_length=255,
+            examples=["FinOps For Cloud Marketplace Fulfillment Extension"],
+        ),
     ]
-    external_id: Annotated[str, Field(max_length=255)]
+    external_id: Annotated[str, Field(min_length=1, max_length=255)]
     description: Annotated[str | None, Field(max_length=2000)] = None
     owner: AccountReference
 
@@ -42,8 +47,15 @@ class SystemUpdate(BaseSchema):
     # Also, fields such as `description` are nullable, so we want to differentiate
     # between an explicit `None` and an unset value.
 
-    name: str = None  # type: ignore[assignment]
-    external_id: Annotated[str | None, Field(max_length=255)] = None
+    name: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=255,
+            examples=["FinOps For Cloud Marketplace Fulfillment Extension"],
+        ),
+    ] = None
+    external_id: Annotated[str, Field(min_length=1, max_length=255)] = None
     description: Annotated[str | None, Field(max_length=2000)] = None
     jwt_secret: Annotated[str | None, Field(min_length=64)] = None
 

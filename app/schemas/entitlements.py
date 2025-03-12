@@ -16,10 +16,12 @@ from app.schemas.organizations import OrganizationReference
 
 
 class EntitlementBase(BaseSchema):
-    name: Annotated[str | None, Field(max_length=255, examples=["Microsoft CSP"])]
-    affiliate_external_id: Annotated[str, Field(max_length=255, examples=["SUB-9876-5534-9172"])]
+    name: Annotated[str, Field(min_length=1, max_length=255, examples=["Microsoft CSP"])]
+    affiliate_external_id: Annotated[
+        str, Field(min_length=1, max_length=255, examples=["SUB-9876-5534-9172"])
+    ]
     datasource_id: Annotated[
-        str | None, Field(max_length=255, examples=["1098a2fa-07c0-4f40-96c7-3bf32a213e0e"])
+        str, Field(min_length=1, max_length=255, examples=["1098a2fa-07c0-4f40-96c7-3bf32a213e0e"])
     ]
 
 
@@ -28,9 +30,16 @@ class EntitlementCreate(EntitlementBase):
 
 
 class EntitlementUpdate(BaseSchema):
-    name: str | None = None
-    affiliate_external_id: str | None = None
-    datasource_id: str | None = None
+    name: Annotated[str | None, Field(min_length=1, max_length=255, examples=["Microsoft CSP"])] = (
+        None
+    )
+    affiliate_external_id: Annotated[
+        str | None, Field(min_length=1, max_length=255, examples=["SUB-9876-5534-9172"])
+    ] = None
+    datasource_id: Annotated[
+        str | None,
+        Field(min_length=1, max_length=255, examples=["1098a2fa-07c0-4f40-96c7-3bf32a213e0e"]),
+    ] = None
 
 
 class EntitlementReedemEventSchema(AuditFieldSchema):

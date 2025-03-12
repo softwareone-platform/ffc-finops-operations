@@ -42,8 +42,8 @@ class OrganizationExpensesInfo(BaseSchema):
 
 class OrganizationBase(BaseSchema):
     name: Annotated[str, Field(min_length=1, max_length=255, examples=["Nimbus Nexus Inc."])]
-    currency: Annotated[str, Field(examples=["EUR"])]
-    billing_currency: Annotated[str, Field(examples=["USD"])]
+    currency: Annotated[str, Field(min_length=3, max_length=3, examples=["EUR"])]
+    billing_currency: Annotated[str, Field(min_length=3, max_length=3, examples=["USD"])]
     operations_external_id: Annotated[
         str, Field(min_length=1, max_length=255, examples=["AGR-9876-5534-9172"])
     ]
@@ -59,7 +59,9 @@ class OrganizationBase(BaseSchema):
 
 
 class OrganizationCreate(OrganizationBase):
-    user_id: str
+    user_id: Annotated[
+        str, Field(min_length=1, max_length=255, examples=["ee7ebfaf-a222-4209-aecc-67861694a488"])
+    ]
 
 
 class OrganizationRead(IdSchema, CommonEventsSchema, OrganizationBase):
