@@ -1,8 +1,8 @@
-from collections.abc import Callable
-from contextlib import AbstractContextManager, asynccontextmanager
+from contextlib import asynccontextmanager
 
 import pytest
 from fastapi import HTTPException, status
+from pytest_capsqlalchemy import SQLAlchemyCapturer
 from pytest_mock import MockerFixture
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -53,8 +53,8 @@ async def test_get_authentication_context_system(
     gcp_jwt_token: str,
     gcp_extension: System,
     db_session: AsyncSession,
-    assert_num_queries: Callable[[int], AbstractContextManager[None]],
     test_settings: Settings,
+    capsqlalchemy: SQLAlchemyCapturer,
 ):
     bearer = JWTBearer()
     request = mocker.Mock()
@@ -65,7 +65,7 @@ async def test_get_authentication_context_system(
     with pytest.raises(LookupError):
         auth_context.get()
 
-    with assert_num_queries(1):
+    with capsqlalchemy:
         async with asynccontextmanager(get_authentication_context)(
             test_settings, db_session, credentials
         ) as context:
@@ -76,6 +76,8 @@ async def test_get_authentication_context_system(
             assert context.account == gcp_extension.owner
             assert context.get_actor() == gcp_extension
             assert auth_context.get() == context
+
+        capsqlalchemy.assert_query_count(1)
 
     with pytest.raises(LookupError):
         auth_context.get()
@@ -122,8 +124,8 @@ async def test_get_authentication_context_user(
     user_factory: ModelFactory[User],
     jwt_token_factory: JWTTokenFactory,
     db_session: AsyncSession,
-    assert_num_queries: Callable[[int], AbstractContextManager[None]],
     test_settings: Settings,
+    capsqlalchemy: SQLAlchemyCapturer,
 ):
     user = await user_factory()
     jwt_token = jwt_token_factory(user.id, test_settings.auth_access_jwt_secret)
@@ -136,7 +138,7 @@ async def test_get_authentication_context_user(
     with pytest.raises(LookupError):
         auth_context.get()
 
-    with assert_num_queries(3):
+    with capsqlalchemy:
         async with asynccontextmanager(get_authentication_context)(
             test_settings, db_session, credentials
         ) as context:
@@ -147,6 +149,8 @@ async def test_get_authentication_context_user(
             assert context.account == user.last_used_account
             assert context.get_actor() == user
             assert auth_context.get() == context
+
+        capsqlalchemy.assert_query_count(3)
 
     with pytest.raises(LookupError):
         auth_context.get()
@@ -299,8 +303,8 @@ async def test_authentication_required(
     gcp_jwt_token: str,
     gcp_extension: System,
     db_session: AsyncSession,
-    assert_num_queries: Callable[[int], AbstractContextManager[None]],
     test_settings: Settings,
+    capsqlalchemy: SQLAlchemyCapturer,
 ):
     bearer = JWTBearer()
     request = mocker.Mock()
@@ -311,11 +315,13 @@ async def test_authentication_required(
     with pytest.raises(LookupError):
         auth_context.get()
 
-    with assert_num_queries(1):
+    with capsqlalchemy:
         async with asynccontextmanager(authentication_required)(
             test_settings, db_session, credentials
         ):
             assert auth_context.get() is not None
+
+        capsqlalchemy.assert_query_count(1)
 
     with pytest.raises(LookupError):
         auth_context.get()
@@ -324,7 +330,6 @@ async def test_authentication_required(
 async def test_authentication_required_not_authenticated(
     mocker: MockerFixture,
     db_session: AsyncSession,
-    assert_num_queries: Callable[[int], AbstractContextManager[None]],
     test_settings: Settings,
 ):
     bearer = JWTBearer()
