@@ -12,7 +12,9 @@ from app.enums import AccountStatus, AccountType
 
 
 async def test_create_op_account(
-    test_settings: Settings, db_session: AsyncSession, capsys: pytest.CaptureFixture
+    test_settings: Settings,
+    db_session: AsyncSession,
+    capsys: pytest.CaptureFixture,
 ):
     await create_operations_account(
         test_settings,
@@ -32,7 +34,9 @@ async def test_create_op_account(
 
 
 async def test_create_op_account_exist(
-    test_settings: Settings, db_session: AsyncSession, capsys: pytest.CaptureFixture
+    test_settings: Settings,
+    db_session: AsyncSession,
+    capsys: pytest.CaptureFixture,
 ):
     account_handler = AccountHandler(db_session)
     await account_handler.create(
@@ -43,6 +47,7 @@ async def test_create_op_account_exist(
             external_id="ACC-1234-5678",
         )
     )
+    await db_session.commit()
     await create_operations_account(
         test_settings,
         "ACC-1234-5678",

@@ -13,7 +13,6 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy.orm.interfaces import ORMOption
 
 from app.auth.context import auth_context
-from app.db.base import AsyncTxSession
 from app.db.models import (
     Account,
     AccountUser,
@@ -54,7 +53,6 @@ class NullViolationError(DatabaseError):
 class ModelHandler[M: BaseModel]:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
-        self.commit = not isinstance(self.session, AsyncTxSession)
         self.default_options: list[ORMOption] = []
 
     @classmethod
@@ -242,10 +240,7 @@ class ModelHandler[M: BaseModel]:
 
     async def _save_changes(self, obj: M):
         try:
-            if self.commit:
-                await self.session.commit()
-            else:
-                await self.session.flush()
+            await self.session.flush()
         except IntegrityError as e:
             raise ConstraintViolationError(
                 f"Failed to save changes to {self.model_cls.__name__}: {e}."

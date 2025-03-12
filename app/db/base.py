@@ -13,10 +13,6 @@ from sqlalchemy.ext.asyncio import (
 from app.conf import AppSettings, Settings
 
 
-class AsyncTxSession(AsyncSession):
-    pass
-
-
 def get_db_engine(settings: AppSettings) -> AsyncEngine:
     return create_async_engine(
         str(settings.postgres_async_url),
@@ -30,18 +26,8 @@ async def get_db_session(
 ) -> AsyncGenerator[AsyncSession]:
     async_session = async_sessionmaker(bind=db_engine, class_=AsyncSession, expire_on_commit=False)
     async with async_session() as session:
-        yield session
-
-
-@asynccontextmanager
-async def get_tx_db_session(db_engine: AsyncEngine) -> AsyncGenerator[AsyncSession]:
-    async_session = async_sessionmaker(
-        bind=db_engine, class_=AsyncTxSession, expire_on_commit=False
-    )
-    async with async_session() as session:
-        async with session.begin() as transaction:
+        async with session.begin():
             yield session
-            await transaction.commit()
 
 
 async def verify_db_connection(settings: Settings):  # pragma: no cover

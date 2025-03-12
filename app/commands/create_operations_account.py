@@ -1,10 +1,11 @@
 import asyncio
+from contextlib import asynccontextmanager
 
 import typer
 from rich import print
 
 from app.conf import Settings
-from app.db.base import get_db_engine, get_tx_db_session
+from app.db.base import get_db_engine, get_db_session
 from app.db.handlers import AccountHandler
 from app.db.models import Account
 from app.enums import AccountStatus, AccountType
@@ -15,7 +16,7 @@ async def create_operations_account(
     external_id: str,
 ):
     engine = get_db_engine(settings)
-    async with get_tx_db_session(engine) as session:
+    async with asynccontextmanager(get_db_session)(engine) as session:
         account_handler = AccountHandler(session)
         instance = await account_handler.first(
             Account.type == AccountType.OPERATIONS,
