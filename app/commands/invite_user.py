@@ -1,5 +1,6 @@
 import asyncio
 import secrets
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
@@ -8,7 +9,7 @@ from email_validator import EmailNotValidError, validate_email
 from rich import print
 
 from app.conf import Settings
-from app.db.base import get_db_engine, get_tx_db_session
+from app.db.base import get_db_engine, get_db_session
 from app.db.handlers import AccountHandler, AccountUserHandler, UserHandler
 from app.db.models import Account, AccountUser, User
 from app.enums import AccountStatus, AccountType, AccountUserStatus, UserStatus
@@ -61,7 +62,7 @@ async def invite_user(
 ):
     """ """
     engine = get_db_engine(settings)
-    async with get_tx_db_session(engine) as session:
+    async with asynccontextmanager(get_db_session)(engine) as session:
         account_handler = AccountHandler(session)
         user_handler = UserHandler(session)
         accountuser_handler = AccountUserHandler(session)

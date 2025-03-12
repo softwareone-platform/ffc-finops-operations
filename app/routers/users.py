@@ -6,14 +6,13 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import EmailStr
 from sqlalchemy import ColumnExpressionArgument, and_
 from sqlalchemy.orm import joinedload, with_loader_criteria
 
 from app.auth.auth import authentication_required, check_operations_account
 from app.auth.constants import UNAUTHORIZED_EXCEPTION
 from app.conf import AppSettings
-from app.db import DBEngine, DBSession, get_tx_db_session
+from app.db import DBSession
 from app.db.handlers import (
     AccountHandler,
     AccountUserHandler,
@@ -131,8 +130,9 @@ async def get_users(user_repo: UserRepository, auth_context: CurrentAuthContext)
 async def invite_user(
     auth_context: CurrentAuthContext,
     settings: AppSettings,
-    db_engine: DBEngine,
-    db_session: DBSession,
+    user_repo: UserRepository,
+    account_repo: AccountRepository,
+    accountuser_repo: AccountUserRepository,
     data: AccountUserCreate,
 ):
     """
@@ -153,14 +153,9 @@ async def invite_user(
         some reason, the provided account_object's ID  is not found in the DB.
     """
 
-    account = None
-    account = await get_account_object(
-        db_session=db_session, auth_context=auth_context, account_object=data.account
-    )
+    account = await validate_and_get_account(auth_context, account_repo, data)
 
-    user = await get_or_create_user_object(
-        account=account, db_session=db_session, email=data.email, name=data.name
-    )
+    user = await validate_and_get_user(user_repo, accountuser_repo, account, data)
     account_user = AccountUser(
         user=user,
         account=account,
@@ -169,24 +164,24 @@ async def invite_user(
         invitation_token_expires_at=datetime.now(UTC)
         + timedelta(days=settings.invitation_token_expires_days),
     )
-    db_session.expunge_all()
-    async with get_tx_db_session(db_engine) as tx_session:
-        if not user.id:
-            user_handler = UserHandler(tx_session)
-            user = await user_handler.create(user)
-        accountuser_handler = AccountUserHandler(tx_session)
-        account_user = await accountuser_handler.create(account_user)
 
-        response = convert_model_to_schema(
-            UserInvitationRead,
-            user,
-            account_user=convert_model_to_schema(AccountUserRead, account_user),
-        )
-        return response
+    if not user.id:
+        user = await user_repo.create(user)
+    account_user = await accountuser_repo.create(account_user)
+
+    response = convert_model_to_schema(
+        UserInvitationRead,
+        user,
+        account_user=convert_model_to_schema(AccountUserRead, account_user),
+    )
+    return response
 
 
-async def get_or_create_user_object(
-    account: AccountUser, db_session: DBSession, email: EmailStr, name: str
+async def validate_and_get_user(
+    user_handler: UserHandler,
+    accountuser_handler: AccountUserHandler,
+    account: Account,
+    data: AccountUserCreate,
 ) -> User:
     """
     This function is responsible for getting the user object from the DB.
@@ -202,18 +197,15 @@ async def get_or_create_user_object(
      - HTTP STATUS 400 if the provided user already belongs to the fetched account
     """
 
-    user_handler = UserHandler(db_session)
-    accountuser_handler = AccountUserHandler(db_session)
-
     # let's fetch the first occurrence of the user with the provided email address.
     user = await user_handler.first(
-        User.email == email,
+        User.email == data.email,
         User.status != UserStatus.DELETED,
     )
     if not user:
         user = User(
-            email=str(email),
-            name=name,
+            email=str(data.email),
+            name=data.name,
             status=UserStatus.DRAFT,
         )
     if user.status == UserStatus.DISABLED:
@@ -240,8 +232,10 @@ async def get_or_create_user_object(
     return user
 
 
-async def get_account_object(
-    auth_context: CurrentAuthContext, db_session: DBSession, account_object
+async def validate_and_get_account(
+    auth_context: CurrentAuthContext,
+    account_handler: AccountHandler,
+    data: AccountUserCreate,
 ) -> Account:
     """
     This function returns the account object for the auth_context if the account is AFFILIATE.
@@ -256,30 +250,29 @@ async def get_account_object(
         some reason, the provided account_object's ID  is not found in the DB.
 
     """
-    account_handler = AccountHandler(db_session)
     if auth_context.account.type == AccountType.AFFILIATE:  # type: ignore
-        if account_object:
+        if data.account:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Affiliate accounts can only invite users to the same Account.",
             )
         account = auth_context.account  # type: ignore
     else:
-        if not account_object:
+        if not data.account:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Operations accounts must provide an account to invite a User.",
             )
-        try:
+        with wrap_exc_in_http_response(
+            NotFoundError,
+            error_msg=f"No Active Account has been found with ID {data.account.id}.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        ):
             account = await account_handler.get(
-                account_object.id,
+                data.account.id,
                 [Account.status == AccountStatus.ACTIVE],
             )
-        except NotFoundError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"No Active Account has been found with ID {account_object.id}.",
-            )
+
     return account
 
 
@@ -560,7 +553,6 @@ async def accept_user_invitation(
     id: UserId,
     data: UserAcceptInvitation,
     db_session: DBSession,
-    db_engine: DBEngine,
 ):
     user_handler = UserHandler(db_session)
     accountuser_handler = AccountUserHandler(db_session)
@@ -589,9 +581,12 @@ async def accept_user_invitation(
 
     if account_user.invitation_token_expires_at < datetime.now(UTC):  # type: ignore
         if account_user.status != AccountUserStatus.INVITATION_EXPIRED:
-            await accountuser_handler.update(
-                account_user, {"status": AccountUserStatus.INVITATION_EXPIRED}
-            )
+            logger.info("Set invitation to expired")
+            account_user.status = AccountUserStatus.INVITATION_EXPIRED
+            await accountuser_handler.update(account_user)
+            # this commmit must be forced otherwise the exception
+            # raised just after make the session to rollback the transaction
+            await db_session.commit()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invitation has expired.",
@@ -614,30 +609,27 @@ async def accept_user_invitation(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="A password cannot be provided for an Active User.",
             )
-    async with get_tx_db_session(db_engine) as tx_session:
-        if user.status == UserStatus.DRAFT:
-            user_handler = UserHandler(tx_session)
-            user = await user_handler.update(
-                user.id,
-                {
-                    "password": pbkdf2_sha256.hash(data.password.get_secret_value()),  # type: ignore
-                    "status": UserStatus.ACTIVE,
-                    "last_used_account_id": account_user.account.id,
-                },
-            )
-        else:
-            user = await user_handler.get(user.id)
-        accountuser_handler = AccountUserHandler(tx_session)
-        account_user = await accountuser_handler.update(
-            account_user.id,
+    if user.status == UserStatus.DRAFT:
+        user = await user_handler.update(
+            user.id,
             {
-                "status": AccountUserStatus.ACTIVE,
-                "joined_at": datetime.now(UTC),
-                "invitation_token": None,
-                "invitation_token_expires_at": None,
+                "password": pbkdf2_sha256.hash(data.password.get_secret_value()),  # type: ignore
+                "status": UserStatus.ACTIVE,
+                "last_used_account_id": account_user.account.id,
             },
         )
-        return convert_model_to_schema(UserRead, user)
+    else:
+        user = await user_handler.get(user.id)
+    account_user = await accountuser_handler.update(
+        account_user.id,
+        {
+            "status": AccountUserStatus.ACTIVE,
+            "joined_at": datetime.now(UTC),
+            "invitation_token": None,
+            "invitation_token_expires_at": None,
+        },
+    )
+    return convert_model_to_schema(UserRead, user)
 
 
 @router.post("/{id}/reset-password", response_model=UserRead)
