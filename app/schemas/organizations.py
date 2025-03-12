@@ -81,8 +81,9 @@ class OrganizationUpdate(BaseSchema):
     ] = None
 
 
-class OrganizationReference(IdSchema, OrganizationBase):
-    pass
+class OrganizationReference(IdSchema):
+    name: str
+    operations_external_id: str
 
 
 class DatasourceRead(BaseSchema):
