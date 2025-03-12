@@ -40,7 +40,8 @@ class AccountUserBase(BaseSchema):
 
 class AccountUserCreate(BaseSchema):
     account: IdSchema | None = None
-    user: UserCreate
+    name: Annotated[str, Field(max_length=255, examples=["Lady Gaga"])]
+    email: Annotated[EmailStr, Field(max_length=255, examples=["lady.gaga@bennett.tony"])]
 
 
 class AccountUserRead(IdSchema, CommonEventsSchema, AccountUserBase):
