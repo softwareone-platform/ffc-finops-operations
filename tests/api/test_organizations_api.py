@@ -95,7 +95,7 @@ async def test_get_all_organizations_multiple_pages(
     all_items = first_page_data["items"] + second_page_data["items"] + third_page_data["items"]
     all_external_ids = {item["operations_external_id"] for item in all_items}
     assert len(all_items) == 10
-    assert all_external_ids == {f"EXTERNAL_ID_{index}" for index in range(10)}
+    assert sorted(all_external_ids) == sorted({f"EXTERNAL_ID_{index}" for index in range(10)})
 
 
 # ====================

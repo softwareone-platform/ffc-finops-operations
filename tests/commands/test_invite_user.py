@@ -30,9 +30,7 @@ async def test_invite_user(
     assert "invited successfully" in captured.out.replace("\n", "")
 
     user_handler = UserHandler(db_session)
-    user = await user_handler.first(
-        User.email == "test@example.com",
-    )
+    user = await user_handler.first(where_clauses=[User.email == "test@example.com"])
     assert user is not None
     assert user.status == UserStatus.DRAFT
     assert user.name == "Test User"
@@ -77,9 +75,7 @@ async def test_invite_user_already_invited_force(
     db_session.expunge_all()
 
     user_handler = UserHandler(db_session)
-    db_user = await user_handler.first(
-        User.email == "test@example.com",
-    )
+    db_user = await user_handler.first(where_clauses=[User.email == "test@example.com"])
     assert db_user is not None
     assert db_user.status == UserStatus.DRAFT
     assert db_user.name == "Test User"
@@ -125,9 +121,7 @@ async def test_invite_user_already_invited(
     db_session.expunge_all()
 
     user_handler = UserHandler(db_session)
-    db_user = await user_handler.first(
-        User.email == "test@example.com",
-    )
+    db_user = await user_handler.first(where_clauses=[User.email == "test@example.com"])
     assert db_user is not None
     assert db_user.status == UserStatus.DRAFT
     assert db_user.name == "Test User"
@@ -175,9 +169,7 @@ async def test_invite_user_non_default_account(
     assert "invited successfully" in captured.out.replace("\n", "")
 
     user_handler = UserHandler(db_session)
-    user = await user_handler.first(
-        User.email == "test@example.com",
-    )
+    user = await user_handler.first(where_clauses=[User.email == "test@example.com"])
     assert user is not None
     assert user.status == UserStatus.DRAFT
     assert user.name == "Test User"

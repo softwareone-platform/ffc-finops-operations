@@ -100,7 +100,7 @@ async def get_users(user_repo: UserRepository, auth_context: CurrentAuthContext)
         return await paginate(
             user_repo,
             UserRead,
-            extra_conditions=[
+            where_clauses=[
                 User.accounts.any(
                     and_(
                         AccountUser.account_id == auth_context.account.id,  # type: ignore
@@ -118,6 +118,7 @@ async def get_users(user_repo: UserRepository, auth_context: CurrentAuthContext)
                     ),
                 ),
             ],
+            unique=True,
         )
 
 
@@ -199,8 +200,7 @@ async def validate_and_get_user(
 
     # let's fetch the first occurrence of the user with the provided email address.
     user = await user_handler.first(
-        User.email == data.email,
-        User.status != UserStatus.DELETED,
+        where_clauses=[User.email == data.email, User.status != UserStatus.DELETED]
     )
     if not user:
         user = User(
@@ -317,11 +317,12 @@ async def get_user_accounts(
     return await paginate(
         account_repo,
         AccountRead,
-        extra_conditions=[Account.users.any(account_user_filter)],
+        where_clauses=[Account.users.any(account_user_filter)],
         page_options=[
             joinedload(Account.users).joinedload(AccountUser.user),
             with_loader_criteria(AccountUser, account_user_filter),
         ],
+        unique=True,
     )
 
 
@@ -438,7 +439,7 @@ async def resend_user_invitation(
         raise HTTPException(status_code=status_code, detail=detail)
 
     account = await account_repository.first(
-        Account.id == account_id, Account.status != AccountStatus.DELETED
+        where_clauses=[Account.id == account_id, Account.status != AccountStatus.DELETED]
     )
 
     if not account or (
@@ -513,10 +514,12 @@ async def get_user_by_id(
         # No Authentication. We must verify the invitation token
         invitation_token = token
         account_user = await accountuser_repo.first(
-            AccountUser.invitation_token == invitation_token,
-            AccountUser.status.in_(
-                [AccountUserStatus.INVITED, AccountUserStatus.INVITATION_EXPIRED]
-            ),
+            where_clauses=[
+                AccountUser.invitation_token == invitation_token,
+                AccountUser.status.in_(
+                    [AccountUserStatus.INVITED, AccountUserStatus.INVITATION_EXPIRED]
+                ),
+            ]
         )
         if account_user is None:
             logger.error(f"Invalid invitation token for User with ID `{user_id}`.")
@@ -569,9 +572,11 @@ async def accept_user_invitation(
         ) from e
 
     account_user = await accountuser_handler.first(
-        AccountUser.user == user,
-        AccountUser.invitation_token == data.invitation_token,
-        AccountUser.status != AccountUserStatus.DELETED,
+        where_clauses=[
+            AccountUser.user == user,
+            AccountUser.invitation_token == data.invitation_token,
+            AccountUser.status != AccountUserStatus.DELETED,
+        ]
     )
     if not account_user:
         raise HTTPException(

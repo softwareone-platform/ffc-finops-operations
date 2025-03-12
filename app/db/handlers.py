@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import sqlalchemy
-from sqlalchemy import ColumnExpressionArgument, Exists, func, select, update
+from sqlalchemy import ColumnExpressionArgument, Select, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -172,21 +172,70 @@ class ModelHandler[M: BaseModel]:
 
         return await self.update(obj, data=column_updates)
 
-    async def fetch_page(
+    async def query_db(
         self,
-        limit: int = 50,
-        offset: int = 0,
-        extra_conditions: Sequence[ColumnExpressionArgument | Exists] | None = None,
-        options: list[ORMOption] | None = None,
+        where_clauses: Sequence[ColumnExpressionArgument] | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+        order_by: Sequence[ColumnExpressionArgument] | None = None,
+        options: Sequence[ORMOption] | None = None,
+        unique: bool = False,
     ) -> Sequence[M]:
-        query = select(self.model_cls).offset(offset).limit(limit).order_by("id")
-        if extra_conditions:
-            query = query.where(*extra_conditions)
-        orm_options = (self.default_options or []) + (options or [])
-        if orm_options:
-            query = query.options(*orm_options)
-        results = await self.session.execute(query)
-        return results.scalars().unique().all()
+        """
+                Executes a database query with filtering, pagination, ordering, and options.
+
+        This method allows for querying the database with conditions, applying additional
+        filters, controlling pagination, ordering results, and enabling optional query options.
+
+        Args:
+
+            where_clauses (Sequence[ColumnExpressionArgument | Exists] | None, optional):
+                - Additional conditions applied using `.where()`.
+                - Useful for combining multiple filters dynamically.
+                - Default is `None`.
+
+            limit (int | None, optional):
+                - Maximum number of results to return.
+                - If `None`, retrieves all results.
+                - Default is `50`.
+
+            offset (int, optional):
+                - Number of records to skip for pagination.
+                - Default is `0`.
+
+
+            order_by (str | None, optional):
+                - Column name used to order the results.
+                - Default is `"id"`.
+
+            options (list[ORMOption] | None, optional):
+                - SQLAlchemy ORM options to modify query behavior
+                (e.g., `joinedload` for relationships).
+                - Default is `None`.
+
+            unique: Boolean (`True`) or `False` (`False`).
+        Returns:
+            Sequence[M]:
+                - A list of objects matching the query.
+                - If no records are found, returns an empty list.
+
+        """
+        # default query
+        query = select(self.model_cls)
+        # add the default options, if any
+        query = self._apply_conditions_to_the_query(
+            query=query, where_clauses=where_clauses, options=options, order_by=order_by
+        )
+        if limit:
+            # apply limit
+            query = query.limit(limit)
+        if offset:
+            # apply offset
+            query = query.offset(offset)
+        results = await self.session.scalars(query)
+        if unique:
+            return results.unique().all()
+        return results.all()
 
     async def stream_scalars(
         self,
@@ -195,12 +244,9 @@ class ModelHandler[M: BaseModel]:
         batch_size: int = 100,
     ) -> AsyncGenerator[M, None]:
         query = select(self.model_cls)
-        if extra_conditions:
-            query = query.where(*extra_conditions)
-        if self.default_options:
-            query = query.options(*self.default_options)
-        if order_by:
-            query = query.order_by(*order_by)
+        query = self._apply_conditions_to_the_query(
+            query=query, where_clauses=extra_conditions, order_by=order_by
+        )
         result = await self.session.stream_scalars(
             query,
             execution_options={"yield_per": batch_size},
@@ -209,25 +255,31 @@ class ModelHandler[M: BaseModel]:
             yield row
         await result.close()
 
-    async def count(self, *extra_conditions: ColumnExpressionArgument) -> int:
+    async def count(
+        self,
+        where_clauses: list[ColumnExpressionArgument] | None = None,
+    ) -> int:
+        """
+        Counts the number of objects matching the given conditions.
+
+        Args:
+            *where_clauses (ColumnExpressionArgument): Filtering conditions.
+
+        Returns:
+            int: The count of matching records.
+        """
         query = select(func.count(self.model_cls.id))
-        if extra_conditions:
-            query = query.where(*extra_conditions)
+        if where_clauses:
+            query = query.where(*where_clauses)
         result = await self.session.execute(query)
         return result.scalars().one()
 
-    async def filter(self, *conditions: Any) -> Sequence[M]:
-        query = select(self.model_cls).where(*conditions)
-        if self.default_options:
-            query = query.options(*self.default_options)
-
-        results = await self.session.execute(query)
-        return results.scalars().all()
-
-    async def first(self, *conditions: Any) -> M | None:
-        query = select(self.model_cls).where(*conditions)
-        if self.default_options:
-            query = query.options(*self.default_options)
+    async def first(
+        self,
+        where_clauses: list[ColumnExpressionArgument] | None = None,
+    ) -> M | None:
+        query = select(self.model_cls).where(*where_clauses)
+        query = self._apply_conditions_to_the_query(query=query)
 
         result = await self.session.execute(query)
         return result.scalars().first()
@@ -246,6 +298,32 @@ class ModelHandler[M: BaseModel]:
                 f"Failed to save changes to {self.model_cls.__name__}: {e}."
             ) from e
         await self.session.refresh(obj)
+
+    def _apply_conditions_to_the_query(
+        self,
+        query: Select,
+        where_clauses: ColumnExpressionArgument | Sequence[ColumnExpressionArgument] | None = None,
+        options: Sequence[ColumnExpressionArgument] | None = None,
+        order_by: ColumnExpressionArgument | Sequence[ColumnExpressionArgument] | None = None,
+    ) -> Select:
+        """
+        Applies default options and extra conditions to the query.
+
+        Args:
+            query (Select): The query to modify.
+            where_clauses (list[ColumnExpressionArgument] | None): Additional query conditions.
+
+        Returns:
+            Select: The modified query.
+        """
+        if where_clauses:
+            query = query.where(*where_clauses)
+        orm_options = (self.default_options or []) + (options or [])
+        if order_by:
+            query = query.order_by(*order_by)
+        if orm_options:
+            query = query.options(*orm_options)
+        return query
 
 
 class EntitlementHandler(ModelHandler[Entitlement]):

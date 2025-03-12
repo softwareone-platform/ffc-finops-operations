@@ -98,7 +98,10 @@ async def validate_account_type_and_required_conditions(
             detail="You cannot create an Account of type Operations.",
         )
     if await account_repo.first(
-        Account.external_id == data.external_id, Account.status != AccountStatus.DELETED
+        where_clauses=[
+            Account.external_id == data.external_id,
+            Account.status != AccountStatus.DELETED,
+        ]
     ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -244,7 +247,7 @@ async def list_account_users(
     return await paginate(
         user_repo,
         UserRead,
-        extra_conditions=extra_conditions,
+        where_clauses=extra_conditions,
     )
 
 

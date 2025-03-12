@@ -25,9 +25,11 @@ async def test_create_op_account(
     account_handler = AccountHandler(db_session)
     assert (
         await account_handler.count(
-            Account.type == AccountType.OPERATIONS,
-            Account.status == AccountStatus.ACTIVE,
-            Account.external_id == "ACC-1234-5678",
+            where_clauses=[
+                Account.type == AccountType.OPERATIONS,
+                Account.status == AccountStatus.ACTIVE,
+                Account.external_id == "ACC-1234-5678",
+            ]
         )
         == 1
     )
@@ -56,7 +58,10 @@ async def test_create_op_account_exist(
     assert "The Operations Account already exist" in captured.out.replace("\n", "")
     assert (
         await account_handler.count(
-            Account.type == AccountType.OPERATIONS, Account.status == AccountStatus.ACTIVE
+            where_clauses=[
+                Account.type == AccountType.OPERATIONS,
+                Account.status == AccountStatus.ACTIVE,
+            ]
         )
         == 1
     )

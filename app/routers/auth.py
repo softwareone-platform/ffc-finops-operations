@@ -31,8 +31,7 @@ async def start_reset_password_flow(
     user_repo: UserRepository,
 ):
     user = await user_repo.first(
-        User.email == email,
-        User.status == UserStatus.ACTIVE,
+        where_clauses=[User.email == email, User.status == UserStatus.ACTIVE]
     )
 
     if user and (
