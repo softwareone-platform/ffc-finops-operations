@@ -25,6 +25,7 @@ from app.enums import (
     AccountStatus,
     AccountType,
     AccountUserStatus,
+    EntitlementStatus,
     OrganizationStatus,
     SystemStatus,
     UserStatus,
@@ -166,6 +167,7 @@ def entitlement_factory(
         created_by: Actor | None = None,
         updated_by: Actor | None = None,
         owner: Account | None = None,
+        status: EntitlementStatus | None = None,
     ) -> Entitlement:
         entitlement = Entitlement(
             name=name or "AWS",
@@ -173,6 +175,7 @@ def entitlement_factory(
             datasource_id=datasource_id or faker.uuid4(),
             created_by=created_by,
             updated_by=updated_by,
+            status=status or EntitlementStatus.NEW,
             owner=owner or await account_factory(),
         )
         db_session.add(entitlement)
