@@ -286,9 +286,9 @@ def user_factory(
 
 
 @pytest.fixture
-def jwt_token_factory() -> (
-    Callable[[str, str, str | None, datetime | None, datetime | None, datetime | None], str]
-):
+def jwt_token_factory() -> Callable[
+    [str, str, str | None, datetime | None, datetime | None, datetime | None], str
+]:
     def _jwt_token(
         subject: str,
         secret: str,
