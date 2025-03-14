@@ -11,7 +11,7 @@ from app.cli import app
 
 def test_openapi(mocker: MockerFixture):
     spec = {"test": "openapi"}
-    mocker.patch("app.commands.openapi.get_openapi", return_value=spec)
+    mocker.patch("app.commands.openapi.generate_openapi_spec", return_value=spec)
     mocked_open = mocker.mock_open()
     mocker.patch("app.commands.openapi.open", mocked_open)
 
@@ -26,7 +26,7 @@ def test_openapi(mocker: MockerFixture):
 
 def test_openapi_custom_output(mocker: MockerFixture):
     spec = {"test": "openapi"}
-    mocker.patch("app.commands.openapi.get_openapi", return_value=spec)
+    mocker.patch("app.commands.openapi.generate_openapi_spec", return_value=spec)
     mocked_open = mocker.mock_open()
     mocker.patch("app.commands.openapi.open", mocked_open)
 

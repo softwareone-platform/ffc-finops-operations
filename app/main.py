@@ -1,5 +1,6 @@
 import logging
 from contextlib import asynccontextmanager
+from functools import partial
 
 import fastapi_pagination
 from fastapi import Depends, FastAPI
@@ -8,6 +9,7 @@ from fastapi.routing import APIRoute, APIRouter
 from app.auth.auth import authentication_required
 from app.conf import get_settings
 from app.db import verify_db_connection
+from app.openapi import generate_openapi_spec
 from app.routers import (
     accounts,
     auth,
@@ -134,6 +136,9 @@ def setup_app():
     )
 
     app.include_router(auth.router, prefix="/auth", tags=["Auth"])
+
+    app.openapi = partial(generate_openapi_spec, app)
+
     return app
 
 
