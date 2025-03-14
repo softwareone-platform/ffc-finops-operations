@@ -41,6 +41,7 @@ async def test_timestamp_mixin(db_session: AsyncSession):
     org = Organization(
         name="Test Org",
         currency="EUR",
+        billing_currency="EUR",
         operations_external_id="test-org",
     )
     db_session.add(org)
@@ -59,6 +60,7 @@ async def test_id_mixin(mocker: MockerFixture, db_session: AsyncSession):
     org = Organization(
         name="Test Org",
         currency="EUR",
+        billing_currency="EUR",
         operations_external_id="test-org",
     )
     db_session.add(org)
@@ -73,6 +75,7 @@ async def test_id_mixin(mocker: MockerFixture, db_session: AsyncSession):
     new_org = Organization(
         name="Test Org",
         currency="EUR",
+        billing_currency="EUR",
         operations_external_id="test-org",
     )
     db_session.add(new_org)
@@ -87,6 +90,7 @@ async def test_auditable_mixin(db_session: AsyncSession, ffc_extension: System):
     org = Organization(
         name="Test Org",
         currency="EUR",
+        billing_currency="EUR",
         operations_external_id="test-org",
         created_by=ffc_extension,
         updated_by=ffc_extension,
@@ -126,6 +130,7 @@ async def test_organization_unique_external_id(db_session: AsyncSession):
     org1 = Organization(
         name="Test Org 1",
         currency="EUR",
+        billing_currency="EUR",
         operations_external_id="test-org",
     )
     db_session.add(org1)
@@ -136,6 +141,7 @@ async def test_organization_unique_external_id(db_session: AsyncSession):
     org2 = Organization(
         name="Test Org 2",
         currency="EUR",
+        billing_currency="EUR",
         operations_external_id="test-org",
     )
     db_session.add(org2)

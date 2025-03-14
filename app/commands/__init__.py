@@ -1,4 +1,5 @@
 from app.commands import (
+    calculate_accounts_stats,
     check_expired_invitations,
     create_operations_account,
     invite_user,
@@ -12,4 +13,5 @@ __all__ = [
     "invite_user",
     "openapi",
     "redeem_entitlements",
+    "calculate_accounts_stats",
 ]
