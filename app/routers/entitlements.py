@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import ColumnExpressionArgument
 
 from app.api_clients import OptscaleClient
+from app.auth.auth import check_operations_account
 from app.db.handlers import NotFoundError
 from app.db.models import Account, Entitlement
 from app.dependencies import (
@@ -143,7 +144,11 @@ async def delete_entitlement_by_id(
     pass
 
 
-@router.post("/{id}/redeem", response_model=EntitlementRead)
+@router.post(
+    "/{id}/redeem",
+    response_model=EntitlementRead,
+    dependencies=[Depends(check_operations_account)],
+)
 async def redeem_entitlement(
     entitlement: Annotated[Entitlement, Depends(fetch_entitlement_or_404)],
     redeem_info: EntitlementRedeemInput,
@@ -152,12 +157,6 @@ async def redeem_entitlement(
     auth_context: CurrentAuthContext,
     optscale_client: OptscaleClient,
 ):
-    if auth_context and auth_context.account.type != AccountType.OPERATIONS:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only Operations accounts can redeem entitlements.",
-        )
-
     if entitlement.status != EntitlementStatus.NEW:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

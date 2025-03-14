@@ -603,7 +603,6 @@ async def test_redeem_entitlement_by_affiliate(
     )
 
     assert response.status_code == 403
-    assert response.json()["detail"] == "Only Operations accounts can redeem entitlements."
 
 
 async def test_redeem_non_new_entitlement(
