@@ -356,6 +356,18 @@ class EntitlementHandler(ModelHandler[Entitlement]):
             },
         )
 
+    async def get_stats_by_account(self, account_id: str) -> Sequence:
+        stmt = (
+            select(Entitlement.status, func.count(Entitlement.id))
+            .where(
+                Entitlement.owner_id == account_id, Entitlement.status != EntitlementStatus.DELETED
+            )
+            .group_by(Entitlement.status)
+        )
+
+        response = await self.session.execute(stmt)
+        return dict(list(response.tuples()))
+
     async def redeem(
         self,
         entitlement: Entitlement,
