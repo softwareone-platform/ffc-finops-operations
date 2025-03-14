@@ -60,25 +60,25 @@ async def redeem_entitlements(
                 match datasource["type"]:
                     case "azure_tenant" | "gcp_tenant":
                         console.print(
-                            f"\tFound {datasource["type"]} {datasource['account_id']}, skip it"
+                            f"\tFound {datasource['type']} {datasource['account_id']}, skip it"
                         )
                         continue
                     case "azure_cnr":
                         console.print(
-                            f"\t[khaki3]Found Azure CNR {datasource["account_id"]}[/khaki3]"
+                            f"\t[khaki3]Found Azure CNR {datasource['account_id']}[/khaki3]"
                         )
                     case "aws_cnr":
                         console.print(
-                            f"\t[khaki3]Found AWS CNR {datasource["account_id"]}[/khaki3]"
+                            f"\t[khaki3]Found AWS CNR {datasource['account_id']}[/khaki3]"
                         )
                     case "gcp_cnr":
                         console.print(
-                            f"\t[khaki3]Found GCP CNR {datasource["account_id"]}[/khaki3]"
+                            f"\t[khaki3]Found GCP CNR {datasource['account_id']}[/khaki3]"
                         )
                     case _:
                         console.print(
                             "\t[orange3]Unsupported datasource type "
-                            f"{datasource["type"]}, skip it[/orange3]"
+                            f"{datasource['type']}, skip it[/orange3]"
                         )
                         continue
                 try:

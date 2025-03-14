@@ -175,7 +175,7 @@ class PasswordInputSchema(BaseSchema):
             errors.append("Must contain at least one special character (e.g., !@#$%^&*)")
 
         if errors:
-            raise ValueError(f"{", ".join(errors)}.")
+            raise ValueError(f"{', '.join(errors)}.")
 
         return secret_value
 

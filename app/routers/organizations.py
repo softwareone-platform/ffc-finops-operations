@@ -107,8 +107,7 @@ async def get_datasources_by_organization_id(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                f"Organization {organization.name} has no associated "
-                "FinOps for Cloud organization."
+                f"Organization {organization.name} has no associated FinOps for Cloud organization."
             ),
         )
 
@@ -142,8 +141,7 @@ async def get_datasource_by_id(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                f"Organization {organization.name} has no associated "
-                "FinOps for Cloud organization."
+                f"Organization {organization.name} has no associated FinOps for Cloud organization."
             ),
         )
 
@@ -171,8 +169,7 @@ async def get_employees_by_organization_id(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                f"Organization {organization.name} has no associated "
-                "FinOps for Cloud organization."
+                f"Organization {organization.name} has no associated FinOps for Cloud organization."
             ),
         )
 

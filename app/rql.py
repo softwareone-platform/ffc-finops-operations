@@ -1,0 +1,51 @@
+from urllib.parse import parse_qs
+
+from fastapi import Request
+from requela import FieldRule, ModelRQLRules, RelationshipRule
+from sqlalchemy.sql.selectable import Select
+
+from app.db.models import Account, Actor
+
+
+class ActorRules(ModelRQLRules):
+    __model__ = Actor
+
+    id = FieldRule()
+    name = FieldRule()
+    type = FieldRule()
+
+
+class TimestampMixin:
+    created_at = FieldRule(alias="events.created.at")
+    updated_at = FieldRule(alias="events.updated.at")
+    deleted_at = FieldRule(alias="events.deleted.at")
+
+
+class AuditableMixin(TimestampMixin):
+    created_by = RelationshipRule(alias="events.created.by", rules=ActorRules())
+    updated_by = RelationshipRule(alias="events.updated.by", rules=ActorRules())
+    deleted_by = RelationshipRule(alias="events.deleted.by", rules=ActorRules())
+
+
+class AccountRules(ModelRQLRules, AuditableMixin):
+    __model__ = Account
+
+    id = FieldRule()
+    name = FieldRule()
+    external_id = FieldRule()
+    type = FieldRule()
+    status = FieldRule()
+
+
+class RQLQuery:
+    def __init__(self, rules: ModelRQLRules):
+        self.rules = rules
+
+    def __call__(self, request: Request) -> Select | None:
+        qs = request.scope["query_string"].decode()
+        parsed = parse_qs(qs, keep_blank_values=True)
+        rql_tokens = [k for k, v in parsed.items() if v == [""]]
+        rql_expression = "&".join(rql_tokens)
+        if not rql_expression:
+            return None
+        return self.rules.build_query(rql_expression)

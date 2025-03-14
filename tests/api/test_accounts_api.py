@@ -20,6 +20,7 @@ from app.routers.accounts import (
 )
 from app.schemas.accounts import AccountCreate
 from tests.types import JWTTokenFactory, ModelFactory
+from tests.utils import SQLAlchemyCapturer
 
 
 @pytest.fixture
@@ -761,3 +762,94 @@ async def test_cannot_remove_deleted_user_from_account(
         data.get("detail")
         == f"The User `{user.id}` does not belong to the Account with ID `{operations_account.id}`."
     )
+
+
+async def test_get_account_with_filters(
+    account_factory: ModelFactory[Account],
+    api_client: AsyncClient,
+    ffc_jwt_token: str,
+    capsql: SQLAlchemyCapturer,
+):
+    account_1 = await account_factory(
+        name="First",
+    )
+    await account_factory(
+        name="Second",
+    )
+
+    response = await api_client.get(
+        "/accounts?eq(name,First)",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+    assert data["items"][0]["name"] == account_1.name
+
+
+async def test_get_accounts_with_filters_and_ordering(
+    account_factory: ModelFactory[Account],
+    api_client: AsyncClient,
+    ffc_jwt_token: str,
+    capsql: SQLAlchemyCapturer,
+):
+    await account_factory(
+        name="Pilly",
+        status=AccountStatus.ACTIVE,
+    )
+    await account_factory(
+        name="Vanilly",
+        status=AccountStatus.ACTIVE,
+    )
+    await account_factory(
+        name="Milly",
+        status=AccountStatus.DELETED,
+    )
+
+    response = await api_client.get(
+        "/accounts?and(ilike(name,*lly),in(status,(active,disabled)))&order_by(name)",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == len(data["items"])
+    names = [item["name"] for item in data["items"]]
+    assert names == ["Pilly", "Vanilly"]
+
+
+async def test_get_accounts_with_filters_relationship(
+    account_factory: ModelFactory[Account],
+    api_client: AsyncClient,
+    system_factory: ModelFactory[System],
+    ffc_jwt_token: str,
+    capsql: SQLAlchemyCapturer,
+):
+    created_by = await system_factory(name="Oracle")
+
+    await account_factory(
+        name="Pilly",
+        status=AccountStatus.ACTIVE,
+        created_by=created_by,
+    )
+    await account_factory(
+        name="Vanilly",
+        status=AccountStatus.ACTIVE,
+    )
+    await account_factory(
+        name="Milly",
+        status=AccountStatus.ACTIVE,
+        created_by=created_by,
+    )
+
+    response = await api_client.get(
+        "/accounts?ilike(events.created.by.name,*racl*)&order_by(-name)",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == len(data["items"])
+    names = [item["name"] for item in data["items"]]
+    assert names == ["Pilly", "Milly"]

@@ -211,7 +211,7 @@ async def validate_and_get_user(
     if user.status == UserStatus.DISABLED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(f"The user {user.email} cannot be invited " "because it is disabled."),
+            detail=(f"The user {user.email} cannot be invited because it is disabled."),
         )
     if user.id:
         account_user = await accountuser_handler.get_account_user(

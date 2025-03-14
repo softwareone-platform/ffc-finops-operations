@@ -176,7 +176,7 @@ async def test_get_employee_by_email_lookup_error(
     assert response.status_code == 502
     assert response.json() == {
         "detail": (
-            "Error checking employee existence in FinOps " "for Cloud: 500 - Internal Server Error."
+            "Error checking employee existence in FinOps for Cloud: 500 - Internal Server Error."
         ),
     }
 

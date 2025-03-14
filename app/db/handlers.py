@@ -174,6 +174,7 @@ class ModelHandler[M: BaseModel]:
 
     async def query_db(
         self,
+        base_query: Select | None = None,
         where_clauses: Sequence[ColumnExpressionArgument] | None = None,
         limit: int | None = None,
         offset: int | None = None,
@@ -221,7 +222,7 @@ class ModelHandler[M: BaseModel]:
 
         """
         # default query
-        query = select(self.model_cls)
+        query = select(self.model_cls) if base_query is None else base_query
         # add the default options, if any
         query = self._apply_conditions_to_the_query(
             query=query, where_clauses=where_clauses, options=options, order_by=order_by
@@ -257,7 +258,8 @@ class ModelHandler[M: BaseModel]:
 
     async def count(
         self,
-        where_clauses: list[ColumnExpressionArgument] | None = None,
+        base_query: Select | None = None,
+        where_clauses: Sequence[ColumnExpressionArgument] | None = None,
     ) -> int:
         """
         Counts the number of objects matching the given conditions.
@@ -268,7 +270,14 @@ class ModelHandler[M: BaseModel]:
         Returns:
             int: The count of matching records.
         """
-        query = select(func.count(self.model_cls.id))
+        if base_query is not None:
+            query = select(func.count(self.model_cls.id)).select_from(
+                base_query.get_final_froms()[0]
+            )
+            if base_query.whereclause is not None:
+                query = query.where(base_query.whereclause)
+        else:
+            query = select(func.count(self.model_cls.id))
         if where_clauses:
             query = query.where(*where_clauses)
         result = await self.session.execute(query)
@@ -276,10 +285,10 @@ class ModelHandler[M: BaseModel]:
 
     async def first(
         self,
-        where_clauses: list[ColumnExpressionArgument] | None = None,
+        where_clauses: Sequence[ColumnExpressionArgument] | None = None,
     ) -> M | None:
-        query = select(self.model_cls).where(*where_clauses)
-        query = self._apply_conditions_to_the_query(query=query)
+        query = select(self.model_cls)
+        query = self._apply_conditions_to_the_query(query=query, where_clauses=where_clauses)
 
         result = await self.session.execute(query)
         return result.scalars().first()
@@ -302,9 +311,9 @@ class ModelHandler[M: BaseModel]:
     def _apply_conditions_to_the_query(
         self,
         query: Select,
-        where_clauses: ColumnExpressionArgument | Sequence[ColumnExpressionArgument] | None = None,
-        options: Sequence[ColumnExpressionArgument] | None = None,
-        order_by: ColumnExpressionArgument | Sequence[ColumnExpressionArgument] | None = None,
+        where_clauses: Sequence[ColumnExpressionArgument] | None = None,
+        options: Sequence[ORMOption] | None = None,
+        order_by: Sequence[ColumnExpressionArgument] | None = None,
     ) -> Select:
         """
         Applies default options and extra conditions to the query.
@@ -318,7 +327,7 @@ class ModelHandler[M: BaseModel]:
         """
         if where_clauses:
             query = query.where(*where_clauses)
-        orm_options = (self.default_options or []) + (options or [])
+        orm_options = (list(self.default_options) or []) + (list(options or []))
         if order_by:
             query = query.order_by(*order_by)
         if orm_options:
@@ -363,7 +372,13 @@ class SystemHandler(ModelHandler[System]):
 
 
 class AccountHandler(ModelHandler[Account]):
-    pass
+    def __init__(self, session):
+        super().__init__(session)
+        self.default_options = [
+            joinedload(Account.created_by),
+            joinedload(Account.updated_by),
+            joinedload(Account.deleted_by),
+        ]
 
 
 class UserHandler(ModelHandler[User]):
