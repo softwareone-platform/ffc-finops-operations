@@ -1,12 +1,15 @@
+import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
 from httpx import AsyncClient
+from pytest_httpx import HTTPXMock
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.conf import Settings
 from app.db.models import Account, Entitlement, System
-from app.enums import AccountStatus, EntitlementStatus
+from app.enums import AccountStatus, DatasourceType, EntitlementStatus, OrganizationStatus
 from tests.types import JWTTokenFactory, ModelFactory
 
 # ====================
@@ -518,3 +521,235 @@ async def test_terminate_non_existant_entitlement(
     error_msg = response.json()["detail"]
 
     assert error_msg == f"Entitlement with ID `{entitlement_id}` wasn't found."
+
+
+# ==================
+# Redeem Entitlement
+# ==================
+
+
+async def test_redeem_entitlement_success(
+    operations_client: AsyncClient,
+    entitlement_gcp: Entitlement,
+    organization_factory,
+    db_session: AsyncSession,
+    httpx_mock: HTTPXMock,
+    test_settings: Settings,
+):
+    organization = await organization_factory(
+        name="Test Organization",
+        currency="USD",
+        operations_external_id="ORG-123456",
+        linked_organization_id="FORG-123456789012",
+    )
+
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{test_settings.opt_api_base_url}/cloud_accounts/{entitlement_gcp.datasource_id}?details=true",
+        match_headers={"Secret": test_settings.opt_cluster_secret},
+        json={
+            "id": entitlement_gcp.datasource_id,
+            "name": "GCP Dev Project",
+            "type": "gcp_cnr",
+            "organization_id": "FORG-123456789012",
+        },
+    )
+
+    response = await operations_client.post(
+        f"/entitlements/{entitlement_gcp.id}/redeem",
+        json={
+            "organization": {"id": organization.id},
+            "datasource": {
+                "id": entitlement_gcp.datasource_id,
+                "name": "GCP Dev Project",
+                "type": "gcp_cnr",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["id"] == str(entitlement_gcp.id)
+    assert data["status"] == "active"
+    assert data["linked_datasource_id"] == entitlement_gcp.datasource_id
+    assert data["linked_datasource_name"] == "GCP Dev Project"
+    assert data["linked_datasource_type"] == "gcp_cnr"
+    assert data["events"]["redeemed"]["at"] is not None
+    assert data["events"]["redeemed"]["by"]["id"] == organization.id
+
+    await db_session.refresh(entitlement_gcp)
+    assert entitlement_gcp.status == EntitlementStatus.ACTIVE
+    assert entitlement_gcp.redeemed_at is not None
+    assert entitlement_gcp.redeemed_by_id == organization.id
+    assert entitlement_gcp.linked_datasource_id == entitlement_gcp.datasource_id
+    assert entitlement_gcp.linked_datasource_name == "GCP Dev Project"
+    assert entitlement_gcp.linked_datasource_type == DatasourceType.GCP_CNR
+
+
+async def test_redeem_entitlement_by_affiliate(
+    affiliate_client: AsyncClient,
+    entitlement_gcp: Entitlement,
+):
+    response = await affiliate_client.post(
+        f"/entitlements/{entitlement_gcp.id}/redeem",
+        json={
+            "organization": {"id": "FORG-123456789012"},
+            "datasource": {
+                "id": entitlement_gcp.datasource_id,
+                "name": "GCP Dev Project",
+                "type": "gcp_cnr",
+            },
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Only Operations accounts can redeem entitlements."
+
+
+async def test_redeem_non_new_entitlement(
+    operations_client: AsyncClient,
+    entitlement_gcp: Entitlement,
+    db_session: AsyncSession,
+):
+    entitlement_gcp.status = EntitlementStatus.ACTIVE
+    db_session.add(entitlement_gcp)
+    await db_session.commit()
+    await db_session.refresh(entitlement_gcp)
+
+    response = await operations_client.post(
+        f"/entitlements/{entitlement_gcp.id}/redeem",
+        json={
+            "organization": {"id": "FORG-123456789012"},
+            "datasource": {
+                "id": entitlement_gcp.datasource_id,
+                "name": "GCP Dev Project",
+                "type": "gcp_cnr",
+            },
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == (
+        "Only new entitlements can be redeemed, current status is active."
+    )
+
+
+async def test_redeem_entitlement_datasource_mismatch(
+    operations_client: AsyncClient,
+    entitlement_gcp: Entitlement,
+):
+    different_datasource_id = str(uuid.uuid4())  # Different from the entitlement's datasource_id
+
+    response = await operations_client.post(
+        f"/entitlements/{entitlement_gcp.id}/redeem",
+        json={
+            "organization": {"id": "FORG-123456789012"},
+            "datasource": {
+                "id": different_datasource_id,
+                "name": "GCP Dev Project",
+                "type": "gcp_cnr",
+            },
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == (
+        f"Entitlement's datasource_id ({entitlement_gcp.datasource_id}) does not match "
+        f"the provided datasource_id ({different_datasource_id})."
+    )
+
+
+async def test_redeem_entitlement_inactive_organization(
+    operations_client: AsyncClient,
+    entitlement_gcp: Entitlement,
+    organization_factory,
+    db_session: AsyncSession,
+):
+    organization = await organization_factory(
+        name="Test Organization",
+        currency="USD",
+        operations_external_id="ORG-123456",
+        status=OrganizationStatus.CANCELLED,
+    )
+
+    response = await operations_client.post(
+        f"/entitlements/{entitlement_gcp.id}/redeem",
+        json={
+            "organization": {"id": organization.id},
+            "datasource": {
+                "id": entitlement_gcp.datasource_id,
+                "name": "GCP Dev Project",
+                "type": "gcp_cnr",
+            },
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == (
+        "Only active organizations can redeem entitlements, current status is cancelled."
+    )
+
+
+async def test_redeem_entitlement_datasource_organization_mismatch(
+    operations_client: AsyncClient,
+    entitlement_gcp: Entitlement,
+    organization_factory,
+    test_settings: Settings,
+    httpx_mock: HTTPXMock,
+):
+    organization = await organization_factory(
+        name="Test Organization",
+        currency="USD",
+        operations_external_id="ORG-123456",
+        linked_organization_id="FORG-123456789012",
+    )
+
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{test_settings.opt_api_base_url}/cloud_accounts/{entitlement_gcp.datasource_id}?details=true",
+        match_headers={"Secret": test_settings.opt_cluster_secret},
+        json={
+            "id": entitlement_gcp.datasource_id,
+            "name": "GCP Dev Project",
+            "type": "gcp_cnr",
+            "organization_id": "FORG-different-org-id",  # Different from the provided organization
+        },
+    )
+
+    response = await operations_client.post(
+        f"/entitlements/{entitlement_gcp.id}/redeem",
+        json={
+            "organization": {"id": organization.id},
+            "datasource": {
+                "id": entitlement_gcp.datasource_id,
+                "name": "GCP Dev Project",
+                "type": "gcp_cnr",
+            },
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == (
+        f"Datasource {entitlement_gcp.datasource_id} does not belong to organization "
+        f"{organization.id} on Optscale."
+    )
+
+
+async def test_redeem_non_existent_entitlement(operations_client: AsyncClient):
+    entitlement_id = "FENT-1234-5678-9012"
+
+    response = await operations_client.post(
+        f"/entitlements/{entitlement_id}/redeem",
+        json={
+            "organization": {"id": "FORG-123456789012"},
+            "datasource": {
+                "id": "datasource-id",
+                "name": "GCP Dev Project",
+                "type": "gcp_cnr",
+            },
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == f"Entitlement with ID `{entitlement_id}` wasn't found."
