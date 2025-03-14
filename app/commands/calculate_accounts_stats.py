@@ -1,14 +1,3 @@
-"""
-UPDATE Account SET new_ent_count
-
-
-SELECT status, count(id) from Entitlement where status != DELETED AND owner_id = account_id
-group_by status
-
-
-UPDATE Account
-"""
-
 import asyncio
 from contextlib import asynccontextmanager
 
@@ -19,7 +8,7 @@ from app.conf import Settings
 from app.db.base import get_db_engine, get_db_session
 from app.db.handlers import AccountHandler, EntitlementHandler
 from app.db.models import Account
-from app.enums import AccountStatus
+from app.enums import AccountStatus, EntitlementStatus
 
 BATCH_SIZE = 100
 
@@ -29,11 +18,7 @@ console = Console(highlighter=None)
 
 async def calculate_accounts_stats(settings: Settings):
     engine = get_db_engine(settings)
-    # stmt = select(
-    #     Account,
-    #     func.count().over(partition_by=Account.status).label("id")
-    # ).where(Account.status != AccountStatus.DELETED, Entitlement.owner_id == Account.id)
-    #
+
     async with asynccontextmanager(get_db_session)(engine) as session:
         entitlment_handler = EntitlementHandler(session)
         account_handler = AccountHandler(session)
@@ -42,18 +27,23 @@ async def calculate_accounts_stats(settings: Settings):
             where_clauses=[Account.status != AccountStatus.DELETED]
         )
         for account in accounts:
-            # print("account:", account.id, account.status, account.type)
-            response = await entitlment_handler.get_stats_by_account(account.id)
-            print("enti:", response)
+            stats = await entitlment_handler.get_stats_by_account(account.id)
             console.print(
-                "[blue]Fetching accounts: " f"[bold]{account.id} - {account.name}[/bold][/blue]",
+                f"[blue]Fetching accounts: [bold]{account.id} - {account.name}[/bold][/blue]",
             )
-        # async for account in account_hander.stream_scalars(stmt
-        # ):
-        #     console.print(
-        #         "[blue]Fetching accounts: "
-        #         f"[bold]{account.id} - {account.name}[/bold][/blue]",
-        #     )
+            await account_handler.update(
+                account,
+                data={
+                    "new_entitlements_count": stats.get(EntitlementStatus.NEW, 0),
+                    "active_entitlements_count": stats.get(EntitlementStatus.ACTIVE, 0),
+                    "terminated_entitlements_count": stats.get(EntitlementStatus.TERMINATED, 0),
+                },
+            )
+            console.print(
+                f"[blue]Account [bold]{account.id} - {account.name}[/bold][/blue] updated: "
+                f"new = {account.new_entitlements_count} active = {account.active_entitlements_count} "  # noqa: E501
+                f"terminated = {account.terminated_entitlements_count}"
+            )
 
 
 def command(

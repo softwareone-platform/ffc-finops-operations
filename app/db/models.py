@@ -4,7 +4,7 @@ import datetime
 from decimal import Decimal
 
 import sqlalchemy as sa
-from sqlalchemy import Enum, ForeignKey, Index, String, Text
+from sqlalchemy import Enum, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, mapped_column, relationship
 from sqlalchemy_utils import StringEncryptedType
 from sqlalchemy_utils.types.encrypted.encrypted_type import FernetEngine
@@ -121,6 +121,9 @@ class Account(Base, HumanReadablePKMixin, AuditableMixin):
     )
     external_id: Mapped[str] = mapped_column(String(255), nullable=False)
     users: Mapped[list[AccountUser]] = relationship(back_populates="account")
+    new_entitlements_count: Mapped[int] = mapped_column(Integer(), nullable=False, default=0)
+    active_entitlements_count: Mapped[int] = mapped_column(Integer(), nullable=False, default=0)
+    terminated_entitlements_count: Mapped[int] = mapped_column(Integer(), nullable=False, default=0)
 
     @property
     def account_user(self) -> AccountUser | None:
@@ -242,7 +245,7 @@ class Organization(Base, AuditableMixin, HumanReadablePKMixin):
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
-    billing_currency: Mapped[str] = mapped_column(String(3), nullable=True)
+    billing_currency: Mapped[str] = mapped_column(String(3), nullable=False)
     operations_external_id: Mapped[str] = mapped_column(String(255), nullable=False)
     linked_organization_id: Mapped[str | None] = mapped_column(
         String(255), nullable=True, index=True

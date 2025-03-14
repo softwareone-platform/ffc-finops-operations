@@ -95,9 +95,9 @@ def assert_num_queries(capsql: SQLAlchemyCapturer) -> Callable[[int], AbstractCo
         with capsql:
             yield
         executed = len(capsql.queries)
-        assert executed == num, (
-            f"The number of executed is {executed} not {num}:\n {'\n'.join(capsql.queries)}"
-        )
+        assert (
+            executed == num
+        ), f"The number of executed is {executed} not {num}:\n {'\n'.join(capsql.queries)}"
 
     return _assert_num_queries
 
@@ -307,9 +307,9 @@ def user_factory(
 
 
 @pytest.fixture
-def jwt_token_factory() -> Callable[
-    [str, str, str | None, datetime | None, datetime | None, datetime | None], str
-]:
+def jwt_token_factory() -> (
+    Callable[[str, str, str | None, datetime | None, datetime | None, datetime | None], str]
+):
     def _jwt_token(
         subject: str,
         secret: str,
