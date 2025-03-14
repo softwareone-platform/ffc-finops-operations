@@ -5,7 +5,8 @@ from typing import Annotated
 
 import typer
 import yaml
-from fastapi.openapi.utils import get_openapi
+
+from app.openapi import generate_openapi_spec
 
 
 class OutputFormat(str, Enum):
@@ -37,13 +38,7 @@ def command(
     from app import main
 
     dump_fn = json.dump if output_format == OutputFormat.json else yaml.dump
-    spec = get_openapi(
-        title=main.app.title,
-        version=main.app.version,
-        openapi_version=main.app.openapi_version,
-        description=main.app.description,
-        tags=main.app.openapi_tags,
-        routes=main.app.routes,
-    )
+    spec = generate_openapi_spec(main.app)
+
     with open(output, "w") as f:  # type: ignore
         dump_fn(spec, f, indent=2)
