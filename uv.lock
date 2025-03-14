@@ -702,6 +702,7 @@ dev = [
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
+    { name = "pytest-capsqlalchemy" },
     { name = "pytest-cov" },
     { name = "pytest-dotenv" },
     { name = "pytest-httpx" },
@@ -749,6 +750,7 @@ dev = [
     { name = "pre-commit", specifier = ">=4.0.1,<5.0" },
     { name = "pytest", specifier = ">=8.3.3,<9.0" },
     { name = "pytest-asyncio", specifier = ">=0.24.0,<1.0" },
+    { name = "pytest-capsqlalchemy", specifier = ">=0.2.0" },
     { name = "pytest-cov", specifier = ">=6.0.0,<7.0" },
     { name = "pytest-dotenv", specifier = ">=0.5.2,<1.0" },
     { name = "pytest-httpx", specifier = ">=0.34.0,<1.0" },
@@ -1075,6 +1077,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/f2/a8/ecbc8ede70921dd2f544ab1cadd3ff3bf842af27f87bbdea774c7baa1d38/pytest_asyncio-0.25.3.tar.gz", hash = "sha256:fc1da2cf9f125ada7e710b4ddad05518d4cee187ae9412e9ac9271003497f07a", size = 54239 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/67/17/3493c5624e48fd97156ebaec380dcaafee9506d7e2c46218ceebbb57d7de/pytest_asyncio-0.25.3-py3-none-any.whl", hash = "sha256:9e89518e0f9bd08928f97a3482fdc4e244df17529460bc038291ccaf8f85c7c3", size = 19467 },
+]
+
+[[package]]
+name = "pytest-capsqlalchemy"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "sqlalchemy", extra = ["asyncio"] },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d3/33/3da3038abbfbaa49d3fa7e76ae88050b66308ca9ad176cef47c64d1ab262/pytest_capsqlalchemy-0.2.0.tar.gz", hash = "sha256:1ac690d4c8d643c214ea86e558bbcaf155947004ecfd766156d12ecd1ef66199", size = 83248 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a9/35/7c9bfa18c082894262eab2de03501531a977a5d964bdbbba8a375eb59796/pytest_capsqlalchemy-0.2.0-py3-none-any.whl", hash = "sha256:d3f0a734c22788304de510f0176092b6402fd79107f0687c16508d95d4538b3a", size = 11956 },
 ]
 
 [[package]]

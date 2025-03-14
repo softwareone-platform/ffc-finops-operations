@@ -20,7 +20,6 @@ from app.routers.accounts import (
 )
 from app.schemas.accounts import AccountCreate
 from tests.types import JWTTokenFactory, ModelFactory
-from tests.utils import SQLAlchemyCapturer
 
 
 @pytest.fixture
@@ -768,7 +767,6 @@ async def test_get_account_with_filters(
     account_factory: ModelFactory[Account],
     api_client: AsyncClient,
     ffc_jwt_token: str,
-    capsql: SQLAlchemyCapturer,
 ):
     account_1 = await account_factory(
         name="First",
@@ -792,7 +790,6 @@ async def test_get_accounts_with_filters_and_ordering(
     account_factory: ModelFactory[Account],
     api_client: AsyncClient,
     ffc_jwt_token: str,
-    capsql: SQLAlchemyCapturer,
 ):
     await account_factory(
         name="Pilly",
@@ -824,7 +821,6 @@ async def test_get_accounts_with_filters_relationship(
     api_client: AsyncClient,
     system_factory: ModelFactory[System],
     ffc_jwt_token: str,
-    capsql: SQLAlchemyCapturer,
 ):
     created_by = await system_factory(name="Oracle")
 

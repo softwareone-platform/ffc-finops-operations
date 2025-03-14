@@ -52,6 +52,7 @@ dev = [
     "pytest-dotenv>=0.5.2,<1.0",
     "time-machine>=2.16.0,<3.0",
     "pdbr[ipython]>=0.9.0",
+    "pytest-capsqlalchemy>=0.2.0",
 ]
 
 [project.scripts]

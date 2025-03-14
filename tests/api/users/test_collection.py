@@ -1,5 +1,3 @@
-from collections.abc import Callable
-from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
@@ -36,7 +34,6 @@ async def test_operations_account_can_always_get_user_by_id(
     operations_client: AsyncClient,
     test_settings: Settings,
     account_status: str,
-    assert_num_queries: Callable[[int], AbstractContextManager[None]],
 ):
     user = await user_factory(
         name="Invited User",
@@ -564,7 +561,6 @@ async def test_affiliate_cannot_enable_user(
 async def test_affiliate_can_update_user_name(
     affiliate_client: AsyncClient,
     user_factory: ModelFactory[User],
-    assert_num_queries: Callable[[int], AbstractContextManager[None]],
 ):
     user = await user_factory(
         name="Peter Parker",
