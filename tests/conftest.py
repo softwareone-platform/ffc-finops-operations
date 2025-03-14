@@ -1,6 +1,7 @@
 import secrets
 import uuid
 from collections.abc import AsyncGenerator, Callable
+from contextlib import AbstractContextManager, contextmanager
 from datetime import UTC, datetime, timedelta
 
 import jwt
@@ -32,6 +33,7 @@ from app.enums import (
 from app.hasher import pbkdf2_sha256
 from tests.db.models import ModelForTests, ParentModelForTests  # noqa: F401
 from tests.types import ModelFactory
+from tests.utils import SQLAlchemyCapturer
 
 
 def pytest_collection_modifyitems(items):
@@ -79,6 +81,25 @@ def fastapi_app(test_settings: Settings, db_engine: AsyncEngine) -> FastAPI:
 async def app_lifespan_manager(fastapi_app: FastAPI) -> AsyncGenerator[LifespanManager, None]:
     async with LifespanManager(fastapi_app) as lifespan_manager:
         yield lifespan_manager
+
+
+@pytest.fixture(scope="session")
+def capsql(db_engine: AsyncEngine) -> SQLAlchemyCapturer:
+    return SQLAlchemyCapturer(db_engine)
+
+
+@pytest.fixture
+def assert_num_queries(capsql: SQLAlchemyCapturer) -> Callable[[int], AbstractContextManager[None]]:
+    @contextmanager
+    def _assert_num_queries(num: int):
+        with capsql:
+            yield
+        executed = len(capsql.queries)
+        assert (
+            executed == num
+        ), f"The number of executed is {executed} not {num}:\n {'\n'.join(capsql.queries)}"
+
+    return _assert_num_queries
 
 
 @pytest.fixture(autouse=True)
@@ -286,9 +307,9 @@ def user_factory(
 
 
 @pytest.fixture
-def jwt_token_factory() -> Callable[
-    [str, str, str | None, datetime | None, datetime | None, datetime | None], str
-]:
+def jwt_token_factory() -> (
+    Callable[[str, str, str | None, datetime | None, datetime | None, datetime | None], str]
+):
     def _jwt_token(
         subject: str,
         secret: str,
