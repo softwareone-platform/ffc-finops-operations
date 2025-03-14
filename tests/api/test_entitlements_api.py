@@ -1,4 +1,3 @@
-import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -632,31 +631,6 @@ async def test_redeem_non_new_entitlement(
     assert response.status_code == 400
     assert response.json()["detail"] == (
         "Only new entitlements can be redeemed, current status is active."
-    )
-
-
-async def test_redeem_entitlement_datasource_mismatch(
-    operations_client: AsyncClient,
-    entitlement_gcp: Entitlement,
-):
-    different_datasource_id = str(uuid.uuid4())  # Different from the entitlement's datasource_id
-
-    response = await operations_client.post(
-        f"/entitlements/{entitlement_gcp.id}/redeem",
-        json={
-            "organization": {"id": "FORG-123456789012"},
-            "datasource": {
-                "id": different_datasource_id,
-                "name": "GCP Dev Project",
-                "type": "gcp_cnr",
-            },
-        },
-    )
-
-    assert response.status_code == 400
-    assert response.json()["detail"] == (
-        f"Entitlement's datasource_id ({entitlement_gcp.datasource_id}) does not match "
-        f"the provided datasource_id ({different_datasource_id})."
     )
 
 

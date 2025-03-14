@@ -167,15 +167,6 @@ async def redeem_entitlement(
             ),
         )
 
-    if str(entitlement.datasource_id) != str(redeem_info.datasource.id):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                f"Entitlement's datasource_id ({entitlement.datasource_id}) does not match "
-                f"the provided datasource_id ({redeem_info.datasource.id})."
-            ),
-        )
-
     redeemer_organization = await organization_repo.get(redeem_info.organization.id)
 
     if redeemer_organization.status != OrganizationStatus.ACTIVE:
