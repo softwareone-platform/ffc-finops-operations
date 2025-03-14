@@ -1,6 +1,6 @@
 import datetime
-import uuid
 from typing import Annotated
+from uuid import UUID
 
 from pydantic import Field
 
@@ -65,5 +65,12 @@ class EntitlementRead(IdSchema, EntitlementBase):
     events: EntitlementsEventsSchema
 
 
-class EntitlementRedeem(BaseSchema):
-    organization_id: uuid.UUID
+class DatasourceInfo(BaseSchema):
+    id: UUID
+    name: str
+    type: DatasourceType
+
+
+class EntitlementRedeemInput(BaseSchema):
+    organization: IdSchema
+    datasource: DatasourceInfo

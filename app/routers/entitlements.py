@@ -3,6 +3,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import ColumnExpressionArgument
 
+from app.api_clients import OptscaleClient
+from app.auth.auth import check_operations_account
 from app.db.handlers import NotFoundError
 from app.db.models import Account, Entitlement
 from app.dependencies import (
@@ -10,11 +12,16 @@ from app.dependencies import (
     CurrentAuthContext,
     EntitlementId,
     EntitlementRepository,
+    OrganizationRepository,
 )
-from app.enums import AccountStatus, AccountType, EntitlementStatus
+from app.enums import AccountStatus, AccountType, EntitlementStatus, OrganizationStatus
 from app.pagination import LimitOffsetPage, paginate
 from app.schemas.core import convert_model_to_schema, convert_schema_to_model
-from app.schemas.entitlements import EntitlementCreate, EntitlementRead, EntitlementRedeem
+from app.schemas.entitlements import (
+    EntitlementCreate,
+    EntitlementRead,
+    EntitlementRedeemInput,
+)
 
 # ============
 # Dependencies
@@ -137,9 +144,59 @@ async def delete_entitlement_by_id(
     pass
 
 
-@router.post("/{id}/redeem", response_model=EntitlementRead)
+@router.post(
+    "/{id}/redeem",
+    response_model=EntitlementRead,
+    dependencies=[Depends(check_operations_account)],
+)
 async def redeem_entitlement(
     entitlement: Annotated[Entitlement, Depends(fetch_entitlement_or_404)],
-    redeem_info: EntitlementRedeem,
+    redeem_info: EntitlementRedeemInput,
+    organization_repo: OrganizationRepository,
+    entitlement_repo: EntitlementRepository,
+    auth_context: CurrentAuthContext,
+    optscale_client: OptscaleClient,
 ):
-    pass
+    if entitlement.status != EntitlementStatus.NEW:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Only new entitlements can be redeemed, "
+                f"current status is {entitlement.status.value}."
+            ),
+        )
+
+    redeemer_organization = await organization_repo.get(redeem_info.organization.id)
+
+    if redeemer_organization.status != OrganizationStatus.ACTIVE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Only active organizations can redeem entitlements, "
+                f"current status is {redeemer_organization.status.value}."
+            ),
+        )
+
+    optscale_datasource_response = await optscale_client.fetch_datasource_by_id(
+        redeem_info.datasource.id
+    )
+    optscale_datasource = optscale_datasource_response.json()
+
+    if optscale_datasource["organization_id"] != redeemer_organization.linked_organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Datasource {redeem_info.datasource.id} does not belong to organization "
+                f"{redeemer_organization.id} on Optscale."
+            ),
+        )
+
+    entitlement = await entitlement_repo.redeem(
+        entitlement,
+        redeemer_organization=redeemer_organization,
+        datasource_id=redeem_info.datasource.id,
+        datasource_name=redeem_info.datasource.name,
+        datasource_type=redeem_info.datasource.type,
+    )
+
+    return convert_model_to_schema(EntitlementRead, entitlement)

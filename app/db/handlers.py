@@ -4,6 +4,7 @@ from collections.abc import AsyncGenerator, Sequence
 from contextlib import suppress
 from datetime import UTC, datetime
 from typing import Any
+from uuid import UUID
 
 import sqlalchemy
 from sqlalchemy import ColumnExpressionArgument, Select, func, select, update
@@ -347,11 +348,31 @@ class EntitlementHandler(ModelHandler[Entitlement]):
 
     async def terminate(self, entitlement: Entitlement) -> Entitlement:
         return await self.update(
-            entitlement.id,
+            entitlement,
             data={
                 "status": EntitlementStatus.TERMINATED,
                 "terminated_at": datetime.now(UTC),
                 "terminated_by": auth_context.get().get_actor(),
+            },
+        )
+
+    async def redeem(
+        self,
+        entitlement: Entitlement,
+        redeemer_organization: Organization,
+        datasource_id: UUID | str,
+        datasource_name: str,
+        datasource_type: str,
+    ) -> Entitlement:
+        return await self.update(
+            entitlement,
+            data={
+                "status": EntitlementStatus.ACTIVE,
+                "redeemed_at": datetime.now(UTC),
+                "redeemed_by": redeemer_organization,
+                "linked_datasource_id": str(datasource_id),
+                "linked_datasource_type": datasource_type,
+                "linked_datasource_name": datasource_name,
             },
         )
 
