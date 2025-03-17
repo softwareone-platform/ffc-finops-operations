@@ -11,6 +11,7 @@ from faker import Faker
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from pytest_asyncio import is_async_test
+from pytest_capsqlalchemy import SQLAlchemyCapturer
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -33,7 +34,6 @@ from app.enums import (
 from app.hasher import pbkdf2_sha256
 from tests.db.models import ModelForTests, ParentModelForTests  # noqa: F401
 from tests.types import ModelFactory
-from tests.utils import SQLAlchemyCapturer
 
 
 def pytest_collection_modifyitems(items):
