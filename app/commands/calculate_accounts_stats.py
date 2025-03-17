@@ -17,6 +17,12 @@ console = Console(highlighter=None)
 
 
 async def calculate_accounts_stats(settings: Settings):
+    """
+    This command calculates the stats about all the entitlements linked to
+    all the fetched accounts.
+    The Account Model is then updated with the count for each entitlement's status that
+    is not DELETED.
+    """
     engine = get_db_engine(settings)
 
     async with asynccontextmanager(get_db_session)(engine) as session:

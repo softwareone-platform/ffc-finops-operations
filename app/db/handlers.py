@@ -356,7 +356,14 @@ class EntitlementHandler(ModelHandler[Entitlement]):
             },
         )
 
-    async def get_stats_by_account(self, account_id: str) -> Sequence:
+    async def get_stats_by_account(self, account_id: str) -> dict[str, Any]:
+        """
+        Fetches and counts all the Entitlement statues different from DELETED that are linked to the
+        given account_id.
+        Returns : a dict like
+        {<EntitlementStatus.NEW: 'new'>: 15, <EntitlementStatus.ACTIVE: 'active'>: 30,
+        <EntitlementStatus.TERMINATED: 'terminated'>: 7}
+        """
         stmt = (
             select(Entitlement.status, func.count(Entitlement.id))
             .where(
