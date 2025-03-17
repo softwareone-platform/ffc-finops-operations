@@ -356,6 +356,25 @@ class EntitlementHandler(ModelHandler[Entitlement]):
             },
         )
 
+    async def get_stats_by_account(self, account_id: str) -> dict[str, Any]:
+        """
+        Fetches and counts all the Entitlement statues different from DELETED that are linked to the
+        given account_id.
+        Returns : a dict like
+        {<EntitlementStatus.NEW: 'new'>: 15, <EntitlementStatus.ACTIVE: 'active'>: 30,
+        <EntitlementStatus.TERMINATED: 'terminated'>: 7}
+        """
+        stmt = (
+            select(Entitlement.status, func.count(Entitlement.id))
+            .where(
+                Entitlement.owner_id == account_id, Entitlement.status != EntitlementStatus.DELETED
+            )
+            .group_by(Entitlement.status)
+        )
+
+        response = await self.session.execute(stmt)
+        return dict(list(response.tuples()))
+
     async def redeem(
         self,
         entitlement: Entitlement,
@@ -375,18 +394,6 @@ class EntitlementHandler(ModelHandler[Entitlement]):
                 "linked_datasource_name": datasource_name,
             },
         )
-
-    async def get_stats_by_account(self, account_id: str) -> Sequence:
-        stmt = (
-            select(Entitlement.status, func.count(Entitlement.id))
-            .where(
-                Entitlement.owner_id == account_id, Entitlement.status != EntitlementStatus.DELETED
-            )
-            .group_by(Entitlement.status)
-        )
-
-        response = await self.session.execute(stmt)
-        return dict(list(response.tuples()))
 
 
 class OrganizationHandler(ModelHandler[Organization]):
