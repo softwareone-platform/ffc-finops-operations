@@ -1,7 +1,6 @@
 import secrets
 import uuid
 from collections.abc import AsyncGenerator, Callable
-from contextlib import AbstractContextManager, contextmanager
 from datetime import UTC, datetime, timedelta
 
 import jwt
@@ -11,7 +10,6 @@ from faker import Faker
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from pytest_asyncio import is_async_test
-from pytest_capsqlalchemy import SQLAlchemyCapturer
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -81,25 +79,6 @@ def fastapi_app(test_settings: Settings, db_engine: AsyncEngine) -> FastAPI:
 async def app_lifespan_manager(fastapi_app: FastAPI) -> AsyncGenerator[LifespanManager, None]:
     async with LifespanManager(fastapi_app) as lifespan_manager:
         yield lifespan_manager
-
-
-@pytest.fixture(scope="session")
-def capsql(db_engine: AsyncEngine) -> SQLAlchemyCapturer:
-    return SQLAlchemyCapturer(db_engine)
-
-
-@pytest.fixture
-def assert_num_queries(capsql: SQLAlchemyCapturer) -> Callable[[int], AbstractContextManager[None]]:
-    @contextmanager
-    def _assert_num_queries(num: int):
-        with capsql:
-            yield
-        executed = len(capsql.queries)
-        assert executed == num, (
-            f"The number of executed is {executed} not {num}:\n {'\n'.join(capsql.queries)}"
-        )
-
-    return _assert_num_queries
 
 
 @pytest.fixture(autouse=True)
