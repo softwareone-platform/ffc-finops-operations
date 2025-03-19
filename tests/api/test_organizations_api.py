@@ -24,6 +24,136 @@ async def test_get_all_organizations_empty_db(api_client: AsyncClient, ffc_jwt_t
     assert response.json()["items"] == []
 
 
+async def test_get_organization_with_name_filter(
+    organization_factory: ModelFactory[Organization], api_client: AsyncClient, ffc_jwt_token: str
+):
+    organization_1 = await organization_factory(
+        operations_external_id="EXTERNAL_ID_1", name="SpiderMan"
+    )
+    await organization_factory(operations_external_id="EXTERNAL_ID_2")
+    print("organization_1", organization_1.__dict__)
+    response = await api_client.get(
+        f"/organizations?eq(name,{organization_1.name})",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    print("data", data)
+    assert data["total"] == 1
+    assert data["items"][0]["name"] == organization_1.name
+    assert len(data["items"]) == data["total"]
+
+
+async def test_get_organization_with_not_found_name_filter(
+    organization_factory: ModelFactory[Organization], api_client: AsyncClient, ffc_jwt_token: str
+):
+    organization_1 = await organization_factory(
+        operations_external_id="EXTERNAL_ID_1", name="Pippo"
+    )
+    await organization_factory(operations_external_id="EXTERNAL_ID_2", name="SpiderMan")
+    response = await api_client.get(
+        f"/organizations?ne(name,{organization_1.name})",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+    assert data["items"][0]["name"] == "SpiderMan"
+    assert len(data["items"]) == data["total"]
+
+
+async def test_get_organization_with_updated_at_filter(
+    organization_factory: ModelFactory[Organization], api_client: AsyncClient, ffc_jwt_token: str
+):
+    organization_1 = await organization_factory(operations_external_id="EXTERNAL_ID_1")
+    response = await api_client.get(
+        f"/organizations?eq(events.updated.at,{organization_1.updated_at.isoformat()})",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+    assert data["items"][0]["events"]["updated"]["at"] == organization_1.updated_at.strftime(
+        "%Y-%m-%dT%H:%M:%S.%fZ"
+    )  # noqa: E501
+    assert len(data["items"]) == data["total"]
+
+
+async def test_get_organization_with_created_at_filter(
+    organization_factory: ModelFactory[Organization], api_client: AsyncClient, ffc_jwt_token: str
+):
+    organization_1 = await organization_factory(operations_external_id="EXTERNAL_ID_1")
+    response = await api_client.get(
+        f"/organizations?eq(events.created.at,{organization_1.created_at.isoformat()})",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+    assert data["items"][0]["events"]["created"]["at"] == organization_1.created_at.strftime(
+        "%Y-%m-%dT%H:%M:%S.%fZ"
+    )  # noqa: E501
+    assert len(data["items"]) == data["total"]
+
+
+async def test_get_organization_with_currency_filter(
+    organization_factory: ModelFactory[Organization], api_client: AsyncClient, ffc_jwt_token: str
+):
+    organization_1 = await organization_factory(operations_external_id="EXTERNAL_ID_1")
+    print("organization_1", organization_1.__dict__)
+    response = await api_client.get(
+        f"/organizations?eq(currency,{organization_1.currency})",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+    assert data["items"][0]["currency"] == organization_1.currency
+    assert len(data["items"]) == data["total"]
+
+
+async def test_get_organization_with_billing_currency_filter(
+    organization_factory: ModelFactory[Organization], api_client: AsyncClient, ffc_jwt_token: str
+):
+    organization_1 = await organization_factory(operations_external_id="EXTERNAL_ID_1")
+    response = await api_client.get(
+        f"/organizations?eq(billing_currency,{organization_1.billing_currency})",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+    assert data["items"][0]["billing_currency"] == organization_1.billing_currency
+    assert len(data["items"]) == data["total"]
+
+
+async def test_get_organization_with_status_filter(
+    organization_factory: ModelFactory[Organization], api_client: AsyncClient, ffc_jwt_token: str
+):
+    await organization_factory(operations_external_id="EXTERNAL_ID_1")
+    response = await api_client.get(
+        "/organizations?eq(status,active)",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+    assert data["items"][0]["status"] == "active"
+    assert len(data["items"]) == data["total"]
+
+
+async def test_get_organization_with_not_valid_filter(
+    organization_factory: ModelFactory[Organization], api_client: AsyncClient, ffc_jwt_token: str
+):
+    await organization_factory(operations_external_id="EXTERNAL_ID_1")
+    with pytest.raises(ValueError):
+        await api_client.get(
+            "/organizations?eq(ciaociao,active)",
+            headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+        )
+
+
 async def test_get_all_organizations_single_page(
     organization_factory: ModelFactory[Organization], api_client: AsyncClient, ffc_jwt_token: str
 ):
@@ -34,13 +164,10 @@ async def test_get_all_organizations_single_page(
         "/organizations",
         headers={"Authorization": f"Bearer {ffc_jwt_token}"},
     )
-
     assert response.status_code == 200
     data = response.json()
-
     assert data["total"] == 2
     assert len(data["items"]) == data["total"]
-
     assert {organization_1.id, organization_2.id} == {item["id"] for item in data["items"]}
 
 

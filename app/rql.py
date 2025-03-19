@@ -1,10 +1,10 @@
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, quote
 
 from fastapi import Request
 from requela import FieldRule, ModelRQLRules, RelationshipRule
 from sqlalchemy.sql.selectable import Select
 
-from app.db.models import Account, Actor
+from app.db.models import Account, Actor, Organization
 
 
 class ActorRules(ModelRQLRules):
@@ -37,12 +37,24 @@ class AccountRules(ModelRQLRules, AuditableMixin):
     status = FieldRule()
 
 
+class OrganizationRules(ModelRQLRules, AuditableMixin):
+    __model__ = Organization
+
+    id = FieldRule()
+    name = FieldRule()
+    currency = FieldRule()
+    billing_currency = FieldRule()
+    status = FieldRule()
+
+
 class RQLQuery:
     def __init__(self, rules: ModelRQLRules):
         self.rules = rules
 
     def __call__(self, request: Request) -> Select | None:
-        qs = request.scope["query_string"].decode()
+        qs = quote(
+            request.scope["query_string"].decode(), safe="/&()=_.-~:,"
+        )  # make sure we can decode datetime
         parsed = parse_qs(qs, keep_blank_values=True)
         rql_tokens = [k for k, v in parsed.items() if v == [""]]
         rql_expression = "&".join(rql_tokens)

@@ -3,6 +3,7 @@ from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import Select
 
 from app.api_clients import APIModifierClient, OptscaleAuthClient, OptscaleClient
 from app.auth.auth import check_operations_account
@@ -12,6 +13,7 @@ from app.db.models import Organization
 from app.dependencies import OrganizationId, OrganizationRepository
 from app.enums import DatasourceType
 from app.pagination import LimitOffsetPage, paginate
+from app.rql import OrganizationRules, RQLQuery
 from app.schemas.core import convert_model_to_schema
 from app.schemas.employees import EmployeeRead
 from app.schemas.organizations import (
@@ -26,8 +28,11 @@ router = APIRouter(dependencies=[Depends(check_operations_account)])
 
 
 @router.get("", response_model=LimitOffsetPage[OrganizationRead])
-async def get_organizations(organization_repo: OrganizationRepository):
-    return await paginate(organization_repo, OrganizationRead)
+async def get_organizations(
+    organization_repo: OrganizationRepository,
+    base_query: Select = Depends(RQLQuery(OrganizationRules())),
+):
+    return await paginate(organization_repo, OrganizationRead, base_query=base_query)
 
 
 @router.post("", response_model=OrganizationRead, status_code=status.HTTP_201_CREATED)
