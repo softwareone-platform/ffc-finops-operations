@@ -31,7 +31,6 @@ async def test_get_organization_with_name_filter(
         operations_external_id="EXTERNAL_ID_1", name="SpiderMan"
     )
     await organization_factory(operations_external_id="EXTERNAL_ID_2")
-    print("organization_1", organization_1.__dict__)
     response = await api_client.get(
         f"/organizations?eq(name,{organization_1.name})",
         headers={"Authorization": f"Bearer {ffc_jwt_token}"},
@@ -39,7 +38,6 @@ async def test_get_organization_with_name_filter(
 
     assert response.status_code == 200
     data = response.json()
-    print("data", data)
     assert data["total"] == 1
     assert data["items"][0]["name"] == organization_1.name
     assert len(data["items"]) == data["total"]
@@ -101,7 +99,6 @@ async def test_get_organization_with_currency_filter(
     organization_factory: ModelFactory[Organization], api_client: AsyncClient, ffc_jwt_token: str
 ):
     organization_1 = await organization_factory(operations_external_id="EXTERNAL_ID_1")
-    print("organization_1", organization_1.__dict__)
     response = await api_client.get(
         f"/organizations?eq(currency,{organization_1.currency})",
         headers={"Authorization": f"Bearer {ffc_jwt_token}"},
