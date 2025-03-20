@@ -4,7 +4,7 @@ from fastapi import Request
 from requela import FieldRule, ModelRQLRules, RelationshipRule
 from sqlalchemy.sql.selectable import Select
 
-from app.db.models import Account, Actor, Entitlement, Organization
+from app.db.models import Account, Actor, Entitlement, Organization, System
 
 
 class ActorRules(ModelRQLRules):
@@ -25,6 +25,15 @@ class AuditableMixin(TimestampMixin):
     created_by = RelationshipRule(alias="events.created.by", rules=ActorRules())
     updated_by = RelationshipRule(alias="events.updated.by", rules=ActorRules())
     deleted_by = RelationshipRule(alias="events.deleted.by", rules=ActorRules())
+
+
+class SystemRules(ModelRQLRules, AuditableMixin):
+    __model__ = System
+
+    id = FieldRule()
+    external_id = FieldRule()
+    owner_id = FieldRule()
+    status = FieldRule()
 
 
 class EntitlementRules(ModelRQLRules, AuditableMixin):
