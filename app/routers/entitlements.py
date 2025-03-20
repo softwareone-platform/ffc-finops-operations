@@ -1,7 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import ColumnExpressionArgument
+from sqlalchemy import ColumnExpressionArgument, Select
 
 from app.api_clients import OptscaleClient
 from app.auth.auth import check_operations_account
@@ -16,6 +16,7 @@ from app.dependencies import (
 )
 from app.enums import AccountStatus, AccountType, EntitlementStatus, OrganizationStatus
 from app.pagination import LimitOffsetPage, paginate
+from app.rql import EntitlementRules, RQLQuery
 from app.schemas.core import convert_model_to_schema, convert_schema_to_model
 from app.schemas.entitlements import (
     EntitlementCreate,
@@ -63,9 +64,13 @@ router = APIRouter()
 
 @router.get("", response_model=LimitOffsetPage[EntitlementRead])
 async def get_entitlements(
-    entitlement_repo: EntitlementRepository, extra_conditions: CommonConditions
+    entitlement_repo: EntitlementRepository,
+    extra_conditions: CommonConditions,
+    base_query: Select = Depends(RQLQuery(EntitlementRules())),
 ):
-    return await paginate(entitlement_repo, EntitlementRead, where_clauses=extra_conditions)
+    return await paginate(
+        entitlement_repo, EntitlementRead, where_clauses=extra_conditions, base_query=base_query
+    )
 
 
 @router.post("", response_model=EntitlementRead, status_code=status.HTTP_201_CREATED)

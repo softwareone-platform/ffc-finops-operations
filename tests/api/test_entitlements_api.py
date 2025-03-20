@@ -241,7 +241,7 @@ async def test_get_all_entitlements_empty_db(api_client: AsyncClient, gcp_jwt_to
 
 
 async def test_get_all_entitlements_single_page(
-    entitlement_aws, entitlement_gcp, api_client: AsyncClient, gcp_jwt_token: str
+    entitlement_gcp: Entitlement, api_client: AsyncClient, gcp_jwt_token: str
 ):
     response = await api_client.get(
         "/entitlements",
@@ -253,6 +253,101 @@ async def test_get_all_entitlements_single_page(
 
     assert data["total"] == 1
     assert len(data["items"]) == data["total"]
+    assert data["items"][0]["id"] == entitlement_gcp.id
+
+
+async def test_get_all_entitlements_single_page_with_name_filter(
+    entitlement_gcp: Entitlement, api_client: AsyncClient, gcp_jwt_token: str
+):
+    response = await api_client.get(
+        "/entitlements?eq(name,GCP)",
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["total"] == 1
+    assert len(data["items"]) == data["total"]
+    assert data["items"][0]["id"] == entitlement_gcp.id
+
+
+async def test_get_all_entitlements_single_page_with_created_at_filter(
+    entitlement_gcp: Entitlement, api_client: AsyncClient, gcp_jwt_token: str
+):
+    response = await api_client.get(
+        f"/entitlements?eq(events.created.at,{entitlement_gcp.created_at.isoformat()})",
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["total"] == 1
+    assert len(data["items"]) == data["total"]
+    assert data["items"][0]["id"] == entitlement_gcp.id
+
+
+async def test_get_all_entitlements_single_page_with_updated_at_filter(
+    entitlement_gcp: Entitlement,
+    api_client: AsyncClient,
+    gcp_jwt_token: str,
+):
+    response = await api_client.get(
+        f"/entitlements?eq(events.updated.at,{entitlement_gcp.updated_at.isoformat()})",
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["total"] == 1
+    assert len(data["items"]) == data["total"]
+    assert data["items"][0]["id"] == entitlement_gcp.id
+
+
+async def test_get_all_entitlements_single_page_with_no_matching_name_filter(
+    entitlement_gcp: Entitlement, api_client: AsyncClient, gcp_jwt_token: str
+):
+    response = await api_client.get(
+        "/entitlements?ne(name,GCP)",
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["total"] == 0
+
+
+async def test_get_all_entitlements_single_page_with_datasource_id_filter(
+    entitlement_gcp: Entitlement, api_client: AsyncClient, gcp_jwt_token: str
+):
+    response = await api_client.get(
+        f"/entitlements?eq(datasource_id,{entitlement_gcp.datasource_id})",
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+    assert len(data["items"]) == data["total"]
+    assert data["items"][0]["id"] == entitlement_gcp.id
+
+
+async def test_get_all_entitlements_single_page_with_status_filter(
+    entitlement_gcp: Entitlement, api_client: AsyncClient, gcp_jwt_token: str
+):
+    response = await api_client.get(
+        "/entitlements?eq(status,new)",
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+    assert len(data["items"]) == data["total"]
+    assert data["items"][0]["status"] == "new"
     assert data["items"][0]["id"] == entitlement_gcp.id
 
 
