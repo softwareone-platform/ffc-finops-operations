@@ -65,6 +65,7 @@ class EntitlementRules(ModelRQLRules, AuditableMixin):
     status = FieldRule()
     redeemed_by = RelationshipRule(rules=OrganizationRules(), alias="events.redeemed.by")
     terminated_by = RelationshipRule(rules=ActorRules(), alias="events.terminated.by")
+    terminated_at = FieldRule(alias="events.terminated.at")
 
 
 class RQLQuery:
