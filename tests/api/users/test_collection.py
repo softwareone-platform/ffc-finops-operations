@@ -214,6 +214,109 @@ async def test_operators_can_always_list_users(
 
 
 @pytest.mark.parametrize(
+    ("useraccount_status", "http_status"),
+    [
+        (AccountUserStatus.ACTIVE, 200),
+        (AccountUserStatus.INVITED, 200),
+        (AccountUserStatus.INVITATION_EXPIRED, 200),
+        (AccountUserStatus.DELETED, 200),
+    ],
+)
+async def test_operators_can_always_list_users_with_email_in_filter(
+    operations_client: AsyncClient,
+    operations_account: Account,
+    accountuser_factory: ModelFactory[AccountUser],
+    user_factory: ModelFactory[User],
+    useraccount_status: str,
+    http_status: str,
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+    await accountuser_factory(
+        user_id=user.id, account_id=operations_account.id, status=useraccount_status
+    )
+
+    response = await operations_client.get("/users?eq(email,peter.parker@spiderman.com)")
+    data = response.json()
+    assert response.status_code == http_status
+    assert data.get("items")[0]["email"] == "peter.parker@spiderman.com"
+    assert isinstance(data.get("items"), list)
+
+
+async def test_get_user_with_status_in_filter(
+    operations_client: AsyncClient,
+    operations_account: Account,
+    accountuser_factory: ModelFactory[AccountUser],
+    user_factory: ModelFactory[User],
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+    await accountuser_factory(
+        user_id=user.id, account_id=operations_account.id, status=AccountUserStatus.ACTIVE
+    )
+
+    response = await operations_client.get("/users?eq(status,active)")
+    data = response.json()
+    assert response.status_code == 200
+    assert data.get("items")[0]["email"] == "peter.parker@spiderman.com"
+    assert isinstance(data.get("items"), list)
+
+
+async def test_get_user_with_created_at_in_filter(
+    operations_client: AsyncClient,
+    operations_account: Account,
+    accountuser_factory: ModelFactory[AccountUser],
+    user_factory: ModelFactory[User],
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+    await accountuser_factory(
+        user_id=user.id, account_id=operations_account.id, status=AccountUserStatus.ACTIVE
+    )
+
+    response = await operations_client.get(
+        f"/users?eq(events.created.at,{user.created_at.isoformat()})"
+    )
+    data = response.json()
+    assert response.status_code == 200
+    assert data.get("items")[0]["email"] == "peter.parker@spiderman.com"
+    assert isinstance(data.get("items"), list)
+
+
+async def test_get_user_with_updated_at_in_filter(
+    operations_client: AsyncClient,
+    operations_account: Account,
+    accountuser_factory: ModelFactory[AccountUser],
+    user_factory: ModelFactory[User],
+):
+    user = await user_factory(
+        name="Peter Parker",
+        email="peter.parker@spiderman.com",
+        status=UserStatus.ACTIVE,
+    )
+    await accountuser_factory(
+        user_id=user.id, account_id=operations_account.id, status=AccountUserStatus.ACTIVE
+    )
+
+    response = await operations_client.get(
+        f"/users?eq(events.updated.at,{user.updated_at.isoformat()})"
+    )
+    data = response.json()
+    assert response.status_code == 200
+    assert data.get("items")[0]["email"] == "peter.parker@spiderman.com"
+    assert isinstance(data.get("items"), list)
+
+
+@pytest.mark.parametrize(
     ("user_status", "http_status"),
     [
         (AccountUserStatus.ACTIVE, 200),
