@@ -4,7 +4,7 @@ from fastapi import Request
 from requela import FieldRule, ModelRQLRules, RelationshipRule
 from sqlalchemy.sql.selectable import Select
 
-from app.db.models import Account, Actor, Entitlement, Organization
+from app.db.models import Account, Actor, Entitlement, Organization, System
 
 
 class ActorRules(ModelRQLRules):
@@ -27,15 +27,6 @@ class AuditableMixin(TimestampMixin):
     deleted_by = RelationshipRule(alias="events.deleted.by", rules=ActorRules())
 
 
-class EntitlementRules(ModelRQLRules, AuditableMixin):
-    __model__ = Entitlement
-
-    id = FieldRule()
-    name = FieldRule()
-    datasource_id = FieldRule()
-    status = FieldRule()
-
-
 class AccountRules(ModelRQLRules, AuditableMixin):
     __model__ = Account
 
@@ -43,6 +34,15 @@ class AccountRules(ModelRQLRules, AuditableMixin):
     name = FieldRule()
     external_id = FieldRule()
     type = FieldRule()
+    status = FieldRule()
+
+
+class SystemRules(ModelRQLRules, AuditableMixin):
+    __model__ = System
+
+    id = FieldRule()
+    external_id = FieldRule()
+    owner = RelationshipRule(rules=AccountRules(), alias="owner")
     status = FieldRule()
 
 
@@ -54,6 +54,18 @@ class OrganizationRules(ModelRQLRules, AuditableMixin):
     currency = FieldRule()
     billing_currency = FieldRule()
     status = FieldRule()
+
+
+class EntitlementRules(ModelRQLRules, AuditableMixin):
+    __model__ = Entitlement
+
+    id = FieldRule()
+    name = FieldRule()
+    datasource_id = FieldRule()
+    status = FieldRule()
+    redeemed_by = RelationshipRule(rules=OrganizationRules(), alias="events.redeemed.by")
+    terminated_by = RelationshipRule(rules=ActorRules(), alias="events.terminated.by")
+    terminated_at = FieldRule(alias="events.terminated.at")
 
 
 class RQLQuery:

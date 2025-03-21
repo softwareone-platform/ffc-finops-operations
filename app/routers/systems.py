@@ -1,13 +1,14 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import ColumnExpressionArgument
+from sqlalchemy import ColumnExpressionArgument, Select
 
 from app.db.handlers import ConstraintViolationError, NotFoundError
 from app.db.models import System
 from app.dependencies import AccountRepository, CurrentAuthContext, SystemId, SystemRepository
 from app.enums import AccountType, SystemStatus
 from app.pagination import LimitOffsetPage, paginate
+from app.rql import RQLQuery, SystemRules
 from app.schemas.core import convert_model_to_schema
 from app.schemas.systems import SystemCreate, SystemCreateResponse, SystemRead, SystemUpdate
 from app.utils import wrap_exc_in_http_response
@@ -51,11 +52,10 @@ router = APIRouter()
 async def get_systems(
     system_repo: SystemRepository,
     extra_conditions: CommonConditions,
+    base_query: Select = Depends(RQLQuery(SystemRules())),
 ):
     return await paginate(
-        system_repo,
-        SystemRead,
-        where_clauses=extra_conditions,
+        system_repo, SystemRead, where_clauses=extra_conditions, base_query=base_query
     )
 
 
