@@ -27,24 +27,6 @@ class AuditableMixin(TimestampMixin):
     deleted_by = RelationshipRule(alias="events.deleted.by", rules=ActorRules())
 
 
-class SystemRules(ModelRQLRules, AuditableMixin):
-    __model__ = System
-
-    id = FieldRule()
-    external_id = FieldRule()
-    owner_id = FieldRule()
-    status = FieldRule()
-
-
-class EntitlementRules(ModelRQLRules, AuditableMixin):
-    __model__ = Entitlement
-
-    id = FieldRule()
-    name = FieldRule()
-    datasource_id = FieldRule()
-    status = FieldRule()
-
-
 class AccountRules(ModelRQLRules, AuditableMixin):
     __model__ = Account
 
@@ -52,6 +34,15 @@ class AccountRules(ModelRQLRules, AuditableMixin):
     name = FieldRule()
     external_id = FieldRule()
     type = FieldRule()
+    status = FieldRule()
+
+
+class SystemRules(ModelRQLRules, AuditableMixin):
+    __model__ = System
+
+    id = FieldRule()
+    external_id = FieldRule()
+    owner_id = RelationshipRule(rules=AccountRules(), alias="owner_id")
     status = FieldRule()
 
 
@@ -63,6 +54,16 @@ class OrganizationRules(ModelRQLRules, AuditableMixin):
     currency = FieldRule()
     billing_currency = FieldRule()
     status = FieldRule()
+
+
+class EntitlementRules(ModelRQLRules, AuditableMixin):
+    __model__ = Entitlement
+
+    id = FieldRule()
+    name = FieldRule()
+    datasource_id = FieldRule()
+    status = FieldRule()
+    redeemed_by = RelationshipRule(alias="redeemed_by", rules=OrganizationRules())
 
 
 class RQLQuery:
