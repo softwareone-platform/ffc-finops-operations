@@ -42,7 +42,7 @@ class SystemRules(ModelRQLRules, AuditableMixin):
 
     id = FieldRule()
     external_id = FieldRule()
-    owner_id = RelationshipRule(rules=AccountRules(), alias="owner_id")
+    owner = RelationshipRule(rules=AccountRules(), alias="owner")
     status = FieldRule()
 
 
@@ -63,7 +63,8 @@ class EntitlementRules(ModelRQLRules, AuditableMixin):
     name = FieldRule()
     datasource_id = FieldRule()
     status = FieldRule()
-    redeemed_by = RelationshipRule(alias="redeemed_by", rules=OrganizationRules())
+    redeemed_by = RelationshipRule(rules=OrganizationRules(), alias="events.redeemed.by")
+    terminated_by = RelationshipRule(rules=ActorRules(), alias="events.terminated.by")
 
 
 class RQLQuery:

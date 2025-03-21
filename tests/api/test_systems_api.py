@@ -308,6 +308,26 @@ async def test_get_all_systems_with_id_filter(
     assert "jwt_secret" not in data["items"][0]
 
 
+async def test_get_all_systems_with_owner_filter(
+    api_client: AsyncClient,
+    gcp_extension: System,
+    gcp_jwt_token: str,
+):
+    response = await api_client.get(
+        f"/systems?eq(owner.id,{gcp_extension.owner.id})",
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["total"] == 1
+    assert data["items"][0]["id"] == gcp_extension.id
+
+    assert "jwt_secret" not in data["items"][0]
+
+
 async def test_get_all_systems_multiple_systems_single_account_affiliate(
     api_client: AsyncClient,
     account_factory: ModelFactory[Account],
