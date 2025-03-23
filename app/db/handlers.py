@@ -8,6 +8,7 @@ from uuid import UUID
 
 import sqlalchemy
 from sqlalchemy import ColumnExpressionArgument, Select, func, select, update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -18,6 +19,7 @@ from app.db.models import (
     Account,
     AccountUser,
     AuditableMixin,
+    DatasourceExpense,
     Entitlement,
     Organization,
     System,
@@ -479,3 +481,43 @@ class AccountUserHandler(ModelHandler[AccountUser]):
             query = query.options(*self.default_options)
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
+
+
+class DatasourceExpenseHandler(ModelHandler[DatasourceExpense]):
+    async def bulk_upsert(
+        self,
+        expenses_to_upsert: list[dict[str, Any]],
+    ) -> None:
+        if not expenses_to_upsert:
+            return
+
+        for _ in range(DatasourceExpense.PK_MAX_RETRIES):
+            ids_in_db_stmt = select(DatasourceExpense.id).where(
+                DatasourceExpense.id.in_([ds_exp["id"] for ds_exp in expenses_to_upsert])
+            )
+
+            ids_in_db = (await self.session.scalars(ids_in_db_stmt)).all()
+
+            if not ids_in_db:
+                break
+
+            # regenerate ids for the ones that are already in the database
+            for ds_exp in expenses_to_upsert:
+                if ds_exp["id"] in ids_in_db:
+                    ds_exp["id"] = DatasourceExpense.generate_human_readable_pk()
+        else:
+            raise DatabaseError(
+                f"Failed to generate unique IDs for the datasource expenses after "
+                f"{DatasourceExpense.PK_MAX_RETRIES} retries."
+            )
+
+        upsert_stmt = insert(DatasourceExpense).values(expenses_to_upsert)
+        upsert_stmt = upsert_stmt.on_conflict_do_update(
+            constraint="uq_datasource_expenses_per_month",
+            set_={
+                DatasourceExpense.month_expenses: upsert_stmt.excluded.month_expenses,
+                DatasourceExpense.updated_at: upsert_stmt.excluded.updated_at,
+            },
+        )
+
+        await self.session.execute(upsert_stmt)

@@ -21,11 +21,16 @@ def get_db_engine(settings: AppSettings) -> AsyncEngine:
     )
 
 
+def get_sessionmaker(db_engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
+    return async_sessionmaker(bind=db_engine, class_=AsyncSession, expire_on_commit=False)
+
+
 async def get_db_session(
     db_engine: AsyncEngine = Depends(get_db_engine),
 ) -> AsyncGenerator[AsyncSession]:
-    async_session = async_sessionmaker(bind=db_engine, class_=AsyncSession, expire_on_commit=False)
-    async with async_session() as session:
+    AsyncSession = get_sessionmaker(db_engine)
+
+    async with AsyncSession() as session:
         async with session.begin():
             yield session
 

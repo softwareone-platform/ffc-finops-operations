@@ -5,6 +5,7 @@ from app.commands import (
     invite_user,
     openapi,
     redeem_entitlements,
+    update_last_month_datasource_expenses,
 )
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "openapi",
     "redeem_entitlements",
     "calculate_accounts_stats",
+    "update_last_month_datasource_expenses",
 ]
