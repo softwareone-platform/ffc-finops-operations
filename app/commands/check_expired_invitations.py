@@ -7,14 +7,16 @@ from rich import print
 from sqlalchemy import update
 
 from app.conf import Settings
-from app.db.base import get_db_engine, get_db_session
+from app.db.base import get_db_engine, get_db_session, get_db_sessionmaker
 from app.db.models import AccountUser
 from app.enums import AccountUserStatus
 
 
 async def check_expired_invitations(settings: Settings):
     engine = get_db_engine(settings)
-    async with asynccontextmanager(get_db_session)(engine) as session:
+    session_maker = get_db_sessionmaker(engine)
+
+    async with asynccontextmanager(get_db_session)(session_maker) as session:
         stmt = (
             update(AccountUser)
             .where(

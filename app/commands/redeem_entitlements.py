@@ -9,7 +9,7 @@ from sqlalchemy.exc import DatabaseError
 
 from app.api_clients.optscale import OptscaleClient
 from app.conf import Settings
-from app.db.base import get_db_engine, get_db_session
+from app.db.base import get_db_engine, get_db_session, get_db_sessionmaker
 from app.db.handlers import EntitlementHandler, OrganizationHandler
 from app.db.models import Entitlement, Organization
 from app.enums import EntitlementStatus, OrganizationStatus
@@ -33,7 +33,8 @@ async def redeem_entitlements(
     settings: Settings,
 ):
     engine = get_db_engine(settings)
-    async with asynccontextmanager(get_db_session)(engine) as session:
+    session_maker = get_db_sessionmaker(engine)
+    async with asynccontextmanager(get_db_session)(session_maker) as session:
         organization_handler = OrganizationHandler(session)
         entitlement_handler = EntitlementHandler(session)
 

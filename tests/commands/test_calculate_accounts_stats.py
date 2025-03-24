@@ -1,9 +1,18 @@
 import pytest
+from pytest_mock import MockerFixture
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.commands.calculate_accounts_stats import calculate_accounts_stats
 from app.conf import Settings
 from app.enums import AccountStatus, EntitlementStatus
+
+
+@pytest.fixture(autouse=True)
+def mock_db_session(db_session: AsyncSession, mocker: MockerFixture):
+    async def mock_get_db_session(*args, **kwargs):  # noqa: RUF029
+        yield db_session
+
+    mocker.patch("app.commands.calculate_accounts_stats.get_db_session", new=mock_get_db_session)
 
 
 @pytest.mark.parametrize(

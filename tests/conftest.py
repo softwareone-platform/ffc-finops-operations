@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import (
 
 from app.conf import Settings, get_settings
 from app.db import get_db_engine
+from app.db.base import get_db_sessionmaker
 from app.db.models import (
     Account,
     AccountUser,
@@ -89,7 +90,21 @@ def db_engine(test_settings: Settings) -> AsyncEngine:
 
 
 @pytest.fixture(scope="session")
-def fastapi_app(test_settings: Settings, db_engine: AsyncEngine) -> FastAPI:
+async def setup_db_tables(db_engine: AsyncEngine) -> None:
+    async with db_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    try:
+        yield
+    finally:
+        async with db_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+
+        await db_engine.dispose()
+
+
+@pytest.fixture(scope="session")
+def fastapi_app(test_settings: Settings, setup_db_tables: None, db_engine: AsyncEngine) -> FastAPI:
     from app.main import app
 
     app.dependency_overrides[get_settings] = lambda: test_settings
@@ -104,20 +119,31 @@ async def app_lifespan_manager(fastapi_app: FastAPI) -> AsyncGenerator[LifespanM
 
 
 @pytest.fixture(autouse=True)
-async def db_session(db_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, None]:
-    session = async_sessionmaker(db_engine, expire_on_commit=False)
+async def db_session(
+    db_engine: AsyncEngine, fastapi_app: FastAPI
+) -> AsyncGenerator[AsyncSession, None]:
+    # Use nested transactions to avoid committing changes to the database, speeding up
+    # the tests significantly and avoiding side effects between them.
+    #
+    # ref: https://docs.sqlalchemy.org/en/20/orm/session_transaction.html#joining-a-session-into-an-external-transaction-such-as-for-test-suites
 
-    async with db_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    async with db_engine.connect() as conn:
+        outer_transaction = await conn.begin()
 
-    try:
-        async with session() as s:
-            yield s
-    finally:
-        async with db_engine.begin() as conn:
-            await conn.run_sync(Base.metadata.drop_all)
+        session_maker = async_sessionmaker(
+            bind=conn,
+            class_=AsyncSession,
+            expire_on_commit=False,
+            join_transaction_mode="create_savepoint",
+        )
 
-        await db_engine.dispose()
+        fastapi_app.dependency_overrides[get_db_sessionmaker] = lambda: session_maker
+
+        try:
+            async with session_maker() as s:
+                yield s
+        finally:
+            await outer_transaction.rollback()
 
 
 @pytest.fixture()

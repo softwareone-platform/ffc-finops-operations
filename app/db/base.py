@@ -25,18 +25,25 @@ def get_sessionmaker(db_engine: AsyncEngine) -> async_sessionmaker[AsyncSession]
     return async_sessionmaker(bind=db_engine, class_=AsyncSession, expire_on_commit=False)
 
 
-async def get_db_session(
+def get_db_sessionmaker(
     db_engine: AsyncEngine = Depends(get_db_engine),
-) -> AsyncGenerator[AsyncSession]:
-    AsyncSession = get_sessionmaker(db_engine)
+) -> async_sessionmaker[AsyncSession]:
+    return async_sessionmaker(bind=db_engine, class_=AsyncSession, expire_on_commit=False)
 
-    async with AsyncSession() as session:
+
+async def get_db_session(
+    session_maker: async_sessionmaker[AsyncSession] = Depends(get_db_sessionmaker),
+) -> AsyncGenerator[AsyncSession]:
+    async with session_maker() as session:
         async with session.begin():
             yield session
 
 
 async def verify_db_connection(settings: Settings):  # pragma: no cover
-    async with asynccontextmanager(get_db_session)(get_db_engine(settings)) as session:
+    db_engine = get_db_engine(settings)
+    session_maker = get_db_sessionmaker(db_engine)
+
+    async with asynccontextmanager(get_db_session)(session_maker) as session:
         result = await session.execute(text("SELECT 1"))
 
         if result.one()[0] != 1:

@@ -13,6 +13,14 @@ from app.enums import AccountUserStatus, UserStatus
 from tests.types import ModelFactory
 
 
+@pytest.fixture(autouse=True)
+def mock_db_session(db_session: AsyncSession, mocker: MockerFixture):
+    async def mock_get_db_session(*args, **kwargs):  # noqa: RUF029
+        yield db_session
+
+    mocker.patch("app.commands.check_expired_invitations.get_db_session", new=mock_get_db_session)
+
+
 async def test_check_expired_invitation(
     test_settings: Settings,
     db_session: AsyncSession,

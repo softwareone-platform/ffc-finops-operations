@@ -11,6 +11,14 @@ from app.db.models import Account
 from app.enums import AccountStatus, AccountType
 
 
+@pytest.fixture(autouse=True)
+def mock_db_session(db_session: AsyncSession, mocker: MockerFixture):
+    async def mock_get_db_session(*args, **kwargs):  # noqa: RUF029
+        yield db_session
+
+    mocker.patch("app.commands.create_operations_account.get_db_session", new=mock_get_db_session)
+
+
 async def test_create_op_account(
     test_settings: Settings,
     db_session: AsyncSession,
