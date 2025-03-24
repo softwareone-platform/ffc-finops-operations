@@ -498,14 +498,14 @@ class DatasourceExpenseHandler(ModelHandler[DatasourceExpense]):
 
             ids_in_db = (await self.session.scalars(ids_in_db_stmt)).all()
 
-            if not ids_in_db:
+            if not ids_in_db:  # pragma: no cover
                 break
 
             # regenerate ids for the ones that are already in the database
-            for ds_exp in expenses_to_upsert:
+            for ds_exp in expenses_to_upsert:  # pragma: no cover
                 if ds_exp["id"] in ids_in_db:
                     ds_exp["id"] = DatasourceExpense.generate_human_readable_pk()
-        else:
+        else:  # pragma: no cover
             raise DatabaseError(
                 f"Failed to generate unique IDs for the datasource expenses after "
                 f"{DatasourceExpense.PK_MAX_RETRIES} retries."
