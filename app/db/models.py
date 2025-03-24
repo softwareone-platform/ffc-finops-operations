@@ -285,12 +285,6 @@ class DatasourceExpense(Base, HumanReadablePKMixin, AuditableMixin):
     datasource_id: Mapped[str] = mapped_column(String(255), index=True)
     organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"))
 
-    # TODO: Uncomment once I fucking figure out how to do this
-    # entitlement: Mapped[Entitlement | None] = relationship(
-    #     "Entitlement",
-    #     back_populates="datasource_expenses",
-    #     primaryjoin=lambda: DatasourceExpense.datasource_id == foreign(Entitlement.datasource_id),
-    # )
     organization: Mapped[Organization] = relationship(
         "Organization", back_populates="datasource_expenses"
     )
@@ -320,13 +314,6 @@ class Entitlement(Base, HumanReadablePKMixin, AuditableMixin):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     affiliate_external_id: Mapped[str] = mapped_column(String(255), nullable=False)
     datasource_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-    # TODO: Uncomment once I fucking figure out how to do this
-    # datasource_expenses: Mapped[list[DatasourceExpense]] = relationship(
-    #     "DatasourceExpense",
-    #     order_by=lambda: [desc(DatasourceExpense.year), desc(DatasourceExpense.month)],
-    #     primaryjoin=lambda: Entitlement.datasource_id == foreign(DatasourceExpense.datasource_id),
-    #     back_populates="entitlement",
-    # )
     linked_datasource_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     linked_datasource_type: Mapped[DatasourceType | None] = mapped_column(
         Enum(DatasourceType, values_callable=lambda obj: [e.value for e in obj]),
