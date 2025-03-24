@@ -9,13 +9,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.auth import (
     JWTBearer,
     JWTCredentials,
-    authentication_required,
-    check_operations_account,
-    get_authentication_context,
 )
 from app.auth.context import AuthenticationContext, auth_context
 from app.conf import Settings
 from app.db.models import System, User
+from app.dependencies import (
+    authentication_required,
+    check_operations_account,
+    get_authentication_context,
+)
 from app.enums import AccountType, AccountUserStatus, ActorType, SystemStatus, UserStatus
 from tests.types import JWTTokenFactory, ModelFactory
 

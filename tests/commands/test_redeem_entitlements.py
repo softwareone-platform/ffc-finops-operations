@@ -15,14 +15,6 @@ from app.db.models import Entitlement, Organization
 from app.enums import DatasourceType, EntitlementStatus
 
 
-@pytest.fixture(autouse=True)
-def mock_db_session(db_session: AsyncSession, mocker: MockerFixture):
-    async def mock_get_db_session(*args, **kwargs):  # noqa: RUF029
-        yield db_session
-
-    mocker.patch("app.commands.redeem_entitlements.get_db_session", new=mock_get_db_session)
-
-
 @time_machine.travel("2025-03-07T10:00:00Z", tick=False)
 async def test_redeeem_entitlements(
     mocker: MockerFixture,

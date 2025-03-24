@@ -1,11 +1,10 @@
 import asyncio
-from contextlib import asynccontextmanager
 
 import typer
 from rich.console import Console
 
 from app.conf import Settings
-from app.db.base import get_db_engine, get_db_session, get_db_sessionmaker
+from app.db.base import session_factory
 from app.db.handlers import AccountHandler, EntitlementHandler
 from app.db.models import Account
 from app.enums import AccountStatus, EntitlementStatus
@@ -23,10 +22,7 @@ async def calculate_accounts_stats(settings: Settings):
     The Account Model is then updated with the count for each entitlement's status that
     is not DELETED.
     """
-    engine = get_db_engine(settings)
-    session_maker = get_db_sessionmaker(engine)
-
-    async with asynccontextmanager(get_db_session)(session_maker) as session:
+    async with session_factory.begin() as session:
         entitlment_handler = EntitlementHandler(session)
         account_handler = AccountHandler(session)
 
@@ -53,7 +49,5 @@ async def calculate_accounts_stats(settings: Settings):
             )
 
 
-def command(
-    ctx: typer.Context,
-):
+def command(ctx: typer.Context):
     asyncio.run(calculate_accounts_stats(ctx.obj))

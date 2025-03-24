@@ -6,11 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import Select
 
 from app.api_clients import APIModifierClient, OptscaleAuthClient, OptscaleClient
-from app.auth.auth import check_operations_account
 from app.auth.context import auth_context
 from app.db.handlers import ConstraintViolationError, NotFoundError
 from app.db.models import Organization
-from app.dependencies import OrganizationId, OrganizationRepository
+from app.dependencies import OrganizationId, OrganizationRepository, check_operations_account
 from app.enums import DatasourceType
 from app.pagination import LimitOffsetPage, paginate
 from app.rql import OrganizationRules, RQLQuery

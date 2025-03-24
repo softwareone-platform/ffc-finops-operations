@@ -1,24 +1,17 @@
 import asyncio
-from contextlib import asynccontextmanager
 
 import typer
 from rich import print
 
 from app.conf import Settings
-from app.db.base import get_db_engine, get_db_session, get_db_sessionmaker
+from app.db.base import session_factory
 from app.db.handlers import AccountHandler
 from app.db.models import Account
 from app.enums import AccountStatus, AccountType
 
 
-async def create_operations_account(
-    settings: Settings,
-    external_id: str,
-):
-    engine = get_db_engine(settings)
-    session_maker = get_db_sessionmaker(engine)
-
-    async with asynccontextmanager(get_db_session)(session_maker) as session:
+async def create_operations_account(settings: Settings, external_id: str):
+    async with session_factory.begin() as session:
         account_handler = AccountHandler(session)
         instance = await account_handler.first(
             where_clauses=[

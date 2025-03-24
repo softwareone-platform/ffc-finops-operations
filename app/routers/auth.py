@@ -4,9 +4,8 @@ from datetime import UTC, datetime, timedelta
 from fastapi import APIRouter, status
 
 from app.auth.login import get_tokens_from_credentials, get_tokens_from_refresh
-from app.conf import AppSettings
 from app.db.models import User
-from app.dependencies import DBSession, UserRepository
+from app.dependencies import AppSettings, DBSession, UserRepository
 from app.enums import UserStatus
 from app.schemas.auth import Login, LoginRead, RefreshAccessToken
 

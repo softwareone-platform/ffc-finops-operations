@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import ColumnExpressionArgument, Select
 
 from app.api_clients import OptscaleClient
-from app.auth.auth import check_operations_account
 from app.db.handlers import NotFoundError
 from app.db.models import Account, Entitlement
 from app.dependencies import (
@@ -13,6 +12,7 @@ from app.dependencies import (
     EntitlementId,
     EntitlementRepository,
     OrganizationRepository,
+    check_operations_account,
 )
 from app.enums import AccountStatus, AccountType, EntitlementStatus, OrganizationStatus
 from app.pagination import LimitOffsetPage, paginate

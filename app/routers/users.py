@@ -9,10 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import ColumnExpressionArgument, Select, and_
 from sqlalchemy.orm import joinedload, with_loader_criteria
 
-from app.auth.auth import authentication_required, check_operations_account
 from app.auth.constants import UNAUTHORIZED_EXCEPTION
-from app.conf import AppSettings
-from app.db import DBSession
 from app.db.handlers import (
     AccountHandler,
     AccountUserHandler,
@@ -24,9 +21,13 @@ from app.dependencies import (
     AccountId,
     AccountRepository,
     AccountUserRepository,
+    AppSettings,
     CurrentAuthContext,
+    DBSession,
     UserId,
     UserRepository,
+    authentication_required,
+    check_operations_account,
 )
 from app.enums import AccountStatus, AccountType, AccountUserStatus, UserStatus
 from app.hasher import pbkdf2_sha256

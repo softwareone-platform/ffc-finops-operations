@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import and_, exists
 from sqlalchemy.sql.selectable import Select
 
-from app.auth.auth import authentication_required, check_operations_account
 from app.db.handlers import NotFoundError
 from app.db.models import Account, AccountUser, User
 from app.dependencies import (
@@ -16,6 +15,8 @@ from app.dependencies import (
     CurrentAuthContext,
     UserId,
     UserRepository,
+    authentication_required,
+    check_operations_account,
 )
 from app.enums import AccountStatus, AccountType, AccountUserStatus, UserStatus
 from app.pagination import LimitOffsetPage, paginate
