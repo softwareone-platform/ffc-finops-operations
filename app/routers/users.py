@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import ColumnExpressionArgument, and_
+from sqlalchemy import ColumnExpressionArgument, Select, and_
 from sqlalchemy.orm import joinedload, with_loader_criteria
 
 from app.auth.auth import authentication_required, check_operations_account
@@ -31,6 +31,7 @@ from app.dependencies import (
 from app.enums import AccountStatus, AccountType, AccountUserStatus, UserStatus
 from app.hasher import pbkdf2_sha256
 from app.pagination import LimitOffsetPage, paginate
+from app.rql import RQLQuery, UserRules
 from app.schemas.accounts import AccountRead
 from app.schemas.core import convert_model_to_schema
 from app.schemas.users import (
@@ -79,7 +80,11 @@ router = APIRouter()
     dependencies=[Depends(authentication_required)],
     response_model=LimitOffsetPage[UserRead],
 )
-async def get_users(user_repo: UserRepository, auth_context: CurrentAuthContext):
+async def get_users(
+    user_repo: UserRepository,
+    auth_context: CurrentAuthContext,
+    base_query: Select = Depends(RQLQuery(UserRules())),
+):
     """
     This endpoint returns all the users in the DB
     There are 2 possible scenarios
@@ -95,7 +100,7 @@ async def get_users(user_repo: UserRepository, auth_context: CurrentAuthContext)
 
     """
     if auth_context.account.type == AccountType.OPERATIONS:  # type: ignore
-        return await paginate(user_repo, UserRead)
+        return await paginate(user_repo, UserRead, base_query=base_query)
     else:
         return await paginate(
             user_repo,
@@ -119,6 +124,7 @@ async def get_users(user_repo: UserRepository, auth_context: CurrentAuthContext)
                 ),
             ],
             unique=True,
+            base_query=base_query,
         )
 
 
@@ -309,6 +315,7 @@ async def get_user_accounts(
     user: Annotated[User, Depends(fetch_user_or_404)],
     account_repo: AccountRepository,
     auth_ctx: CurrentAuthContext,
+    base_query: Select = Depends(RQLQuery(UserRules())),
 ):
     account_user_filter = AccountUser.user_id == user.id
     if auth_ctx is not None and auth_ctx.account.type == AccountType.AFFILIATE:
@@ -323,6 +330,7 @@ async def get_user_accounts(
             with_loader_criteria(AccountUser, account_user_filter),
         ],
         unique=True,
+        base_query=base_query,
     )
 
 

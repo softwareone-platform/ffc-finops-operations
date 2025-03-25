@@ -4,7 +4,7 @@ from fastapi import Request
 from requela import FieldRule, ModelRQLRules, RelationshipRule
 from sqlalchemy.sql.selectable import Select
 
-from app.db.models import Account, Actor, Entitlement, Organization, System
+from app.db.models import Account, AccountUser, Actor, Entitlement, Organization, System, User
 
 
 class ActorRules(ModelRQLRules):
@@ -37,12 +37,26 @@ class AccountRules(ModelRQLRules, AuditableMixin):
     status = FieldRule()
 
 
+class UserAccountRules(ModelRQLRules, AuditableMixin):
+    __model__ = AccountUser
+    accounts = RelationshipRule(rules=AccountRules())
+
+
+class UserRules(ModelRQLRules, AuditableMixin):
+    __model__ = User
+
+    id = FieldRule()
+    email = FieldRule()
+    status = FieldRule()
+    user_accounts = RelationshipRule(rules=UserAccountRules())
+
+
 class SystemRules(ModelRQLRules, AuditableMixin):
     __model__ = System
 
     id = FieldRule()
     external_id = FieldRule()
-    owner = RelationshipRule(rules=AccountRules(), alias="owner")
+    owner = RelationshipRule(rules=AccountRules())
     status = FieldRule()
 
 
