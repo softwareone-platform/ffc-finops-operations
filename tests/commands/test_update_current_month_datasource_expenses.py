@@ -6,8 +6,6 @@ from decimal import Decimal
 import pytest
 import time_machine
 from fastapi import status
-from pytest_capsqlalchemy import SQLAlchemyCapturer
-from pytest_capsqlalchemy.expression import SQLExpressionType
 from pytest_httpx import HTTPXMock
 from pytest_mock import MockerFixture
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
@@ -270,7 +268,6 @@ async def test_multiple_datasources_are_handled_correctly(
     organization_factory: ModelFactory[Organization],
     datasource_expense_factory: ModelFactory[DatasourceExpense],
     caplog: pytest.LogCaptureFixture,
-    capsqlalchemy: SQLAlchemyCapturer,
 ):
     datasource_expense_handler = DatasourceExpenseHandler(db_session)
     organization1 = await organization_factory(
@@ -352,17 +349,8 @@ async def test_multiple_datasources_are_handled_correctly(
 
     mock_optscale_client.mock_fetch_datasources_for_organization(organization4, status_code=404)
 
-    with caplog.at_level(logging.WARNING), capsqlalchemy:
+    with caplog.at_level(logging.WARNING):
         await update_current_month_datasource_expenses.main(db_session.bind, test_settings)  # type: ignore
-        capsqlalchemy.assert_query_types(
-            SQLExpressionType.BEGIN,   # First transaction
-            SQLExpressionType.SELECT,  # Fetch organizations
-            SQLExpressionType.COMMIT,  # Commmit transaction  (to make the API calls)
-            SQLExpressionType.BEGIN,   # Second transaction
-            SQLExpressionType.SELECT,  # Check that the datasourse IDs are available
-            SQLExpressionType.INSERT,  # Bulk upsert :)
-            SQLExpressionType.COMMIT,  # Commit the transaction
-        )  # fmt: skip
         assert f"Organization {organization4.id} not found on Optscale. Skipping..." in caplog.text
 
     new_datasource_expenses = await datasource_expense_handler.query_db()

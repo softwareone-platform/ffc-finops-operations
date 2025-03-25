@@ -68,23 +68,22 @@ async def store_datasource_expenses(
     year: int,
     month: int,
 ) -> None:
-    expenses_to_upsert = [
-        {
-            "id": DatasourceExpense.generate_human_readable_pk(),
-            "datasource_id": datasource["id"],
-            "organization_id": organization_id,
-            "year": year,
-            "month": month,
-            "month_expenses": datasource["details"]["cost"],
-            "created_at": datetime.now(UTC),
-            "updated_at": datetime.now(UTC),
-        }
-        for organization_id, datasources in datasources_per_organization_id.items()
-        for datasource in datasources
-    ]
-
-    logger.info("Prepared %d expenses to upsert", len(expenses_to_upsert))
-    await datasource_expense_handler.bulk_upsert(expenses_to_upsert)
+    for organization_id, datasources in datasources_per_organization_id.items():
+        for datasource in datasources:
+            existing_datasource_expense, created = await datasource_expense_handler.get_or_create(
+                datasource_id=datasource["id"],
+                organization_id=organization_id,
+                year=year,
+                month=month,
+                defaults={
+                    "month_expenses": datasource["details"]["cost"],
+                },
+            )
+            if not created:
+                await datasource_expense_handler.update(
+                    existing_datasource_expense,
+                    {"month_expenses": datasource["details"]["cost"]},
+                )
 
 
 async def main(db_engine: AsyncEngine, settings: Settings) -> None:
