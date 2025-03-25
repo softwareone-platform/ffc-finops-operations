@@ -141,8 +141,8 @@ async def test_get_datasources_for_organization_success(
     )
     httpx_mock.add_response(
         method="GET",
-        url=f"{test_settings.opt_api_base_url}/organizations/{org.linked_organization_id}/cloud_accounts?details=true",
-        match_headers={"Secret": test_settings.opt_cluster_secret},
+        url=f"{test_settings.optscale_rest_api_base_url}/organizations/{org.linked_organization_id}/cloud_accounts?details=true",
+        match_headers={"Secret": test_settings.optscale_cluster_secret},
         json={
             "cloud_accounts": [
                 optscale_azure_cnr_datasource_response_data(org.linked_organization_id),  # type: ignore
@@ -200,8 +200,8 @@ async def test_get_datasources_for_organization_with_no_datasources(
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{test_settings.opt_api_base_url}/organizations/{org.linked_organization_id}/cloud_accounts?details=true",
-        match_headers={"Secret": test_settings.opt_cluster_secret},
+        url=f"{test_settings.optscale_rest_api_base_url}/organizations/{org.linked_organization_id}/cloud_accounts?details=true",
+        match_headers={"Secret": test_settings.optscale_cluster_secret},
         json={"cloud_accounts": []},
     )
 
@@ -243,8 +243,8 @@ async def test_get_datasources_for_organization_with_optscale_error(
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{test_settings.opt_api_base_url}/organizations/{org.linked_organization_id}/cloud_accounts?details=true",
-        match_headers={"Secret": test_settings.opt_cluster_secret},
+        url=f"{test_settings.optscale_rest_api_base_url}/organizations/{org.linked_organization_id}/cloud_accounts?details=true",
+        match_headers={"Secret": test_settings.optscale_cluster_secret},
         status_code=500,
     )
 
@@ -275,8 +275,8 @@ async def test_get_datasource_by_id_success(
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{test_settings.opt_api_base_url}/cloud_accounts/{datasource_data['id']}?details=true",
-        match_headers={"Secret": test_settings.opt_cluster_secret},
+        url=f"{test_settings.optscale_rest_api_base_url}/cloud_accounts/{datasource_data['id']}?details=true",
+        match_headers={"Secret": test_settings.optscale_cluster_secret},
         json=datasource_data,
     )
 
@@ -320,8 +320,8 @@ async def test_get_datasource_by_id_for_missing_datasource(
     datasource_id = str(uuid.uuid4())
     httpx_mock.add_response(
         method="GET",
-        url=f"{test_settings.opt_api_base_url}/cloud_accounts/{datasource_id}?details=true",
-        match_headers={"Secret": test_settings.opt_cluster_secret},
+        url=f"{test_settings.optscale_rest_api_base_url}/cloud_accounts/{datasource_id}?details=true",
+        match_headers={"Secret": test_settings.optscale_cluster_secret},
         status_code=404,
     )
 

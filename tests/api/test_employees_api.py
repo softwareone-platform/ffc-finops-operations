@@ -117,7 +117,7 @@ async def test_get_employee_by_email(
                 "created_at": 1731059464,
             },
         },
-        match_headers={"Secret": test_settings.opt_cluster_secret},
+        match_headers={"Secret": test_settings.optscale_cluster_secret},
     )
 
     response = await api_client.get(
@@ -143,7 +143,7 @@ async def test_get_employee_by_email_not_found(
         json={
             "exists": False,
         },
-        match_headers={"Secret": test_settings.opt_cluster_secret},
+        match_headers={"Secret": test_settings.optscale_cluster_secret},
     )
 
     response = await api_client.get(
@@ -165,7 +165,7 @@ async def test_get_employee_by_email_lookup_error(
         url="https://opt-auth.ffc.com/user_existence?email=test@example.com&user_info=true",
         status_code=500,
         text="Internal Server Error",
-        match_headers={"Secret": test_settings.opt_cluster_secret},
+        match_headers={"Secret": test_settings.optscale_cluster_secret},
     )
 
     response = await api_client.get(
@@ -198,8 +198,8 @@ async def test_get_employees_for_organization_success(
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{test_settings.opt_api_base_url}/organizations/{org.linked_organization_id}/employees?roles=true",
-        match_headers={"Secret": test_settings.opt_cluster_secret},
+        url=f"{test_settings.optscale_rest_api_base_url}/organizations/{org.linked_organization_id}/employees?roles=true",
+        match_headers={"Secret": test_settings.optscale_cluster_secret},
         json={
             "employees": [
                 {
@@ -298,8 +298,8 @@ async def test_get_employees_for_organization_with_no_employees(
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{test_settings.opt_api_base_url}/organizations/{org.linked_organization_id}/employees?roles=true",
-        match_headers={"Secret": test_settings.opt_cluster_secret},
+        url=f"{test_settings.optscale_rest_api_base_url}/organizations/{org.linked_organization_id}/employees?roles=true",
+        match_headers={"Secret": test_settings.optscale_cluster_secret},
         json={"employees": []},
     )
 
@@ -342,8 +342,8 @@ async def test_get_employees_for_organization_with_optscale_error(
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{test_settings.opt_api_base_url}/organizations/{org.linked_organization_id}/employees?roles=true",
-        match_headers={"Secret": test_settings.opt_cluster_secret},
+        url=f"{test_settings.optscale_rest_api_base_url}/organizations/{org.linked_organization_id}/employees?roles=true",
+        match_headers={"Secret": test_settings.optscale_cluster_secret},
         status_code=500,
     )
 
@@ -374,8 +374,8 @@ async def test_make_employee_admin(
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{test_settings.opt_api_base_url}/employees/{user_id}?roles=true",
-        match_headers={"Secret": test_settings.opt_cluster_secret},
+        url=f"{test_settings.optscale_rest_api_base_url}/employees/{user_id}?roles=true",
+        match_headers={"Secret": test_settings.optscale_cluster_secret},
         status_code=200,
         json={
             "deleted_at": 0,
@@ -390,8 +390,8 @@ async def test_make_employee_admin(
 
     httpx_mock.add_response(
         method="POST",
-        url=f"{test_settings.opt_auth_base_url}/users/{auth_user_id}/assignment_register",
-        match_headers={"Secret": test_settings.opt_cluster_secret},
+        url=f"{test_settings.optscale_auth_api_base_url}/users/{auth_user_id}/assignment_register",
+        match_headers={"Secret": test_settings.optscale_cluster_secret},
         status_code=200,
         json={
             "created_at": 1736352461,
@@ -427,8 +427,8 @@ async def test_make_user_admin_not_found(
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{test_settings.opt_api_base_url}/employees/{user_id}?roles=true",
-        match_headers={"Secret": test_settings.opt_cluster_secret},
+        url=f"{test_settings.optscale_rest_api_base_url}/employees/{user_id}?roles=true",
+        match_headers={"Secret": test_settings.optscale_cluster_secret},
         status_code=404,
     )
 
@@ -453,8 +453,8 @@ async def test_make_user_admin_error_assigning_role(
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{test_settings.opt_api_base_url}/employees/{user_id}?roles=true",
-        match_headers={"Secret": test_settings.opt_cluster_secret},
+        url=f"{test_settings.optscale_rest_api_base_url}/employees/{user_id}?roles=true",
+        match_headers={"Secret": test_settings.optscale_cluster_secret},
         status_code=200,
         json={
             "deleted_at": 0,
@@ -469,8 +469,8 @@ async def test_make_user_admin_error_assigning_role(
 
     httpx_mock.add_response(
         method="POST",
-        url=f"{test_settings.opt_auth_base_url}/users/{auth_user_id}/assignment_register",
-        match_headers={"Secret": test_settings.opt_cluster_secret},
+        url=f"{test_settings.optscale_auth_api_base_url}/users/{auth_user_id}/assignment_register",
+        match_headers={"Secret": test_settings.optscale_cluster_secret},
         status_code=400,
         match_json={
             "role_id": 3,  # Admin
