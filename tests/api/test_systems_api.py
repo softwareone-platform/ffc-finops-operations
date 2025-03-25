@@ -271,7 +271,6 @@ async def test_get_all_systems_with_status_filter(
     gcp_extension: System,
     gcp_jwt_token: str,
 ):
-    print("gcp_extension.status", gcp_extension.status)
     response = await api_client.get(
         "/systems?eq(status,active)",
         headers={"Authorization": f"Bearer {gcp_jwt_token}"},
@@ -292,7 +291,6 @@ async def test_get_all_systems_with_id_filter(
     gcp_extension: System,
     gcp_jwt_token: str,
 ):
-    print("gcp_extension.status", gcp_extension.status)
     response = await api_client.get(
         f"/systems?eq(id,{gcp_extension.id})",
         headers={"Authorization": f"Bearer {gcp_jwt_token}"},

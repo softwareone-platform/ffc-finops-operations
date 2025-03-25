@@ -31,7 +31,7 @@ from app.dependencies import (
 from app.enums import AccountStatus, AccountType, AccountUserStatus, UserStatus
 from app.hasher import pbkdf2_sha256
 from app.pagination import LimitOffsetPage, paginate
-from app.rql import RQLQuery, UserRules
+from app.rql import AccountRules, RQLQuery, UserRules
 from app.schemas.accounts import AccountRead
 from app.schemas.core import convert_model_to_schema
 from app.schemas.users import (
@@ -315,7 +315,7 @@ async def get_user_accounts(
     user: Annotated[User, Depends(fetch_user_or_404)],
     account_repo: AccountRepository,
     auth_ctx: CurrentAuthContext,
-    base_query: Select = Depends(RQLQuery(UserRules())),
+    base_query: Select = Depends(RQLQuery(AccountRules())),
 ):
     account_user_filter = AccountUser.user_id == user.id
     if auth_ctx is not None and auth_ctx.account.type == AccountType.AFFILIATE:

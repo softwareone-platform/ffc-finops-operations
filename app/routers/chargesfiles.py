@@ -1,6 +1,9 @@
-from fastapi import APIRouter, status
-from fastapi_pagination.limit_offset import LimitOffsetPage
+from fastapi import APIRouter, Depends, status
+from sqlalchemy import Select
 
+from app.dependencies import ChargesFileRepository
+from app.pagination import LimitOffsetPage, paginate
+from app.rql import ChargesFileRules, RQLQuery
 from app.schemas.charges import ChargesFileRead
 
 router = APIRouter()
@@ -10,9 +13,15 @@ router = APIRouter()
     "",
     response_model=LimitOffsetPage[ChargesFileRead],
 )
-async def get_charges_files():
-    # pending implementation
-    pass  # pragma: no cover
+async def get_charges_files(
+    charges_file_repo: ChargesFileRepository,
+    base_query: Select = Depends(RQLQuery(ChargesFileRules())),
+):
+    return await paginate(
+        charges_file_repo,
+        ChargesFileRead,
+        base_query=base_query,
+    )
 
 
 @router.get(

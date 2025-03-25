@@ -4,7 +4,16 @@ from fastapi import Request
 from requela import FieldRule, ModelRQLRules, RelationshipRule
 from sqlalchemy.sql.selectable import Select
 
-from app.db.models import Account, AccountUser, Actor, Entitlement, Organization, System, User
+from app.db.models import (
+    Account,
+    AccountUser,
+    Actor,
+    ChargesFile,
+    Entitlement,
+    Organization,
+    System,
+    User,
+)
 
 
 class ActorRules(ModelRQLRules):
@@ -78,8 +87,20 @@ class EntitlementRules(ModelRQLRules, AuditableMixin):
     datasource_id = FieldRule()
     status = FieldRule()
     redeemed_by = RelationshipRule(rules=OrganizationRules(), alias="events.redeemed.by")
+    redeemed_at = FieldRule(alias="events.redeemed.at")
     terminated_by = RelationshipRule(rules=ActorRules(), alias="events.terminated.by")
     terminated_at = FieldRule(alias="events.terminated.at")
+
+
+class ChargesFileRules(ModelRQLRules, AuditableMixin):
+    __model__ = ChargesFile
+
+    id = FieldRule()
+    document_date = FieldRule()
+    currency = FieldRule()
+    amount = FieldRule()
+    owner = RelationshipRule(rules=AccountRules())
+    status = FieldRule()
 
 
 class RQLQuery:
