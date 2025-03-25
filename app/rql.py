@@ -27,19 +27,6 @@ class AuditableMixin(TimestampMixin):
     deleted_by = RelationshipRule(alias="events.deleted.by", rules=ActorRules())
 
 
-class AccountUserRules(ModelRQLRules, AuditableMixin):
-    __model__ = AccountUser
-
-
-class UserRules(ModelRQLRules, AuditableMixin):
-    __model__ = User
-
-    id = FieldRule()
-    email = FieldRule()
-    status = FieldRule()
-    accounts = RelationshipRule(rules=AccountUserRules(), alias="accounts")
-
-
 class AccountRules(ModelRQLRules, AuditableMixin):
     __model__ = Account
 
@@ -50,12 +37,26 @@ class AccountRules(ModelRQLRules, AuditableMixin):
     status = FieldRule()
 
 
+class UserAccountRules(ModelRQLRules, AuditableMixin):
+    __model__ = AccountUser
+    accounts = RelationshipRule(rules=AccountRules())
+
+
+class UserRules(ModelRQLRules, AuditableMixin):
+    __model__ = User
+
+    id = FieldRule()
+    email = FieldRule()
+    status = FieldRule()
+    user_accounts = RelationshipRule(rules=UserAccountRules())
+
+
 class SystemRules(ModelRQLRules, AuditableMixin):
     __model__ = System
 
     id = FieldRule()
     external_id = FieldRule()
-    owner = RelationshipRule(rules=AccountRules(), alias="owner")
+    owner = RelationshipRule(rules=AccountRules())
     status = FieldRule()
 
 

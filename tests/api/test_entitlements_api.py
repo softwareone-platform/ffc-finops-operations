@@ -320,7 +320,6 @@ async def test_get_all_entitlements_single_page_with_no_matching_name_filter(
     assert data["total"] == 0
 
 
-@pytest.mark.skip
 async def test_get_all_entitlements_single_page_with_datasource_id_filter(
     entitlement_gcp: Entitlement, api_client: AsyncClient, gcp_jwt_token: str
 ):
