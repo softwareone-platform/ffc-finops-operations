@@ -458,6 +458,20 @@ async def affiliate_account(
 
 
 @pytest.fixture
+async def affiliate_system(
+    system_factory: ModelFactory[System], affiliate_account: Account
+) -> System:
+    return await system_factory(external_id="FFC", owner=affiliate_account)
+
+
+@pytest.fixture
+def affiliate_account_jwt_token(
+    system_jwt_token_factory: Callable[[System], str], affiliate_system: System
+) -> str:
+    return system_jwt_token_factory(affiliate_system)
+
+
+@pytest.fixture
 def gcp_jwt_token(system_jwt_token_factory: Callable[[System], str], gcp_extension: System) -> str:
     return system_jwt_token_factory(gcp_extension)
 

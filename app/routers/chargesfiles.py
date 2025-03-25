@@ -1,10 +1,27 @@
-from fastapi import APIRouter, Depends, status
-from sqlalchemy import Select
+from typing import Annotated
 
-from app.dependencies import ChargesFileRepository
+from fastapi import APIRouter, Depends, status
+from sqlalchemy import ColumnExpressionArgument, Select
+
+from app.db.models import ChargesFile
+from app.dependencies import ChargesFileRepository, CurrentAuthContext
+from app.enums import AccountType, ChargesFileStatus
 from app.pagination import LimitOffsetPage, paginate
 from app.rql import ChargesFileRules, RQLQuery
 from app.schemas.charges import ChargesFileRead
+
+
+def common_extra_conditions(auth_ctx: CurrentAuthContext) -> list[ColumnExpressionArgument]:
+    conditions: list[ColumnExpressionArgument] = []
+
+    if auth_ctx.account.type == AccountType.AFFILIATE:  # type: ignore
+        conditions.append(ChargesFile.owner == auth_ctx.account)  # type: ignore
+        conditions.append(ChargesFile.status != ChargesFileStatus.DELETED)
+
+    return conditions
+
+
+CommonConditions = Annotated[list[ColumnExpressionArgument], Depends(common_extra_conditions)]
 
 router = APIRouter()
 
@@ -15,11 +32,13 @@ router = APIRouter()
 )
 async def get_charges_files(
     charges_file_repo: ChargesFileRepository,
+    extra_conditions: CommonConditions,
     base_query: Select = Depends(RQLQuery(ChargesFileRules())),
 ):
     return await paginate(
         charges_file_repo,
         ChargesFileRead,
+        where_clauses=extra_conditions,
         base_query=base_query,
     )
 

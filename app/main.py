@@ -135,12 +135,6 @@ def setup_app():
         dependencies=[Depends(authentication_required)],
         tags=["Portal Settings"],
     )
-    app.include_router(
-        chargesfiles.router,
-        prefix="/charges_file",
-        dependencies=[Depends(authentication_required)],
-        tags=["Charges File"],
-    )
 
     app.include_router(auth.router, prefix="/auth", tags=["Auth"])
 

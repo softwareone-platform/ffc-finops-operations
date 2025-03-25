@@ -488,4 +488,8 @@ class DatasourceExpenseHandler(ModelHandler[DatasourceExpense]):
 
 
 class ChargesFileHandler(ModelHandler[ChargesFile]):
-    pass
+    def __init__(self, session):
+        super().__init__(session)
+        self.default_options = [
+            joinedload(ChargesFile.owner),
+        ]
