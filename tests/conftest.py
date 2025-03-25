@@ -60,9 +60,9 @@ def test_settings() -> Settings:
         _env_file=("../.env", "../.env.test"),
         _env_file_encoding="utf-8",
     )
-    settings.opt_cluster_secret = "test_cluster_secret"
-    settings.opt_api_base_url = "https://opt-api.ffc.com"
-    settings.opt_auth_base_url = "https://opt-auth.ffc.com"
+    settings.optscale_cluster_secret = "test_cluster_secret"
+    settings.optscale_rest_api_base_url = "https://opt-api.ffc.com"
+    settings.optscale_auth_api_base_url = "https://opt-auth.ffc.com"
     settings.api_modifier_base_url = "https://api-modifier.ffc.com"
     settings.api_modifier_jwt_secret = "test_jwt_secret"
     settings.auth_access_jwt_secret = "auth_access_jwt_secret"
@@ -492,8 +492,8 @@ class MockOptscaleClient:
     def add_mock_response(self, method: str, url: str, **kwargs: Any) -> None:
         self.httpx_mock.add_response(
             method=method,
-            url=f"{self.test_settings.opt_api_base_url}/{url.removeprefix('/')}",
-            match_headers={"Secret": self.test_settings.opt_cluster_secret},
+            url=f"{self.test_settings.optscale_rest_api_base_url}/{url.removeprefix('/')}",
+            match_headers={"Secret": self.test_settings.optscale_cluster_secret},
             **kwargs,
         )
 

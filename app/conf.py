@@ -35,9 +35,9 @@ class Settings(BaseSettings):
     pwd_reset_token_length: int = 64
     pwd_reset_token_length_expires_minutes: int = 15
 
-    opt_auth_base_url: str
-    opt_api_base_url: str
-    opt_cluster_secret: str
+    optscale_auth_api_base_url: str
+    optscale_rest_api_base_url: str
+    optscale_cluster_secret: str
 
     debug: bool = False
 

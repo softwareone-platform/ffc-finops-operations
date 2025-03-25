@@ -29,7 +29,7 @@ class OptscaleClusterSecretAuth(httpx.Auth):
         self.settings = settings
 
     def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response, None]:
-        request.headers["Secret"] = self.settings.opt_cluster_secret
+        request.headers["Secret"] = self.settings.optscale_cluster_secret
 
         yield request
 
@@ -37,7 +37,7 @@ class OptscaleClusterSecretAuth(httpx.Auth):
 class OptscaleClient(BaseAPIClient):
     @property
     def base_url(self):
-        return self.settings.opt_api_base_url
+        return self.settings.optscale_rest_api_base_url
 
     @property
     def auth(self):
@@ -96,7 +96,7 @@ class OptscaleClient(BaseAPIClient):
 class OptscaleAuthClient(BaseAPIClient):
     @property
     def base_url(self):
-        return self.settings.opt_auth_base_url
+        return self.settings.optscale_auth_api_base_url
 
     @property
     def auth(self):

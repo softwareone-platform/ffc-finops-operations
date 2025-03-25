@@ -102,8 +102,8 @@ async def test_fetch_datasources_for_organization(
     ]
     httpx_mock.add_response(
         method="GET",
-        url=f"{test_settings.opt_api_base_url}/organizations/linked_organization_id/cloud_accounts?details=true",
-        match_headers={"Secret": test_settings.opt_cluster_secret},
+        url=f"{test_settings.optscale_rest_api_base_url}/organizations/linked_organization_id/cloud_accounts?details=true",
+        match_headers={"Secret": test_settings.optscale_cluster_secret},
         json={
             "cloud_accounts": datasources,
         },
@@ -122,7 +122,7 @@ async def test_fetch_datasources_for_organization_error(
 ):
     httpx_mock.add_response(
         method="GET",
-        url=f"{test_settings.opt_api_base_url}/organizations/linked_organization_id/cloud_accounts?details=true",
+        url=f"{test_settings.optscale_rest_api_base_url}/organizations/linked_organization_id/cloud_accounts?details=true",
         status_code=500,
     )
 

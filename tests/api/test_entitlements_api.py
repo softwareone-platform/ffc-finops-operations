@@ -639,8 +639,8 @@ async def test_redeem_entitlement_success(
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{test_settings.opt_api_base_url}/cloud_accounts/{entitlement_gcp.datasource_id}?details=true",
-        match_headers={"Secret": test_settings.opt_cluster_secret},
+        url=f"{test_settings.optscale_rest_api_base_url}/cloud_accounts/{entitlement_gcp.datasource_id}?details=true",
+        match_headers={"Secret": test_settings.optscale_cluster_secret},
         json={
             "id": entitlement_gcp.datasource_id,
             "name": "GCP Dev Project",
@@ -775,8 +775,8 @@ async def test_redeem_entitlement_datasource_organization_mismatch(
 
     httpx_mock.add_response(
         method="GET",
-        url=f"{test_settings.opt_api_base_url}/cloud_accounts/{entitlement_gcp.datasource_id}?details=true",
-        match_headers={"Secret": test_settings.opt_cluster_secret},
+        url=f"{test_settings.optscale_rest_api_base_url}/cloud_accounts/{entitlement_gcp.datasource_id}?details=true",
+        match_headers={"Secret": test_settings.optscale_cluster_secret},
         json={
             "id": entitlement_gcp.datasource_id,
             "name": "GCP Dev Project",
