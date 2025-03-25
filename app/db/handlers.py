@@ -18,6 +18,7 @@ from app.db.models import (
     Account,
     AccountUser,
     AuditableMixin,
+    ChargesFile,
     DatasourceExpense,
     Entitlement,
     Organization,
@@ -484,3 +485,11 @@ class AccountUserHandler(ModelHandler[AccountUser]):
 
 class DatasourceExpenseHandler(ModelHandler[DatasourceExpense]):
     pass
+
+
+class ChargesFileHandler(ModelHandler[ChargesFile]):
+    def __init__(self, session):
+        super().__init__(session)
+        self.default_options = [
+            joinedload(ChargesFile.owner),
+        ]

@@ -89,6 +89,7 @@ def setup_app():
         employees.router,
         accounts.router,
         users.router,
+        chargesfiles.router,
     ):
         setup_custom_serialization(router)
 

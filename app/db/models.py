@@ -291,7 +291,7 @@ class DatasourceExpense(Base, HumanReadablePKMixin, AuditableMixin):
 
     year: Mapped[int] = mapped_column(Integer(), nullable=False)
     month: Mapped[int] = mapped_column(Integer(), nullable=False)
-    month_expenses: Mapped[Decimal] = mapped_column(sa.Numeric(10, 4))
+    month_expenses: Mapped[Decimal] = mapped_column(sa.Numeric(18, 4))
 
     __table_args__ = (
         Index("ix_datasource_expenses_year_and_month", year, month),
@@ -345,7 +345,7 @@ class ChargesFile(Base, HumanReadablePKMixin, TimestampMixin):
 
     document_date: Mapped[datetime.date] = mapped_column(sa.Date())
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
-    amount: Mapped[Decimal | None] = mapped_column(sa.Numeric(10, 4), nullable=True)
+    amount: Mapped[Decimal | None] = mapped_column(sa.Numeric(18, 4), nullable=True)
     owner_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), nullable=False)
     owner: Mapped[Account] = relationship(foreign_keys=[owner_id])
     status: Mapped[ChargesFileStatus] = mapped_column(

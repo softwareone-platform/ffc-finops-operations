@@ -35,7 +35,9 @@ AccountUserRepository = Annotated[
 SystemRepository = Annotated[
     handlers.SystemHandler, Depends(HandlerFactory(handlers.SystemHandler))
 ]
-
+ChargesFileRepository = Annotated[
+    handlers.ChargesFileHandler, Depends(HandlerFactory(handlers.ChargesFileHandler))
+]
 #######
 # Ids path parameters
 #######

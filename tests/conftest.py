@@ -2,6 +2,7 @@ import secrets
 import uuid
 from collections.abc import AsyncGenerator, Callable
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import Any
 
 import jwt
@@ -27,6 +28,7 @@ from app.db.models import (
     AccountUser,
     Actor,
     Base,
+    ChargesFile,
     DatasourceExpense,
     Entitlement,
     Organization,
@@ -37,6 +39,7 @@ from app.enums import (
     AccountStatus,
     AccountType,
     AccountUserStatus,
+    ChargesFileStatus,
     EntitlementStatus,
     OrganizationStatus,
     SystemStatus,
@@ -351,6 +354,39 @@ def system_jwt_token_factory(
 
 
 @pytest.fixture
+def charges_file_factory(
+    faker: Faker,
+    db_session: AsyncSession,
+    gcp_account: Account,
+) -> ModelFactory[ChargesFile]:
+    async def _charges_file(
+        currency: str | None = None,
+        amount: Decimal | None = None,
+        owner: Account | None = None,
+        status: str | None = None,
+        document_date: str | None = None,
+    ):
+        charges_file = ChargesFile(
+            id=faker.uuid4(),
+            document_date=datetime.strptime(document_date, format("%Y-%m-%d")).date()
+            if document_date
+            else faker.date_time().date(),
+            currency=currency or "USD",
+            amount=amount
+            or Decimal(f"{faker.pydecimal(left_digits=14, right_digits=4, positive=True)}"),
+            owner=owner or gcp_account,
+            owner_id=owner.id or gcp_account.id,
+            status=status or ChargesFileStatus.DRAFT,
+        )
+        db_session.add(charges_file)
+        await db_session.commit()
+        await db_session.refresh(charges_file)
+        return charges_file
+
+    return _charges_file
+
+
+@pytest.fixture
 def datasource_expense_factory(
     faker: Faker,
     db_session: AsyncSession,
@@ -419,6 +455,20 @@ async def affiliate_account(
         created_by=ffc_extension,
         updated_by=ffc_extension,
     )
+
+
+@pytest.fixture
+async def affiliate_system(
+    system_factory: ModelFactory[System], affiliate_account: Account
+) -> System:
+    return await system_factory(external_id="FFC", owner=affiliate_account)
+
+
+@pytest.fixture
+def affiliate_account_jwt_token(
+    system_jwt_token_factory: Callable[[System], str], affiliate_system: System
+) -> str:
+    return system_jwt_token_factory(affiliate_system)
 
 
 @pytest.fixture
