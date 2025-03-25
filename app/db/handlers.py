@@ -18,6 +18,7 @@ from app.db.models import (
     Account,
     AccountUser,
     AuditableMixin,
+    DatasourceExpense,
     Entitlement,
     Organization,
     System,
@@ -479,3 +480,7 @@ class AccountUserHandler(ModelHandler[AccountUser]):
             query = query.options(*self.default_options)
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
+
+
+class DatasourceExpenseHandler(ModelHandler[DatasourceExpense]):
+    pass

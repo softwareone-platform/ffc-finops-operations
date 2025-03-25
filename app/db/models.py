@@ -4,8 +4,14 @@ import datetime
 from decimal import Decimal
 
 import sqlalchemy as sa
-from sqlalchemy import Enum, ForeignKey, Index, Integer, String, Text
-from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, mapped_column, relationship
+from sqlalchemy import Enum, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy.orm import (
+    DeclarativeBase,
+    Mapped,
+    declared_attr,
+    mapped_column,
+    relationship,
+)
 from sqlalchemy_utils import StringEncryptedType
 from sqlalchemy_utils.types.encrypted.encrypted_type import FernetEngine
 
@@ -256,6 +262,9 @@ class Organization(Base, AuditableMixin, HumanReadablePKMixin):
         default=OrganizationStatus.ACTIVE,
         server_default=OrganizationStatus.ACTIVE.value,
     )
+    datasource_expenses: Mapped[list[DatasourceExpense]] = relationship(
+        "DatasourceExpense", back_populates="organization"
+    )
 
     __table_args__ = (
         Index(
@@ -263,6 +272,35 @@ class Organization(Base, AuditableMixin, HumanReadablePKMixin):
             operations_external_id,
             unique=True,
             postgresql_where=(status != OrganizationStatus.DELETED),
+        ),
+    )
+
+
+class DatasourceExpense(Base, HumanReadablePKMixin, AuditableMixin):
+    __tablename__ = "datasource_expenses"
+
+    PK_PREFIX = "FDSX"
+    PK_NUM_LENGTH = 12
+
+    datasource_id: Mapped[str] = mapped_column(String(255), index=True)
+    organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"))
+
+    organization: Mapped[Organization] = relationship(
+        "Organization", back_populates="datasource_expenses"
+    )
+
+    year: Mapped[int] = mapped_column(Integer(), nullable=False)
+    month: Mapped[int] = mapped_column(Integer(), nullable=False)
+    month_expenses: Mapped[Decimal] = mapped_column(sa.Numeric(10, 4))
+
+    __table_args__ = (
+        Index("ix_datasource_expenses_year_and_month", year, month),
+        UniqueConstraint(
+            datasource_id,
+            organization_id,
+            year,
+            month,
+            name="uq_datasource_expenses_per_month",
         ),
     )
 
@@ -275,7 +313,7 @@ class Entitlement(Base, HumanReadablePKMixin, AuditableMixin):
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     affiliate_external_id: Mapped[str] = mapped_column(String(255), nullable=False)
-    datasource_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    datasource_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     linked_datasource_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     linked_datasource_type: Mapped[DatasourceType | None] = mapped_column(
         Enum(DatasourceType, values_callable=lambda obj: [e.value for e in obj]),

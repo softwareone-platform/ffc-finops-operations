@@ -2,14 +2,17 @@ import secrets
 import uuid
 from collections.abc import AsyncGenerator, Callable
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import jwt
 import pytest
 from asgi_lifespan import LifespanManager
 from faker import Faker
-from fastapi import FastAPI
+from fastapi import FastAPI, status
 from httpx import ASGITransport, AsyncClient
+from pydantic.v1.utils import deep_update
 from pytest_asyncio import is_async_test
+from pytest_httpx import HTTPXMock
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -19,7 +22,17 @@ from sqlalchemy.ext.asyncio import (
 
 from app.conf import Settings, get_settings
 from app.db import get_db_engine
-from app.db.models import Account, AccountUser, Actor, Base, Entitlement, Organization, System, User
+from app.db.models import (
+    Account,
+    AccountUser,
+    Actor,
+    Base,
+    DatasourceExpense,
+    Entitlement,
+    Organization,
+    System,
+    User,
+)
 from app.enums import (
     AccountStatus,
     AccountType,
@@ -338,6 +351,40 @@ def system_jwt_token_factory(
 
 
 @pytest.fixture
+def datasource_expense_factory(
+    faker: Faker,
+    db_session: AsyncSession,
+    organization_factory: ModelFactory[Organization],
+) -> ModelFactory[DatasourceExpense]:
+    async def _datasource_expense(
+        organization: Organization | None = None,
+        year: int = 2025,
+        month: int = 3,
+        month_expenses: float = 123.45,
+        datasource_id: str | None = None,
+        created_at: datetime | None = None,
+        updated_at: datetime | None = None,
+    ) -> DatasourceExpense:
+        organization = organization or await organization_factory()
+
+        datasource_expense = DatasourceExpense(
+            organization=organization,
+            datasource_id=datasource_id or faker.uuid4(),
+            year=year,
+            month=month,
+            month_expenses=month_expenses,
+            created_at=created_at or datetime.now(UTC) - timedelta(days=7),
+            updated_at=updated_at or datetime.now(UTC) - timedelta(days=7),
+        )
+        db_session.add(datasource_expense)
+        await db_session.commit()
+        await db_session.refresh(datasource_expense)
+        return datasource_expense
+
+    return _datasource_expense
+
+
+@pytest.fixture
 async def aws_account(account_factory: ModelFactory[Account]) -> Account:
     return await account_factory(name="AWS", type=AccountType.AFFILIATE)
 
@@ -435,3 +482,67 @@ async def apple_inc_organization(organization_factory: ModelFactory[Organization
         currency="USD",
         linked_organization_id=str(uuid.uuid4()),
     )
+
+
+class MockOptscaleClient:
+    def __init__(self, test_settings: Settings, httpx_mock: HTTPXMock):
+        self.test_settings = test_settings
+        self.httpx_mock = httpx_mock
+
+    def add_mock_response(self, method: str, url: str, **kwargs: Any) -> None:
+        self.httpx_mock.add_response(
+            method=method,
+            url=f"{self.test_settings.opt_api_base_url}/{url.removeprefix('/')}",
+            match_headers={"Secret": self.test_settings.opt_cluster_secret},
+            **kwargs,
+        )
+
+    def mock_fetch_datasources_for_organization(
+        self,
+        organization: Organization,
+        cloud_account_configs: list[dict[str, Any]] | None = None,
+        status_code: int = status.HTTP_200_OK,
+    ):
+        if organization.linked_organization_id is None:
+            raise ValueError("Organization has no linked organization ID")
+
+        def cloud_account_details_factory(config: dict[str, Any]) -> dict[str, Any]:
+            return deep_update(
+                {
+                    "id": str(uuid.uuid4()),
+                    "deleted_at": 0,
+                    "created_at": 1729683941,
+                    "name": "CPA (Development and Test)",
+                    "type": "azure_cnr",
+                    "organization_id": organization.linked_organization_id,
+                    "account_id": str(uuid.uuid4()),
+                    "details": {
+                        "cost": 123.45,
+                        "forecast": 1099.0,
+                        "tracked": 2,
+                        "last_month_cost": 987.65,
+                    },
+                },
+                config,
+            )
+
+        json = None
+
+        if cloud_account_configs is not None:
+            json = {
+                "cloud_accounts": [
+                    cloud_account_details_factory(config) for config in cloud_account_configs
+                ]
+            }
+
+        self.add_mock_response(
+            "GET",
+            f"organizations/{organization.linked_organization_id}/cloud_accounts?details=true",
+            json=json,
+            status_code=status_code,
+        )
+
+
+@pytest.fixture
+def mock_optscale_client(test_settings: Settings, httpx_mock: HTTPXMock) -> MockOptscaleClient:
+    return MockOptscaleClient(test_settings, httpx_mock)
