@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from typer.testing import CliRunner
 
 from app.cli import app
-from app.commands import update_last_month_datasource_expenses
+from app.commands import update_current_month_datasource_expenses
 from app.conf import Settings
 from app.db.handlers import DatasourceExpenseHandler
 from app.db.models import DatasourceExpense, Organization
@@ -59,7 +59,7 @@ async def test_create_new_datasource_expenses_single_organization(
     existing_datasource_expenses = await datasource_expense_handler.query_db()
     assert len(existing_datasource_expenses) == 0
 
-    await update_last_month_datasource_expenses.main(db_session.bind, test_settings)  # type: ignore
+    await update_current_month_datasource_expenses.main(db_session.bind, test_settings)  # type: ignore
 
     new_datasource_expenses = await datasource_expense_handler.query_db()
     assert len(new_datasource_expenses) == 2
@@ -123,7 +123,7 @@ async def test_datasource_expenses_are_updated_for_current_month(
     existing_datasource_expenses = await datasource_expense_handler.query_db()
     assert len(existing_datasource_expenses) == 2
 
-    await update_last_month_datasource_expenses.main(db_session.bind, test_settings)  # type: ignore
+    await update_current_month_datasource_expenses.main(db_session.bind, test_settings)  # type: ignore
 
     new_datasource_expenses = await datasource_expense_handler.query_db()
     assert len(new_datasource_expenses) == 3
@@ -131,7 +131,7 @@ async def test_datasource_expenses_are_updated_for_current_month(
     ds_exp1 = next(
         ds_exp for ds_exp in new_datasource_expenses if ds_exp.datasource_id == datasource_id1
     )
-    ds_exp2_last_month = next(
+    ds_exp2_current_month = next(
         ds_exp
         for ds_exp in new_datasource_expenses
         if (ds_exp.datasource_id == datasource_id2 and ds_exp.month == 2)
@@ -151,11 +151,11 @@ async def test_datasource_expenses_are_updated_for_current_month(
     assert ds_exp1.month == 3
     assert ds_exp1.month_expenses == Decimal("234.56")
 
-    assert ds_exp2_last_month.id == existing_datasource_expense2.id
-    assert ds_exp2_last_month.organization_id == organization.id
-    assert ds_exp2_last_month.year == 2025
-    assert ds_exp2_last_month.month == 2
-    assert ds_exp2_last_month.month_expenses == Decimal("567.89")
+    assert ds_exp2_current_month.id == existing_datasource_expense2.id
+    assert ds_exp2_current_month.organization_id == organization.id
+    assert ds_exp2_current_month.year == 2025
+    assert ds_exp2_current_month.month == 2
+    assert ds_exp2_current_month.month_expenses == Decimal("567.89")
 
     assert ds_exp2_this_month.id not in (
         existing_datasource_expense1.id,
@@ -178,7 +178,7 @@ async def test_organization_with_no_linked_organization_id(
     organization = await organization_factory(linked_organization_id=None)
 
     with caplog.at_level(logging.WARNING):
-        await update_last_month_datasource_expenses.main(db_session.bind, test_settings)  # type: ignore
+        await update_current_month_datasource_expenses.main(db_session.bind, test_settings)  # type: ignore
 
     assert (
         f"Organization {organization.id} has no linked organization ID. Skipping..." in caplog.text
@@ -201,7 +201,7 @@ async def test_organization_with_recent_updates_to_datasource_expences(
     organization = await organization_factory(linked_organization_id=None)
 
     store_datasource_expenses_mock = mocker.patch(
-        "app.commands.update_last_month_datasource_expenses.store_datasource_expenses"
+        "app.commands.update_current_month_datasource_expenses.store_datasource_expenses"
     )
 
     await datasource_expense_factory(
@@ -212,7 +212,7 @@ async def test_organization_with_recent_updates_to_datasource_expences(
         updated_at=datetime.now(UTC),
     )
 
-    await update_last_month_datasource_expenses.main(db_session.bind, test_settings)  # type: ignore
+    await update_current_month_datasource_expenses.main(db_session.bind, test_settings)  # type: ignore
     assert not httpx_mock.get_request()
     store_datasource_expenses_mock.assert_called_once_with(mocker.ANY, {}, year=2025, month=3)
 
@@ -250,10 +250,10 @@ async def test_optscale_api_returns_exception(
     )
 
     with caplog.at_level(logging.WARNING):
-        await update_last_month_datasource_expenses.main(db_session.bind, test_settings)  # type: ignore
+        await update_current_month_datasource_expenses.main(db_session.bind, test_settings)  # type: ignore
 
     assert (
-        update_last_month_datasource_expenses.logger.name,
+        update_current_month_datasource_expenses.logger.name,
         expected_log_level,
         expected_log_format % organization.id,
     ) in caplog.record_tuples
@@ -353,7 +353,7 @@ async def test_multiple_datasources_are_handled_correctly(
     mock_optscale_client.mock_fetch_datasources_for_organization(organization4, status_code=404)
 
     with caplog.at_level(logging.WARNING), capsqlalchemy:
-        await update_last_month_datasource_expenses.main(db_session.bind, test_settings)  # type: ignore
+        await update_current_month_datasource_expenses.main(db_session.bind, test_settings)  # type: ignore
         capsqlalchemy.assert_query_types(
             SQLExpressionType.BEGIN,   # First transaction
             SQLExpressionType.SELECT,  # Fetch organizations
@@ -393,14 +393,15 @@ def test_cli_command(db_engine: AsyncEngine, mocker: MockerFixture, test_setting
     mock_command_coro = mocker.MagicMock()
     mock_command = mocker.MagicMock(return_value=mock_command_coro)
 
-    mocker.patch("app.commands.update_last_month_datasource_expenses.main", mock_command)
+    mocker.patch("app.commands.update_current_month_datasource_expenses.main", mock_command)
     mocker.patch(
-        "app.commands.update_last_month_datasource_expenses.get_db_engine", return_value=db_engine
+        "app.commands.update_current_month_datasource_expenses.get_db_engine",
+        return_value=db_engine,
     )
-    mock_run = mocker.patch("app.commands.update_last_month_datasource_expenses.asyncio.run")
+    mock_run = mocker.patch("app.commands.update_current_month_datasource_expenses.asyncio.run")
     runner = CliRunner()
 
-    result = runner.invoke(app, ["update-last-month-datasource-expenses"])
+    result = runner.invoke(app, ["update-current-month-datasource-expenses"])
     assert result.exit_code == 0
     mock_run.assert_called_once_with(mock_command_coro)
 

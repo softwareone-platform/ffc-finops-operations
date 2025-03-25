@@ -131,7 +131,8 @@ async def main(db_engine: AsyncEngine, settings: Settings) -> None:
 
 def command(ctx: typer.Context) -> None:
     """
-    Fetch from Optscale all datasource expenses for the last month and store them in the database.
+    Fetch from Optscale all datasource expenses for the current month
+    and store them in the database.
     """
     db_engine = get_db_engine(ctx.obj)
     logger.info("Starting command function")
