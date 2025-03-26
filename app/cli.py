@@ -1,6 +1,8 @@
 import inspect
+import logging
 
 import typer
+from rich.logging import RichHandler
 
 from app import commands
 from app.conf import get_settings
@@ -25,3 +27,11 @@ def main(
     ctx: typer.Context,
 ):
     ctx.obj = get_settings()
+
+    if ctx.obj.cli_rich_logging:
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(message)s",
+            datefmt="%X",
+            handlers=[RichHandler()],
+        )

@@ -30,6 +30,9 @@ dependencies = [
     "email-validator==2.2.*",
     "pycountry>=24.6.1,<24.7",
     "requela==0.1.*",
+    # stamina uses calendar versioning meaning only the latest one is officially supported
+    # ref: https://github.com/hynek/stamina/blob/main/.github/SECURITY.md
+    "stamina>=25.1.0",
 ]
 
 [dependency-groups]

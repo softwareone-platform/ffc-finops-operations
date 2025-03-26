@@ -4,7 +4,17 @@ import datetime
 from decimal import Decimal
 
 import sqlalchemy as sa
-from sqlalchemy import Enum, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
@@ -303,6 +313,48 @@ class DatasourceExpense(Base, HumanReadablePKMixin, AuditableMixin):
             name="uq_datasource_expenses_per_month",
         ),
     )
+
+
+class ExchangeRates(Base, HumanReadablePKMixin, AuditableMixin):
+    __tablename__ = "exchange_rates"
+
+    PK_PREFIX = "FEXR"
+    PK_NUM_LENGTH = 12
+
+    api_response: Mapped[dict] = mapped_column(JSONB(), nullable=False)
+
+    @hybrid_property
+    def base_currency(self) -> str:
+        return self.api_response["base_code"]
+
+    @base_currency.inplace.expression
+    @classmethod
+    def _base_currency_sql_expr(cls) -> sa.ColumnElement[str]:
+        return cls.api_response["base_code"].astext
+
+    @hybrid_property
+    def last_update(self) -> datetime.datetime:
+        last_update_unix = self.api_response["time_last_update_unix"]
+        return datetime.datetime.fromtimestamp(last_update_unix, datetime.UTC)
+
+    @last_update.inplace.expression
+    @classmethod
+    def _last_update_sql_expr(cls) -> sa.ColumnElement[datetime.datetime]:
+        return sa.func.to_timestamp(
+            sa.cast(cls.api_response["time_last_update_unix"].astext, sa.Integer)
+        )
+
+    @hybrid_property
+    def next_update(self) -> datetime.datetime:
+        next_update_unix = self.api_response["time_next_update_unix"]
+        return datetime.datetime.fromtimestamp(next_update_unix, datetime.UTC)
+
+    @next_update.inplace.expression
+    @classmethod
+    def _next_update_sql_expr(cls) -> sa.ColumnElement[datetime.datetime]:
+        return sa.func.to_timestamp(
+            sa.cast(cls.api_response["time_next_update_unix"].astext, sa.Integer)
+        )
 
 
 class Entitlement(Base, HumanReadablePKMixin, AuditableMixin):
