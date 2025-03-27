@@ -209,6 +209,7 @@ async def test_invite_user_non_default_account_not_active(
 
 async def test_invite_user_no_operations_account(
     test_settings: Settings,
+    db_session: AsyncSession,
     capsys: pytest.CaptureFixture,
 ):
     with pytest.raises(Abort):
