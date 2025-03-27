@@ -125,7 +125,7 @@ wheels = [
 
 [[package]]
 name = "azure-storage-blob"
-version = "12.15.0"
+version = "12.25.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "azure-core" },
@@ -133,9 +133,9 @@ dependencies = [
     { name = "isodate" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/43/20/cdd33ec1fdb22f5374332172c2be941e5bc598ef624ce2ccc49ba93569d5/azure-storage-blob-12.15.0.zip", hash = "sha256:f8b8d582492740ab16744455408342fb8e4c8897b64a8a3fc31743844722c2f2", size = 698823 }
+sdist = { url = "https://files.pythonhosted.org/packages/8a/a6/343e225ffd1c27971fa3059b8bbb90088042ff9a41f631fdf2f9df4f190e/azure_storage_blob-12.25.0.tar.gz", hash = "sha256:42364ca8f9f49dbccd0acc10144ed47bb6770bf78719970b51915f048891abba", size = 570274 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/46/cf/ef1daa7b7df2b2d72db82fa2a777bf50133f4797b4bdfa6b3bbea09660fe/azure_storage_blob-12.15.0-py3-none-any.whl", hash = "sha256:08d8807c577c63a436740627927c1a03a97c963efc29af5c818aed906590e1cf", size = 387801 },
+    { url = "https://files.pythonhosted.org/packages/8a/90/b2bb0c338a486e62428d5126236d09e03e890f59c4939292e13ee57e5007/azure_storage_blob-12.25.0-py3-none-any.whl", hash = "sha256:a38e18bf10258fb19028f343db0d3d373280c6427a619c98c06d76485805b755", size = 406921 },
 ]
 
 [[package]]
@@ -758,19 +758,14 @@ source = { editable = "." }
 dependencies = [
     { name = "alembic" },
     { name = "asyncpg" },
-    { name = "azure-core" },
     { name = "azure-identity" },
     { name = "azure-storage-blob" },
-    { name = "charset-normalizer" },
     { name = "cryptography" },
     { name = "email-validator" },
     { name = "fastapi", extra = ["standard"] },
     { name = "fastapi-pagination" },
     { name = "gunicorn" },
     { name = "httpx" },
-    { name = "isodate" },
-    { name = "msal" },
-    { name = "msal-extensions" },
     { name = "pycountry" },
     { name = "pydantic-extra-types" },
     { name = "pydantic-settings" },
@@ -778,13 +773,11 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "pyyaml" },
     { name = "requela" },
-    { name = "requests" },
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "sqlalchemy-utils" },
     { name = "stamina" },
     { name = "svcs" },
     { name = "typer" },
-    { name = "urllib3" },
     { name = "uvicorn-worker" },
     { name = "uvloop" },
 ]
@@ -816,19 +809,14 @@ dev = [
 requires-dist = [
     { name = "alembic", specifier = "==1.14.*" },
     { name = "asyncpg", specifier = "==0.30.*" },
-    { name = "azure-core", specifier = "==1.32.0" },
-    { name = "azure-identity", specifier = "==1.21.0" },
-    { name = "azure-storage-blob", specifier = "==12.15.0" },
-    { name = "charset-normalizer", specifier = "==3.4.1" },
+    { name = "azure-identity", specifier = ">=1.21.0" },
+    { name = "azure-storage-blob", specifier = ">=12.25.0" },
     { name = "cryptography", specifier = "==44.0.*" },
     { name = "email-validator", specifier = "==2.2.*" },
     { name = "fastapi", extras = ["standard"], specifier = "==0.115.*" },
     { name = "fastapi-pagination", specifier = "==0.12.*" },
     { name = "gunicorn", specifier = "==23.0.*" },
     { name = "httpx", specifier = "==0.27.*" },
-    { name = "isodate", specifier = "==0.7.2" },
-    { name = "msal", specifier = "==1.32.0" },
-    { name = "msal-extensions", specifier = "==1.3.1" },
     { name = "pycountry", specifier = ">=24.6.1,<24.7" },
     { name = "pydantic-extra-types", specifier = "==2.10.*" },
     { name = "pydantic-settings", specifier = "==2.6.*" },
@@ -836,13 +824,11 @@ requires-dist = [
     { name = "python-dotenv", specifier = "==1.0.*" },
     { name = "pyyaml", specifier = "==6.0.*" },
     { name = "requela", specifier = "==0.1.*" },
-    { name = "requests", specifier = "==2.32.3" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = "==2.0.*" },
     { name = "sqlalchemy-utils", specifier = "==0.41.*" },
     { name = "stamina", specifier = ">=25.1.0" },
     { name = "svcs", specifier = "==24.1.*" },
     { name = "typer", specifier = "==0.13.*" },
-    { name = "urllib3", specifier = "==2.3.0" },
     { name = "uvicorn-worker", specifier = "==0.3.*" },
     { name = "uvloop", specifier = "==0.21.*" },
 ]
