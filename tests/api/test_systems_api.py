@@ -784,7 +784,7 @@ async def test_system_cannot_delete_itself(
         ),
         pytest.param(
             {"name": None},
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status.HTTP_400_BAD_REQUEST,
             "initial_name",
             None,
             "initial_external_id",

@@ -144,11 +144,11 @@ async def test_get_organization_with_not_valid_filter(
     organization_factory: ModelFactory[Organization], api_client: AsyncClient, ffc_jwt_token: str
 ):
     await organization_factory(operations_external_id="EXTERNAL_ID_1")
-    with pytest.raises(ValueError):
-        await api_client.get(
-            "/organizations?eq(ciaociao,active)",
-            headers={"Authorization": f"Bearer {ffc_jwt_token}"},
-        )
+    response = await api_client.get(
+        "/organizations?eq(ciaociao,active)",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+    )
+    assert response.status_code == 400
 
 
 async def test_get_all_organizations_single_page(

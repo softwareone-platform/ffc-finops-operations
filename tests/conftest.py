@@ -83,7 +83,7 @@ def db_engine(test_settings: Settings) -> AsyncEngine:
 
 
 @pytest.fixture(scope="session", autouse=True)
-async def setup_db_tables(db_engine: AsyncEngine) -> None:
+async def setup_db_tables(db_engine: AsyncEngine) -> AsyncGenerator[None]:
     async with db_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

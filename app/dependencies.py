@@ -223,6 +223,7 @@ def check_operations_account(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You've found the door, but you don't have the key.",
         )
+    return None
 
 
 CurrentAuthContext = Annotated[AuthenticationContext | None, Depends(get_authentication_context)]

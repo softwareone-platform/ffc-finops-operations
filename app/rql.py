@@ -1,7 +1,7 @@
 from urllib.parse import parse_qs, quote
 
 from fastapi import Request
-from requela import FieldRule, ModelRQLRules, RelationshipRule
+from requela import FieldRule, ModelRQLRules, RelationshipRule, RequelaError
 from sqlalchemy.sql.selectable import Select
 
 from app.db.models import (
@@ -14,6 +14,7 @@ from app.db.models import (
     System,
     User,
 )
+from app.utils import wrap_exc_in_http_response
 
 
 class ActorRules(ModelRQLRules):
@@ -116,4 +117,6 @@ class RQLQuery:
         rql_expression = "&".join(rql_tokens)
         if not rql_expression:
             return None
-        return self.rules.build_query(rql_expression)
+
+        with wrap_exc_in_http_response(RequelaError):
+            return self.rules.build_query(rql_expression)
