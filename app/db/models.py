@@ -286,7 +286,7 @@ class Organization(Base, AuditableMixin, HumanReadablePKMixin):
     )
 
 
-class DatasourceExpense(Base, HumanReadablePKMixin, AuditableMixin):
+class DatasourceExpense(Base, HumanReadablePKMixin, TimestampMixin):
     __tablename__ = "datasource_expenses"
 
     PK_PREFIX = "FDSX"
@@ -315,7 +315,7 @@ class DatasourceExpense(Base, HumanReadablePKMixin, AuditableMixin):
     )
 
 
-class ExchangeRates(Base, HumanReadablePKMixin, AuditableMixin):
+class ExchangeRates(Base, HumanReadablePKMixin, TimestampMixin):
     __tablename__ = "exchange_rates"
 
     PK_PREFIX = "FEXR"
