@@ -8,7 +8,7 @@ from fastapi.routing import APIRoute, APIRouter
 
 from app.conf import get_settings
 from app.db.base import configure_db_engine, verify_db_connection
-from app.dependencies import authentication_required
+from app.dependencies.auth import authentication_required
 from app.openapi import generate_openapi_spec
 from app.routers import (
     accounts,
