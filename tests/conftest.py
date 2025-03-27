@@ -82,7 +82,7 @@ def db_engine(test_settings: Settings) -> AsyncEngine:
     return configure_db_engine(test_settings)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="session", autouse=True)
 async def setup_db_tables(db_engine: AsyncEngine) -> None:
     async with db_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -96,7 +96,7 @@ async def setup_db_tables(db_engine: AsyncEngine) -> None:
         await db_engine.dispose()
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 async def db_session(db_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, None]:
     # Use nested transactions to avoid committing changes to the database, speeding up
     # the tests significantly and avoiding side effects between them.
@@ -115,21 +115,25 @@ async def db_session(db_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, Non
 
 
 @pytest.fixture(scope="session")
-def fastapi_app(test_settings: Settings, setup_db_tables: None) -> FastAPI:
+def fastapi_app(test_settings: Settings) -> FastAPI:
     from app.main import app
 
     app.dependency_overrides[get_settings] = lambda: test_settings
     return app
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 async def app_lifespan_manager(fastapi_app: FastAPI) -> AsyncGenerator[LifespanManager, None]:
     async with LifespanManager(fastapi_app) as lifespan_manager:
         yield lifespan_manager
 
 
-@pytest.fixture()
-async def api_client(fastapi_app: FastAPI, app_lifespan_manager: LifespanManager):
+@pytest.fixture
+async def api_client(
+    fastapi_app: FastAPI,
+    app_lifespan_manager: LifespanManager,
+    db_session: AsyncSession,
+) -> AsyncGenerator[AsyncClient]:
     async with AsyncClient(
         transport=ASGITransport(app=app_lifespan_manager.app),
         base_url=f"http://localhost/{fastapi_app.root_path.removeprefix('/')}/",
