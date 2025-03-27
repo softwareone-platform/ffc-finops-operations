@@ -27,14 +27,19 @@ class ExchangeRateAPIError(APIClientError):
     #
     # ref: https://www.exchangerate-api.com/docs/standard-requests
     response: httpx.Response
-    response_result: str
+    response_result: str | None
     error_type: ExchangeRateAPIErrorType
 
     def __init__(self, response: httpx.Response):
-        data = response.json()
         self.response = response
-        self.response_result = data["result"]
-        self.error_type = ExchangeRateAPIErrorType(data.get("error-type", "unknown"))
+
+        try:
+            data = response.json()
+            self.response_result = data.get("result")
+            self.error_type = ExchangeRateAPIErrorType(data.get("error-type", "unknown"))
+        except ValueError:
+            self.response_result = None
+            self.error_type = ExchangeRateAPIErrorType.UNKNOWN
 
         super().__init__(f"response result is {self.response_result}, code: {self.error_type}")
 
@@ -67,9 +72,12 @@ class ExchangeRateAPIClient(BaseAPIClient):
     async def get_latest_rates(self, base_currency: str) -> httpx.Response:
         response = await self.httpx_client.get(f"/latest/{base_currency}")
         response.raise_for_status()
-        response_data = response.json()
+        try:
+            response_data = response.json()
+        except ValueError:
+            raise ExchangeRateAPIError(response)
 
-        if response_data["result"] != "success":
+        if response_data.get("result") != "success":
             raise ExchangeRateAPIError(response)
 
         return response
