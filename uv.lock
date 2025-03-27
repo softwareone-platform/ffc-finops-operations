@@ -683,6 +683,7 @@ dependencies = [
     { name = "requela" },
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "sqlalchemy-utils" },
+    { name = "stamina" },
     { name = "svcs" },
     { name = "typer" },
     { name = "uvicorn-worker" },
@@ -731,6 +732,7 @@ requires-dist = [
     { name = "requela", specifier = "==0.1.*" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = "==2.0.*" },
     { name = "sqlalchemy-utils", specifier = "==0.41.*" },
+    { name = "stamina", specifier = ">=25.1.0" },
     { name = "svcs", specifier = "==24.1.*" },
     { name = "typer", specifier = "==0.13.*" },
     { name = "uvicorn-worker", specifier = "==0.3.*" },
@@ -1371,6 +1373,18 @@ wheels = [
 ]
 
 [[package]]
+name = "stamina"
+version = "25.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "tenacity" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fd/c4/d242d76ffc88aa1fd14214d3143b542857b32276db4a20f8d99669054a5e/stamina-25.1.0.tar.gz", hash = "sha256:ad674809796ae40512b3b6296cfade826efd63863ff2ca2f59f806342e91e94a", size = 561127 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/14/ba/d03f7ee711391af1d5f4dd7c44f8abdd06bce247028af2441ba8f6ff329b/stamina-25.1.0-py3-none-any.whl", hash = "sha256:c08291da540e6f4243c20f7ee98f0ed0ac9101d639803c481a029b56d7e9b45d", size = 17323 },
+]
+
+[[package]]
 name = "starlette"
 version = "0.46.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1404,6 +1418,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/00/35/d04e27a2c15dc948155eb4635338e9f2c66c5d0b68e1abee4eca887661f3/svcs-24.1.0.tar.gz", hash = "sha256:7419980475dd6b8e256e072c895c84cfe40d4da1ee944145f98724f2985dfd1f", size = 710520 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/55/75/795347abe56c4012fd511af35db80370f1461aa443546a83b32d65a19bbb/svcs-24.1.0-py3-none-any.whl", hash = "sha256:f050f4a6fcf163aa3a5d5e17b66bbf5efa3ed2164018aebecd70fc27794ecf6b", size = 18772 },
+]
+
+[[package]]
+name = "tenacity"
+version = "9.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/cd/94/91fccdb4b8110642462e653d5dcb27e7b674742ad68efd146367da7bdb10/tenacity-9.0.0.tar.gz", hash = "sha256:807f37ca97d62aa361264d497b0e31e92b8027044942bfa756160d908320d73b", size = 47421 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b6/cb/b86984bed139586d01532a587464b5805f12e397594f19f931c4c2fbfa61/tenacity-9.0.0-py3-none-any.whl", hash = "sha256:93de0c98785b27fcf659856aa9f54bfbd399e29969b0621bc7f762bd441b4539", size = 28169 },
 ]
 
 [[package]]

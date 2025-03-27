@@ -7,7 +7,7 @@ from typing import Any
 from uuid import UUID
 
 import sqlalchemy
-from sqlalchemy import ColumnExpressionArgument, Select, func, select, update
+from sqlalchemy import ColumnExpressionArgument, Select, desc, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -21,6 +21,7 @@ from app.db.models import (
     ChargesFile,
     DatasourceExpense,
     Entitlement,
+    ExchangeRates,
     Organization,
     System,
     TimestampMixin,
@@ -493,3 +494,18 @@ class ChargesFileHandler(ModelHandler[ChargesFile]):
         self.default_options = [
             joinedload(ChargesFile.owner),
         ]
+
+
+class ExchangeRatesHandler(ModelHandler[ExchangeRates]):
+    async def fetch_latest_valid(self) -> ExchangeRates | None:
+        scalars = await self.query_db(
+            select(ExchangeRates)
+            .filter(ExchangeRates.next_update > datetime.now(UTC))
+            .order_by(desc(ExchangeRates.last_update))
+            .limit(1)
+        )
+
+        if not scalars:
+            return None
+
+        return scalars[0]

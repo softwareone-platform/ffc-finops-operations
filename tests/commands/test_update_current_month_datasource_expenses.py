@@ -17,7 +17,7 @@ from app.conf import Settings
 from app.db.handlers import DatasourceExpenseHandler
 from app.db.models import DatasourceExpense, Organization
 from app.enums import OrganizationStatus
-from tests.conftest import MockOptscaleClient
+from tests.fixtures.mock_api_clients import MockOptscaleClient
 from tests.types import ModelFactory
 
 

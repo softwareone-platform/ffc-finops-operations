@@ -6,6 +6,7 @@ from app.commands import (
     openapi,
     redeem_entitlements,
     update_current_month_datasource_expenses,
+    update_latest_exchange_rates,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "redeem_entitlements",
     "calculate_accounts_stats",
     "update_current_month_datasource_expenses",
+    "update_latest_exchange_rates",
 ]

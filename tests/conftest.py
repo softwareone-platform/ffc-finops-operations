@@ -3,17 +3,15 @@ import uuid
 from collections.abc import AsyncGenerator, Callable
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Any
 
 import jwt
 import pytest
+import stamina
 from asgi_lifespan import LifespanManager
 from faker import Faker
-from fastapi import FastAPI, status
+from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-from pydantic.v1.utils import deep_update
 from pytest_asyncio import is_async_test
-from pytest_httpx import HTTPXMock
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -31,6 +29,7 @@ from app.db.models import (
     ChargesFile,
     DatasourceExpense,
     Entitlement,
+    ExchangeRates,
     Organization,
     System,
     User,
@@ -48,6 +47,10 @@ from app.enums import (
 from app.hasher import pbkdf2_sha256
 from tests.db.models import ModelForTests, ParentModelForTests  # noqa: F401
 from tests.types import ModelFactory
+
+pytest_plugins = [
+    "tests.fixtures.mock_api_clients",
+]
 
 
 def pytest_collection_modifyitems(items):
@@ -70,6 +73,9 @@ def test_settings() -> Settings:
     settings.api_modifier_jwt_secret = "test_jwt_secret"
     settings.auth_access_jwt_secret = "auth_access_jwt_secret"
     settings.auth_refresh_jwt_secret = "auth_refresh_jwt_secret"
+    settings.exchange_rate_api_base_url = "https://v6.exchangerate-api.com/v6"
+    settings.exchange_rate_api_token = "my_exchange_rate_api_token"
+    settings.cli_rich_logging = False
     return settings
 
 
@@ -366,6 +372,7 @@ def charges_file_factory(
         status: str | None = None,
         document_date: str | None = None,
     ):
+        owner = owner or gcp_account
         charges_file = ChargesFile(
             id=faker.uuid4(),
             document_date=datetime.strptime(document_date, format("%Y-%m-%d")).date()
@@ -374,7 +381,7 @@ def charges_file_factory(
             currency=currency or "USD",
             amount=amount
             or Decimal(f"{faker.pydecimal(left_digits=14, right_digits=4, positive=True)}"),
-            owner=owner or gcp_account,
+            owner=owner,
             owner_id=owner.id or gcp_account.id,
             status=status or ChargesFileStatus.DRAFT,
         )
@@ -418,6 +425,48 @@ def datasource_expense_factory(
         return datasource_expense
 
     return _datasource_expense
+
+
+@pytest.fixture
+def exchange_rates_factory(db_session: AsyncSession) -> ModelFactory[ExchangeRates]:
+    async def _exchange_rates(
+        exchange_rates: dict[str, float] | None = None,
+        base_currency: str = "USD",
+        last_update: datetime | None = None,
+        next_update: datetime | None = None,
+    ):
+        if exchange_rates is None:
+            exchange_rates = {
+                "USD": 1.0,
+                "EUR": 0.9252,
+                "GBP": 0.7737,
+            }
+
+        if last_update is None:
+            last_update = datetime.now(UTC)
+
+        if next_update is None:
+            next_update = last_update + timedelta(days=1)
+
+        if last_update > next_update:
+            raise ValueError("Last update time must be before next update time")
+
+        exchange_rates_model = ExchangeRates(
+            api_response={
+                "result": "success",
+                "time_last_update_unix": int(last_update.timestamp()),
+                "time_next_update_unix": int(next_update.timestamp()),
+                "base_code": base_currency,
+                "conversion_rates": exchange_rates,
+            },
+        )
+
+        db_session.add(exchange_rates_model)
+        await db_session.commit()
+        await db_session.refresh(exchange_rates_model)
+        return exchange_rates_model
+
+    return _exchange_rates
 
 
 @pytest.fixture
@@ -534,65 +583,10 @@ async def apple_inc_organization(organization_factory: ModelFactory[Organization
     )
 
 
-class MockOptscaleClient:
-    def __init__(self, test_settings: Settings, httpx_mock: HTTPXMock):
-        self.test_settings = test_settings
-        self.httpx_mock = httpx_mock
-
-    def add_mock_response(self, method: str, url: str, **kwargs: Any) -> None:
-        self.httpx_mock.add_response(
-            method=method,
-            url=f"{self.test_settings.optscale_rest_api_base_url}/{url.removeprefix('/')}",
-            match_headers={"Secret": self.test_settings.optscale_cluster_secret},
-            **kwargs,
-        )
-
-    def mock_fetch_datasources_for_organization(
-        self,
-        organization: Organization,
-        cloud_account_configs: list[dict[str, Any]] | None = None,
-        status_code: int = status.HTTP_200_OK,
-    ):
-        if organization.linked_organization_id is None:
-            raise ValueError("Organization has no linked organization ID")
-
-        def cloud_account_details_factory(config: dict[str, Any]) -> dict[str, Any]:
-            return deep_update(
-                {
-                    "id": str(uuid.uuid4()),
-                    "deleted_at": 0,
-                    "created_at": 1729683941,
-                    "name": "CPA (Development and Test)",
-                    "type": "azure_cnr",
-                    "organization_id": organization.linked_organization_id,
-                    "account_id": str(uuid.uuid4()),
-                    "details": {
-                        "cost": 123.45,
-                        "forecast": 1099.0,
-                        "tracked": 2,
-                        "last_month_cost": 987.65,
-                    },
-                },
-                config,
-            )
-
-        json = None
-
-        if cloud_account_configs is not None:
-            json = {
-                "cloud_accounts": [
-                    cloud_account_details_factory(config) for config in cloud_account_configs
-                ]
-            }
-
-        self.add_mock_response(
-            "GET",
-            f"organizations/{organization.linked_organization_id}/cloud_accounts?details=true",
-            json=json,
-            status_code=status_code,
-        )
-
-
-@pytest.fixture
-def mock_optscale_client(test_settings: Settings, httpx_mock: HTTPXMock) -> MockOptscaleClient:
-    return MockOptscaleClient(test_settings, httpx_mock)
+@pytest.fixture(autouse=True, scope="session")
+def stamina_testing_mode():
+    stamina.set_testing(True, attempts=2)  # no backoff, maximum 2 attempts
+    try:
+        yield
+    finally:
+        stamina.set_testing(False)

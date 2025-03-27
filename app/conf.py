@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     optscale_rest_api_base_url: str
     optscale_cluster_secret: str
 
+    exchange_rate_api_base_url: str
+    exchange_rate_api_token: str
+
+    cli_rich_logging: bool = True
     debug: bool = False
 
     @computed_field
