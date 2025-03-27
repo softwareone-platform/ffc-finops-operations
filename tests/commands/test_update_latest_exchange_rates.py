@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 import time_machine
 from pytest_mock import MockerFixture
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession
 from typer.testing import CliRunner
 
 from app.api_clients.exchange_rate import ExchangeRateAPIError, ExchangeRateAPIErrorType
@@ -39,7 +39,7 @@ async def test_successful_fetch_exchange_rates_when_missing(
     )
 
     with caplog.at_level(logging.INFO, logger="app.commands.update_latest_exchange_rates"):
-        await update_latest_exchange_rates.main(db_session.bind, test_settings)  # type: ignore
+        await update_latest_exchange_rates.main(test_settings)
 
     assert caplog.messages == [
         "Exchange rates are not stored in the database or are no longer valid",
@@ -81,7 +81,7 @@ async def test_dont_fetch_exchange_rates_when_recent_are_present_in_db(
     await exchange_rates_factory()
 
     with caplog.at_level(logging.INFO, logger="app.commands.update_latest_exchange_rates"):
-        await update_latest_exchange_rates.main(db_session.bind, test_settings)  # type: ignore
+        await update_latest_exchange_rates.main(test_settings)
 
     assert caplog.messages == [
         "Exchange rates are already stored in the database and are still valid",
@@ -115,7 +115,7 @@ async def test_fetch_exchange_rates_when_outdated_are_present_in_db(
     )
 
     with caplog.at_level(logging.INFO, logger="app.commands.update_latest_exchange_rates"):
-        await update_latest_exchange_rates.main(db_session.bind, test_settings)  # type: ignore
+        await update_latest_exchange_rates.main(test_settings)
 
     assert caplog.messages == [
         "Exchange rates are not stored in the database or are no longer valid",
@@ -153,7 +153,7 @@ async def test_exchange_rate_api_rerturns_unrecoverable_error(
 
     with caplog.at_level(logging.INFO, logger="app.commands.update_latest_exchange_rates"):
         with pytest.raises(ExchangeRateAPIError) as exc_info:
-            await update_latest_exchange_rates.main(db_session.bind, test_settings)  # type: ignore
+            await update_latest_exchange_rates.main(test_settings)
 
     assert exc_info.value.error_type == ExchangeRateAPIErrorType.INACTIVE_ACCOUNT
 
@@ -188,7 +188,7 @@ async def test_exchange_rate_api_timeouts_then_succeeds(
     )
 
     with caplog.at_level(logging.INFO, logger="app.commands.update_latest_exchange_rates"):
-        await update_latest_exchange_rates.main(db_session.bind, test_settings)  # type: ignore
+        await update_latest_exchange_rates.main(test_settings)
 
     latest_exchange_rates = await exchange_rates_handler.fetch_latest_valid()
 
@@ -215,7 +215,6 @@ async def test_exchange_rate_api_timeouts_then_succeeds(
 
 
 def test_cli_command(
-    db_engine: AsyncEngine,
     mocker: MockerFixture,
     test_settings: Settings,
     mock_exchange_rate_api_client: MockExchangeRateAPIClient,
@@ -225,17 +224,11 @@ def test_cli_command(
     mock_command = mocker.MagicMock(return_value=mock_command_coro)
 
     mocker.patch("app.commands.update_latest_exchange_rates.main", mock_command)
-    mocker.patch(
-        "app.commands.update_latest_exchange_rates.get_db_engine",
-        return_value=db_engine,
-    )
     mock_run = mocker.patch("app.commands.update_latest_exchange_rates.asyncio.run")
     runner = CliRunner()
 
     result = runner.invoke(app, ["update-latest-exchange-rates"])
     assert result.exit_code == 0
     mock_run.assert_called_once_with(mock_command_coro)
-
-    mock_command.assert_called_once_with(db_engine, test_settings)
 
     mock_exchange_rate_api_client.assert_no_api_calls()

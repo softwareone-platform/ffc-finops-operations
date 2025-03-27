@@ -27,7 +27,7 @@ for name, module in inspect.getmembers(commands):
 def main(ctx: typer.Context):
     settings = get_settings()
 
-    if settings.cli_rich_lo;ging:
+    if settings.cli_rich_logging:
         logging.basicConfig(
             level=logging.INFO,
             format="%(message)s",
