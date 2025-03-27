@@ -4,7 +4,6 @@ import jwt
 
 from app.auth.constants import JWT_ALGORITHM, JWT_LEEWAY, UNAUTHORIZED_EXCEPTION
 from app.conf import Settings
-from app.db import DBSession
 from app.db.handlers import (
     AccountHandler,
     AccountUserHandler,
@@ -12,6 +11,7 @@ from app.db.handlers import (
     UserHandler,
 )
 from app.db.models import Account, AccountUser, User
+from app.dependencies import DBSession
 from app.enums import AccountStatus, AccountUserStatus, UserStatus
 from app.hasher import pbkdf2_sha256
 from app.schemas.accounts import AccountReference

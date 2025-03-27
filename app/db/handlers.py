@@ -142,6 +142,7 @@ class ModelHandler[M: BaseModel]:
                 obj.updated_by = auth_context.get().get_actor()
 
         await self._save_changes(obj)
+
         return obj
 
     async def soft_delete(self, id_or_obj: str | M) -> M:

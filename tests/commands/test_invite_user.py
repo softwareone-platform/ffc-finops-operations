@@ -58,12 +58,16 @@ async def test_invite_user_already_invited_force(
         name="Test User",
         status=UserStatus.DRAFT,
     )
-    account_user = await accountuser_factory(
+
+    original_invitation_token = "an invitation token"
+    original_invitation_token_expires_at = datetime(2025, 3, 7, 9, 0, 0, tzinfo=UTC)
+
+    await accountuser_factory(
         user_id=user.id,
         account_id=operations_account.id,
         status=AccountUserStatus.INVITED,
-        invitation_token="an invitation token",
-        invitation_token_expires_at=datetime(2025, 3, 7, 9, 0, 0, tzinfo=UTC),
+        invitation_token=original_invitation_token,
+        invitation_token_expires_at=original_invitation_token_expires_at,
     )
 
     await invite_user(test_settings, "test@example.com", "Test User", None, True)
@@ -79,12 +83,14 @@ async def test_invite_user_already_invited_force(
     assert db_user is not None
     assert db_user.status == UserStatus.DRAFT
     assert db_user.name == "Test User"
+
     accountuser_handler = AccountUserHandler(db_session)
     db_account_user = await accountuser_handler.get_account_user(operations_account.id, user.id)
+
     assert db_account_user is not None
     assert db_account_user.status == AccountUserStatus.INVITED
-    assert db_account_user.invitation_token != account_user.invitation_token
-    assert db_account_user.invitation_token_expires_at != account_user.invitation_token_expires_at
+    assert db_account_user.invitation_token != original_invitation_token
+    assert db_account_user.invitation_token_expires_at != original_invitation_token_expires_at
     assert db_account_user.invitation_token_expires_at == (
         datetime.now(UTC) + timedelta(days=test_settings.invitation_token_expires_days)
     )
@@ -203,6 +209,7 @@ async def test_invite_user_non_default_account_not_active(
 
 async def test_invite_user_no_operations_account(
     test_settings: Settings,
+    db_session: AsyncSession,
     capsys: pytest.CaptureFixture,
 ):
     with pytest.raises(Abort):

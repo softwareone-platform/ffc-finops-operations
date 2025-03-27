@@ -6,9 +6,9 @@ import fastapi_pagination
 from fastapi import Depends, FastAPI
 from fastapi.routing import APIRoute, APIRouter
 
-from app.auth.auth import authentication_required
 from app.conf import get_settings
-from app.db import verify_db_connection
+from app.db.base import configure_db_engine, verify_db_connection
+from app.dependencies import authentication_required
 from app.openapi import generate_openapi_spec
 from app.routers import (
     accounts,
@@ -30,6 +30,8 @@ async def lifespan(app: FastAPI):
     #       use the function bellow its healthcheck
     settings = get_settings()
     app.debug = settings.debug
+
+    configure_db_engine(settings)
     await verify_db_connection(settings)
     # for client_name, client_cls in BaseAPIClient.get_clients_by_name().items():
     #     logging.info("Registering %s API client as a service", client_name)

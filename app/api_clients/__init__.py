@@ -9,7 +9,9 @@ from app.api_clients.base import BaseAPIClient
 from app.api_clients.optscale import OptscaleAuthClient as _OptscaleAuthClient
 from app.api_clients.optscale import OptscaleAuthClientError, OptscaleClientError, UserDoesNotExist
 from app.api_clients.optscale import OptscaleClient as _OptscaleClient
-from app.conf import AppSettings
+
+# TODO: Move this module to app.dependencies
+from app.dependencies import AppSettings
 
 
 class APIClientFactory[T: BaseAPIClient]:

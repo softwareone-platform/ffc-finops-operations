@@ -15,12 +15,10 @@ from pytest_asyncio import is_async_test
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
-    async_sessionmaker,
-    create_async_engine,
 )
 
 from app.conf import Settings, get_settings
-from app.db import get_db_engine
+from app.db.base import configure_db_engine, session_factory
 from app.db.models import (
     Account,
     AccountUser,
@@ -81,38 +79,16 @@ def test_settings() -> Settings:
 
 @pytest.fixture(scope="session")
 def db_engine(test_settings: Settings) -> AsyncEngine:
-    return create_async_engine(
-        str(test_settings.postgres_async_url),
-        echo=test_settings.debug,
-        future=True,
-    )
-
-
-@pytest.fixture(scope="session")
-def fastapi_app(test_settings: Settings, db_engine: AsyncEngine) -> FastAPI:
-    from app.main import app
-
-    app.dependency_overrides[get_settings] = lambda: test_settings
-    app.dependency_overrides[get_db_engine] = lambda: db_engine
-    return app
+    return configure_db_engine(test_settings)
 
 
 @pytest.fixture(scope="session", autouse=True)
-async def app_lifespan_manager(fastapi_app: FastAPI) -> AsyncGenerator[LifespanManager, None]:
-    async with LifespanManager(fastapi_app) as lifespan_manager:
-        yield lifespan_manager
-
-
-@pytest.fixture(autouse=True)
-async def db_session(db_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, None]:
-    session = async_sessionmaker(db_engine, expire_on_commit=False)
-
+async def setup_db_tables(db_engine: AsyncEngine) -> None:
     async with db_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
     try:
-        async with session() as s:
-            yield s
+        yield
     finally:
         async with db_engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)
@@ -120,8 +96,44 @@ async def db_session(db_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, Non
         await db_engine.dispose()
 
 
-@pytest.fixture()
-async def api_client(fastapi_app: FastAPI, app_lifespan_manager: LifespanManager):
+@pytest.fixture
+async def db_session(db_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, None]:
+    # Use nested transactions to avoid committing changes to the database, speeding up
+    # the tests significantly and avoiding side effects between them.
+    #
+    # ref: https://docs.sqlalchemy.org/en/20/orm/session_transaction.html#joining-a-session-into-an-external-transaction-such-as-for-test-suites
+
+    async with db_engine.connect() as conn:
+        outer_transaction = await conn.begin()
+        session_factory.configure(bind=conn, join_transaction_mode="create_savepoint")
+
+        try:
+            async with session_factory() as s:
+                yield s
+        finally:
+            await outer_transaction.rollback()
+
+
+@pytest.fixture(scope="session")
+def fastapi_app(test_settings: Settings) -> FastAPI:
+    from app.main import app
+
+    app.dependency_overrides[get_settings] = lambda: test_settings
+    return app
+
+
+@pytest.fixture(scope="session")
+async def app_lifespan_manager(fastapi_app: FastAPI) -> AsyncGenerator[LifespanManager, None]:
+    async with LifespanManager(fastapi_app) as lifespan_manager:
+        yield lifespan_manager
+
+
+@pytest.fixture
+async def api_client(
+    fastapi_app: FastAPI,
+    app_lifespan_manager: LifespanManager,
+    db_session: AsyncSession,
+) -> AsyncGenerator[AsyncClient]:
     async with AsyncClient(
         transport=ASGITransport(app=app_lifespan_manager.app),
         base_url=f"http://localhost/{fastapi_app.root_path.removeprefix('/')}/",

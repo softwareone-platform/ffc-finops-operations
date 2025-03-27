@@ -1,5 +1,4 @@
 import asyncio
-from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
 import httpx
@@ -9,7 +8,7 @@ from sqlalchemy.exc import DatabaseError
 
 from app.api_clients.optscale import OptscaleClient
 from app.conf import Settings
-from app.db.base import get_db_engine, get_db_session
+from app.db.base import session_factory
 from app.db.handlers import EntitlementHandler, OrganizationHandler
 from app.db.models import Entitlement, Organization
 from app.enums import EntitlementStatus, OrganizationStatus
@@ -20,20 +19,16 @@ BATCH_SIZE = 100
 console = Console(highlighter=None)
 
 
-async def fetch_datasources_for_organization(
-    settings: Settings,
-    organization_id: str,
-) -> dict:
+async def fetch_datasources_for_organization(settings: Settings, organization_id: str) -> dict:
     client = OptscaleClient(settings)
     response = await client.fetch_datasources_for_organization(organization_id)
     return response.json()["cloud_accounts"]
 
 
-async def redeem_entitlements(
-    settings: Settings,
-):
-    engine = get_db_engine(settings)
-    async with asynccontextmanager(get_db_session)(engine) as session:
+async def redeem_entitlements(settings: Settings):
+    # FIXME: Long-lived DB transaction (making API calls inside the transaction)
+
+    async with session_factory.begin() as session:
         organization_handler = OrganizationHandler(session)
         entitlement_handler = EntitlementHandler(session)
 
@@ -115,8 +110,6 @@ async def redeem_entitlements(
                     continue
 
 
-def command(
-    ctx: typer.Context,
-):
+def command(ctx: typer.Context):
     """Redeem entitlements for an Organization."""
     asyncio.run(redeem_entitlements(ctx.obj))

@@ -6,6 +6,7 @@ from rich.logging import RichHandler
 
 from app import commands
 from app.conf import get_settings
+from app.db.base import configure_db_engine
 
 app = typer.Typer(
     help="FinOps for Cloud Operations API Command Line Interface",
@@ -23,15 +24,16 @@ for name, module in inspect.getmembers(commands):
 
 
 @app.callback()
-def main(
-    ctx: typer.Context,
-):
-    ctx.obj = get_settings()
+def main(ctx: typer.Context):
+    settings = get_settings()
 
-    if ctx.obj.cli_rich_logging:
+    if settings.cli_rich_logging:
         logging.basicConfig(
             level=logging.INFO,
             format="%(message)s",
             datefmt="%X",
             handlers=[RichHandler()],
         )
+
+    configure_db_engine(settings)
+    ctx.obj = settings

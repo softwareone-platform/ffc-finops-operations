@@ -2,21 +2,18 @@ import asyncio
 import logging
 
 import typer
-from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.api_clients.exchange_rate import ExchangeRateAPIClient
 from app.conf import Settings
-from app.db.base import get_db_engine, get_sessionmaker
+from app.db.base import session_factory
 from app.db.handlers import ExchangeRatesHandler
 from app.db.models import ExchangeRates
 
 logger = logging.getLogger(__name__)
 
 
-async def main(db_engine: AsyncEngine, settings: Settings) -> None:
-    sessionmaker = get_sessionmaker(db_engine)
-
-    async with sessionmaker() as session:
+async def main(settings: Settings) -> None:
+    async with session_factory() as session:
         exchange_rates_handler = ExchangeRatesHandler(session)
 
         async with session.begin():
@@ -51,7 +48,6 @@ async def main(db_engine: AsyncEngine, settings: Settings) -> None:
 
 def command(ctx: typer.Context) -> None:
     """Fetch exahnge rates from the exchange rate API and store them in the database"""
-    db_engine = get_db_engine(ctx.obj)
     logger.info("Starting command function")
-    asyncio.run(main(db_engine, ctx.obj))
+    asyncio.run(main(ctx.obj))
     logger.info("Completed command function")
