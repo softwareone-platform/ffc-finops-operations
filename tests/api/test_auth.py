@@ -261,36 +261,23 @@ async def test_get_authentication_context_user_account_does_not_exist(
         auth_context.get()
 
 
-@pytest.mark.parametrize(
-    ("account_type", "should_raise_exception", "expected_status", "expected_detail"),
-    [
-        (
-            AccountType.AFFILIATE,
-            True,
-            status.HTTP_403_FORBIDDEN,
-            "You've found the door, but you don't have the key.",
-        ),
-        (AccountType.OPERATIONS, False, None, None),
-    ],
-)
-def test_check_operations_account(
+def test_check_operations_account_error(
     mocker: MockerFixture,
-    account_type: AccountType,
-    should_raise_exception: bool,
-    expected_status: int,
-    expected_detail: str,
 ):
     context = mocker.Mock()
-    context.account.type = account_type
-    if should_raise_exception:
-        with pytest.raises(HTTPException) as exc_info:
-            check_operations_account(context)
+    context.account.type = (AccountType.AFFILIATE,)
+    with pytest.raises(HTTPException) as exc_info:
+        check_operations_account(context)
+    assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
+    assert "You've found the door, but you don't have the key." in str(exc_info.value.detail)
 
-        assert exc_info.value.status_code == expected_status
-        assert expected_detail in str(exc_info.value.detail)
-    else:
-        result = check_operations_account(context)
-        assert result is None
+
+def test_check_operations_account_ok(
+    mocker: MockerFixture,
+):
+    context = mocker.Mock()
+    context.account.type = AccountType.OPERATIONS
+    check_operations_account(context)
 
 
 def test_check_operations_account_no_auth_context():

@@ -48,14 +48,14 @@ class SystemUpdate(BaseSchema):
     # between an explicit `None` and an unset value.
 
     name: Annotated[
-        str,
+        str | None,
         Field(
             min_length=1,
             max_length=255,
             examples=["FinOps For Cloud Marketplace Fulfillment Extension"],
         ),
     ] = None
-    external_id: Annotated[str, Field(min_length=1, max_length=255)] = None
+    external_id: Annotated[str | None, Field(min_length=1, max_length=255)] = None
     description: Annotated[str | None, Field(max_length=2000)] = None
     jwt_secret: Annotated[str | None, Field(min_length=64)] = None
 
