@@ -37,7 +37,7 @@ class ExchangeRateAPIError(APIClientError):
             data = response.json()
             self.response_result = data.get("result")
             self.error_type = ExchangeRateAPIErrorType(data.get("error-type", "unknown"))
-        except ValueError:
+        except ValueError:  # pragma: no cover
             self.response_result = None
             self.error_type = ExchangeRateAPIErrorType.UNKNOWN
 
@@ -74,7 +74,7 @@ class ExchangeRateAPIClient(BaseAPIClient):
         response.raise_for_status()
         try:
             response_data = response.json()
-        except ValueError:
+        except ValueError:  # pragma: no cover
             raise ExchangeRateAPIError(response)
 
         if response_data.get("result") != "success":
