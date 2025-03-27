@@ -1,5 +1,4 @@
 import pathlib
-
 from pydantic import PostgresDsn, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -38,6 +37,8 @@ class Settings(BaseSettings):
     optscale_rest_api_base_url: str
     optscale_cluster_secret: str
 
+    azure_sa_container_name: str = "ffc-charges-files"
+    azure_sa_url: str
     exchange_rate_api_base_url: str
     exchange_rate_api_token: str
 

@@ -15,7 +15,13 @@ services:
       - .env
     ports:
       - "8000:8000"
-
+  azure:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    restart: unless-stopped
+    ports:
+      - "10000:10000"
+      - "10001:10001"
+      - "10002:10002"
   db: &db
     image: postgres:17
     restart: unless-stopped

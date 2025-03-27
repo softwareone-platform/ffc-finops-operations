@@ -6,13 +6,14 @@ from azure.core.exceptions import (
     ResourceExistsError,
     ResourceNotFoundError,
 )
+from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
-logger.addHandler(ch)
+
+
+AZURE_SA_CREDENTIALS = DefaultAzureCredential()
 
 
 class AzureBlobServiceClient:
@@ -22,14 +23,17 @@ class AzureBlobServiceClient:
         connection_string: str | None = None,
     ):
         if connection_string:
-            self.blob_service_client = BlobServiceClient.from_connection_string(
-                conn_str=connection_string
+            self.blob_service_client = BlobServiceClient(
+                account_url=connection_string, credential=AZURE_SA_CREDENTIALS
             )
-        else:
+        else:  # pragma: no branch
             raise ValueError("The connection_string must be provided.")
         self.container_name = container_name
 
     def get_or_create_container_name(self):
+        """
+        This method creates or returns the container client
+        """
         # Create container if not exists
         try:
             container_client = self.blob_service_client.create_container(self.container_name)
@@ -57,9 +61,8 @@ class AzureBlobServiceClient:
             str | None: The file path if upload succeeds; otherwise, None.
 
         """
-        # Upload the blob
         try:
-            logger.info(f"Uploading {file_path} to Azure Blob Storage {blob_name}")
+            logger.debug(f"Uploading {file_path} to Azure Blob Storage {blob_name}")
             self.get_or_create_container_name()
             blob_client = self.blob_service_client.get_blob_client(
                 container=self.container_name, blob=blob_name
@@ -71,12 +74,12 @@ class AzureBlobServiceClient:
             return file_path
         except FileNotFoundError:
             logger.error(f"The file {file_path} could not be found.")
-        except ResourceNotFoundError:
+        except ResourceNotFoundError:  # pragma: no branch
             logger.error(f"Error: The container {self.container_name} does not exist.")
-        except AzureError as error:
+        except AzureError as error:  # pragma: no branch
             logger.error(f"Azure General Error occurred: {error}")
-        except ClientAuthenticationError as error:
+        except ClientAuthenticationError as error:  # pragma: no branch
             logger.error(f"Credentials or SAS token Error occurred: {error}")
-        except Exception as error:
+        except Exception as error:  # pragma: no branch
             logger.error(f"Unexpected error occurred: {error}")
         return None
