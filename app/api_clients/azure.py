@@ -10,7 +10,7 @@ from azure.identity.aio import DefaultAzureCredential
 from azure.storage.blob.aio import ContainerClient
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+
 AZURE_SA_CREDENTIALS = DefaultAzureCredential()
 
 
