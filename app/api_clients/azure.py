@@ -56,14 +56,12 @@ class AsyncAzureBlobServiceClient:
             str | None: The file path if upload succeeds; otherwise, None.
 
         """
-        if not self.container_client:  # pragma: no branch
-            raise RuntimeError("Container must be initialized before attempting to upload.")
         blob_client = self.container_client.get_blob_client(blob_name)  # create the blob client
 
         try:
             logger.debug(f"Trying to Upload {file_path} to Azure Blob Storage {blob_name}")
             async with aiofiles.open(file_path, "rb") as file:
-                file_to_upload = await file.read()
+                file_to_upload = await file.read()  # todo : to improve to address large files
                 await blob_client.upload_blob(data=file_to_upload, overwrite=True)
             logger.info(f"File '{blob_name}' uploaded to container '{self.container_name}'.")
             return file_path
