@@ -1,48 +1,43 @@
 import logging
 
+import aiofiles
 from azure.core.exceptions import (
     AzureError,
     ClientAuthenticationError,
-    ResourceExistsError,
     ResourceNotFoundError,
 )
-from azure.identity import DefaultAzureCredential
-from azure.storage.blob import BlobServiceClient
+from azure.identity.aio import DefaultAzureCredential
+from azure.storage.blob.aio import ContainerClient
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-
-
 AZURE_SA_CREDENTIALS = DefaultAzureCredential()
 
 
-class AzureBlobServiceClient:
-    def __init__(
-        self,
-        container_name: str,
-        connection_string: str | None = None,
-    ):
-        if connection_string:
-            self.blob_service_client = BlobServiceClient(
-                account_url=connection_string, credential=AZURE_SA_CREDENTIALS
-            )
-        else:  # pragma: no branch
-            raise ValueError("The connection_string must be provided.")
+class AsyncAzureBlobServiceClient:
+    def __init__(self, account_url: str, container_name: str):
         self.container_name = container_name
+        self.account_url = account_url
+        self.container_client = ContainerClient(
+            account_url=self.account_url,
+            container_name=self.container_name,
+            credential=AZURE_SA_CREDENTIALS,
+        )
 
-    def get_or_create_container_name(self):
-        """
-        This method creates or returns the container client
-        """
-        # Create container if not exists
-        try:
-            container_client = self.blob_service_client.create_container(self.container_name)
-        except ResourceExistsError:
-            logger.debug("The Azure storage container already exists. No panic!")
-            container_client = self.blob_service_client.get_container_client(self.container_name)
-        return container_client
+    async def maybe_create_container(self):
+        if not await self.container_client.exists():  # pragma: no branch
+            await self.container_client.create_container()
+            logger.info(f"Created container {self.container_name}")
 
-    def upload_file_to_azure_blob(
+    async def __aenter__(self):
+        await self.container_client.__aenter__()
+        await self.maybe_create_container()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.container_client.__aexit__(exc_type, exc_val, exc_tb)
+
+    async def upload_file_to_azure_blob(
         self,
         blob_name: str,  # the blob name to create or use
         file_path: str,  # Path to the file to upload
@@ -61,15 +56,15 @@ class AzureBlobServiceClient:
             str | None: The file path if upload succeeds; otherwise, None.
 
         """
-        try:
-            logger.debug(f"Uploading {file_path} to Azure Blob Storage {blob_name}")
-            self.get_or_create_container_name()
-            blob_client = self.blob_service_client.get_blob_client(
-                container=self.container_name, blob=blob_name
-            )
+        if not self.container_client:  # pragma: no branch
+            raise RuntimeError("Container must be initialized before attempting to upload.")
+        blob_client = self.container_client.get_blob_client(blob_name)  # create the blob client
 
-            with open(file_path, "rb") as data:
-                blob_client.upload_blob(data, overwrite=True)
+        try:
+            logger.debug(f"Trying to Upload {file_path} to Azure Blob Storage {blob_name}")
+            async with aiofiles.open(file_path, "rb") as file:
+                file_to_upload = await file.read()
+                await blob_client.upload_blob(data=file_to_upload, overwrite=True)
             logger.info(f"File '{blob_name}' uploaded to container '{self.container_name}'.")
             return file_path
         except FileNotFoundError:
