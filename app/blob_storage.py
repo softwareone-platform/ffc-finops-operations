@@ -31,11 +31,12 @@ async def upload_charges_file(
 
     blob_name = f"{currency.upper()}/{year}/{month}/{filename}"
     settings = get_settings()
-    connection_string = settings.azure_sa_url
-    container_name = settings.azure_sa_container_name
     azure_client = AsyncAzureBlobServiceClient(
-        account_url=connection_string,
-        container_name=container_name,
+        account_url=settings.azure_sa_url,
+        container_name=settings.azure_sa_container_name,
+        max_concurrency=settings.azure_sa_max_concurrency,
+        max_single_put_size=settings.azure_sa_max_single_put_size,
+        max_block_size=settings.azure_sa_max_block_size,
     )
     async with azure_client:
         return await azure_client.upload_file_to_azure_blob(

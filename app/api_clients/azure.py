@@ -15,16 +15,23 @@ AZURE_SA_CREDENTIALS = DefaultAzureCredential()
 
 
 class AsyncAzureBlobServiceClient:
-    def __init__(self, account_url: str, container_name: str):
+    def __init__(
+        self,
+        account_url: str,
+        container_name: str,
+        max_block_size: int = 1024 * 1024 * 4,
+        max_single_put_size: int = 1024 * 8,
+        max_concurrency: int = 4,
+    ):
         self.container_name = container_name
         self.account_url = account_url
         self.container_client = ContainerClient(
             account_url=self.account_url,
             container_name=self.container_name,
             credential=AZURE_SA_CREDENTIALS,
-            max_block_size=1024 * 1024 * 4,  # 4 MiB
-            max_single_put_size=1024 * 1024 * 8,  # 8 MiB
-            max_concurrency=4,
+            max_block_size=max_block_size,
+            max_single_put_size=max_single_put_size,
+            max_concurrency=max_concurrency,
         )
 
     async def maybe_create_container(self):
