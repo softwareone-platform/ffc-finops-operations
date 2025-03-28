@@ -1,6 +1,7 @@
 from app.commands import (
     calculate_accounts_stats,
     check_expired_invitations,
+    cleanup_obsolete_datasource_expenses,
     create_operations_account,
     invite_user,
     openapi,
@@ -17,5 +18,6 @@ __all__ = [
     "redeem_entitlements",
     "calculate_accounts_stats",
     "update_current_month_datasource_expenses",
+    "cleanup_obsolete_datasource_expenses",
     "update_latest_exchange_rates",
 ]
