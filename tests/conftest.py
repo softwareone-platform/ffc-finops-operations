@@ -150,6 +150,9 @@ def account_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory[Acco
         status: AccountStatus | None = None,
         created_by: Actor | None = None,
         updated_by: Actor | None = None,
+        new_entitlements_count: int = 0,
+        active_entitlements_count: int = 0,
+        terminated_entitlements_count: int = 0,
     ) -> Account:
         account = Account(
             type=type or AccountType.AFFILIATE,
@@ -158,6 +161,9 @@ def account_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory[Acco
             status=status or AccountStatus.ACTIVE,
             created_by=created_by,
             updated_by=updated_by,
+            new_entitlements_count=new_entitlements_count,
+            active_entitlements_count=active_entitlements_count,
+            terminated_entitlements_count=terminated_entitlements_count,
         )
         db_session.add(account)
         await db_session.commit()
@@ -515,6 +521,9 @@ async def affiliate_account(
         type=AccountType.AFFILIATE,
         created_by=ffc_extension,
         updated_by=ffc_extension,
+        new_entitlements_count=10,
+        active_entitlements_count=15,
+        terminated_entitlements_count=50,
     )
 
 

@@ -1,15 +1,19 @@
 from typing import Annotated
 
-from pydantic import Field
+from pydantic import Field, computed_field
 
 from app.enums import AccountStatus, AccountType
 from app.schemas.core import BaseSchema, CommonEventsSchema, IdSchema
 
 
-class AccountEntitlementsStats(BaseSchema):
+class EntitlementStats(BaseSchema):
     new: Annotated[int, Field(examples=["5"], default=0)]
     redeemed: Annotated[int, Field(examples=["4"], default=0)]
     terminated: Annotated[int, Field(examples=["12"], default=0)]
+
+
+class AccountStats(BaseSchema):
+    entitlements: EntitlementStats
 
 
 class AccountBase(BaseSchema):
@@ -54,7 +58,20 @@ from app.schemas.users import AccountUserReferenceWithUser  # noqa: E402
 
 
 class AccountRead(IdSchema, CommonEventsSchema, AccountBase):
-    entitlements_stats: AccountEntitlementsStats | None = None
+    new_entitlements_count: int = Field(default=0, exclude=True)
+    active_entitlements_count: int = Field(default=0, exclude=True)
+    terminated_entitlements_count: int = Field(default=0, exclude=True)
     account_user: AccountUserReferenceWithUser | None
     status: AccountStatus
     type: AccountType
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def stats(self) -> AccountStats:
+        return AccountStats(
+            entitlements=EntitlementStats(
+                new=self.new_entitlements_count,
+                redeemed=self.active_entitlements_count,
+                terminated=self.terminated_entitlements_count,
+            )
+        )
