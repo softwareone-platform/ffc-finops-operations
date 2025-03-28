@@ -31,7 +31,7 @@ class CurrencyConverter:
         exchange_rates = await exchange_rates_handler.fetch_latest_valid()
 
         if exchange_rates is None:
-            raise ValueError("No active exchange rates found in the database")
+            raise CurrencyConverterError("No active exchange rates found in the database")
 
         conversion_rate: dict[str, Decimal] = {
             currency: cls._normalize(rate)
