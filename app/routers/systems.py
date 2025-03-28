@@ -154,7 +154,7 @@ async def delete_system_by_id(
             detail="System is already deleted.",
         )
 
-    await system_repo.soft_delete(system)
+    await system_repo.delete(system)
 
 
 @router.post("/{id}/disable", response_model=SystemRead)

@@ -361,7 +361,7 @@ async def delete_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="The user has already been deleted.",
         )
-    await user_repo.soft_delete(id_or_obj=user.id)
+    await user_repo.delete(id_or_obj=user.id)
     await accountuser_repo.delete_by_user(user_id=user.id)
 
 

@@ -145,7 +145,7 @@ class ModelHandler[M: BaseModel]:
 
         return obj
 
-    async def soft_delete(self, id_or_obj: str | M) -> M:
+    async def delete(self, id_or_obj: str | M) -> M:
         obj = await self._get_model_obj(id_or_obj)
 
         model_inspection = sqlalchemy.inspect(obj.__class__)
