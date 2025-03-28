@@ -50,4 +50,7 @@ async def calculate_accounts_stats(settings: Settings):
 
 
 def command(ctx: typer.Context):
+    """
+    Update the counters for new, active (redeemed) and terminated entitlements for each Account.
+    """
     asyncio.run(calculate_accounts_stats(ctx.obj))
