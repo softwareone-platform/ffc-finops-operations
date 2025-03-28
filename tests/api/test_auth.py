@@ -1,4 +1,6 @@
+import logging
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi import HTTPException, status
@@ -113,6 +115,50 @@ async def test_get_authentication_context_system_not_active(
             test_settings, db_session, credentials
         ):
             pass
+
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.detail == "Unauthorized."
+
+    with pytest.raises(LookupError):
+        auth_context.get()
+
+
+async def test_get_authentication_context_system_jwt_lifespan_exceeded(
+    caplog: pytest.LogCaptureFixture,
+    mocker: MockerFixture,
+    system_factory: ModelFactory[System],
+    jwt_token_factory: JWTTokenFactory,
+    db_session: AsyncSession,
+    test_settings: Settings,
+):
+    system = await system_factory(
+        jwt_secret="secret",
+    )
+    jwt_token = jwt_token_factory(
+        system.id,
+        "secret",
+        nbf=datetime.now(UTC),
+        exp=(
+            datetime.now(UTC)
+            + timedelta(
+                minutes=test_settings.system_jwt_token_max_lifespan_minutes,
+                seconds=1,
+            )
+        ),
+    )
+    bearer = JWTBearer()
+    request = mocker.Mock()
+    request.headers = {"Authorization": f"Bearer {jwt_token}"}
+    credentials = await bearer(request)
+    assert credentials is not None
+
+    with caplog.at_level(level=logging.INFO):
+        with pytest.raises(HTTPException) as exc_info:
+            async with asynccontextmanager(get_authentication_context)(
+                test_settings, db_session, credentials
+            ):
+                pass
+    assert "system jwt token cannot be valid for more than 5 minutes." in caplog.text
 
     assert exc_info.value.status_code == 401
     assert exc_info.value.detail == "Unauthorized."

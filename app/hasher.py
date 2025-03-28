@@ -21,12 +21,13 @@ class PBKDF2Sha256PasswordHasher:
 
         return f"pbkdf2_sha256${self.iterations}${salt_encoded}${hash_encoded}"
 
-    def verify(self, password: str, hashed_value: str) -> bool:
+    @staticmethod
+    def verify(password: str, hashed_value: str) -> bool:
         if not password or not hashed_value:
             raise ValueError("Password and hashed value cannot be empty.")
 
         try:
-            _algorithm, iterations, salt_encoded, hash_encoded = hashed_value.split("$", 3)
+            _, iterations, salt_encoded, hash_encoded = hashed_value.split("$", 3)
             iterations = int(iterations)  # type: ignore
             salt = base64.b64decode(salt_encoded)
             expected_hash = base64.b64decode(hash_encoded)
