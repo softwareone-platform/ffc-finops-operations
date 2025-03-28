@@ -24,6 +24,7 @@ class AsyncAzureBlobServiceClient:
             credential=AZURE_SA_CREDENTIALS,
             max_block_size=1024 * 1024 * 4,  # 4 MiB
             max_single_put_size=1024 * 1024 * 8,  # 8 MiB
+            max_concurrency=4,
         )
 
     async def maybe_create_container(self):
