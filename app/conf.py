@@ -1,5 +1,4 @@
 import pathlib
-from functools import lru_cache
 
 from pydantic import PostgresDsn, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -66,6 +65,11 @@ class Settings(BaseSettings):
         )
 
 
-@lru_cache
+_settings = None
+
+
 def get_settings() -> Settings:
-    return Settings()
+    global _settings
+    if not _settings:
+        _settings = Settings()
+    return _settings
