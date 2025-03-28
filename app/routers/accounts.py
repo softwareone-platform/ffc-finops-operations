@@ -8,16 +8,17 @@ from sqlalchemy.sql.selectable import Select
 
 from app.db.handlers import NotFoundError
 from app.db.models import Account, AccountUser, User
-from app.dependencies import (
-    AccountId,
-    AccountRepository,
-    AccountUserRepository,
+from app.dependencies.auth import (
     CurrentAuthContext,
-    UserId,
-    UserRepository,
     authentication_required,
     check_operations_account,
 )
+from app.dependencies.db import (
+    AccountRepository,
+    AccountUserRepository,
+    UserRepository,
+)
+from app.dependencies.path import AccountId, UserId
 from app.enums import AccountStatus, AccountType, AccountUserStatus, UserStatus
 from app.pagination import LimitOffsetPage, paginate
 from app.rql import AccountRules, RQLQuery

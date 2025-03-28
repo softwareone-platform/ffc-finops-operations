@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.handlers import NotFoundError
 from app.db.models import Account, AccountUser, System, User
-from app.dependencies import AccountRepository
+from app.dependencies.db import AccountRepository
 from app.enums import AccountStatus, AccountType, UserStatus
 from app.routers.accounts import (
     fetch_account_or_404,

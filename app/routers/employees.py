@@ -2,8 +2,9 @@ import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.api_clients import APIModifierClient, OptscaleAuthClient, OptscaleClient, UserDoesNotExist
-from app.dependencies import check_operations_account
+from app.api_clients.optscale import UserDoesNotExist
+from app.dependencies.api_clients import APIModifierClient, OptscaleAuthClient, OptscaleClient
+from app.dependencies.auth import check_operations_account
 from app.schemas.employees import EmployeeCreate, EmployeeRead
 from app.utils import wrap_http_error_in_502
 

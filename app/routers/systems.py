@@ -5,7 +5,9 @@ from sqlalchemy import ColumnExpressionArgument, Select
 
 from app.db.handlers import ConstraintViolationError, NotFoundError
 from app.db.models import System
-from app.dependencies import AccountRepository, CurrentAuthContext, SystemId, SystemRepository
+from app.dependencies.auth import CurrentAuthContext
+from app.dependencies.db import AccountRepository, SystemRepository
+from app.dependencies.path import SystemId
 from app.enums import AccountType, SystemStatus
 from app.pagination import LimitOffsetPage, paginate
 from app.rql import RQLQuery, SystemRules

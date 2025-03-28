@@ -17,18 +17,19 @@ from app.db.handlers import (
     UserHandler,
 )
 from app.db.models import Account, AccountUser, User
-from app.dependencies import (
-    AccountId,
-    AccountRepository,
-    AccountUserRepository,
-    AppSettings,
+from app.dependencies.auth import (
     CurrentAuthContext,
-    DBSession,
-    UserId,
-    UserRepository,
     authentication_required,
     check_operations_account,
 )
+from app.dependencies.core import AppSettings
+from app.dependencies.db import (
+    AccountRepository,
+    AccountUserRepository,
+    DBSession,
+    UserRepository,
+)
+from app.dependencies.path import AccountId, UserId
 from app.enums import AccountStatus, AccountType, AccountUserStatus, UserStatus
 from app.hasher import pbkdf2_sha256
 from app.pagination import LimitOffsetPage, paginate

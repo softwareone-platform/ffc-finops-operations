@@ -1,6 +1,7 @@
 from datetime import UTC, datetime, timedelta
 
 import jwt
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.constants import JWT_ALGORITHM, JWT_LEEWAY, UNAUTHORIZED_EXCEPTION
 from app.conf import Settings
@@ -11,7 +12,6 @@ from app.db.handlers import (
     UserHandler,
 )
 from app.db.models import Account, AccountUser, User
-from app.dependencies import DBSession
 from app.enums import AccountStatus, AccountUserStatus, UserStatus
 from app.hasher import pbkdf2_sha256
 from app.schemas.accounts import AccountReference
@@ -52,7 +52,7 @@ def generate_access_and_refresh_tokens(settings: Settings, subject: str, account
 
 
 async def get_tokens_from_refresh(
-    settings: Settings, db_session: DBSession, refresh_token_data: RefreshAccessToken
+    settings: Settings, db_session: AsyncSession, refresh_token_data: RefreshAccessToken
 ) -> LoginRead:
     user_handler = UserHandler(db_session)
     account_user_handler = AccountUserHandler(db_session)
@@ -98,7 +98,7 @@ async def get_tokens_from_refresh(
 
 
 async def get_tokens_from_credentials(
-    settings: Settings, db_session: DBSession, login_data: Login
+    settings: Settings, db_session: AsyncSession, login_data: Login
 ) -> LoginRead:
     user_handler = UserHandler(db_session)
     account_user_handler = AccountUserHandler(db_session)

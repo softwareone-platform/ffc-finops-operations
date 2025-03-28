@@ -3,82 +3,16 @@ from contextlib import asynccontextmanager
 from typing import Annotated
 
 import jwt
-from fastapi import Depends, HTTPException, Path, status
+from fastapi import Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.auth import JWTBearer, JWTCredentials
 from app.auth.constants import JWT_ALGORITHM, JWT_LEEWAY, UNAUTHORIZED_EXCEPTION
 from app.auth.context import AuthenticationContext, auth_context
-from app.conf import Settings, get_settings
+from app.conf import Settings
 from app.db import handlers, models
-from app.db.base import session_factory
-
-#######
-# Settings
-#######
-
-AppSettings = Annotated[Settings, Depends(get_settings)]
-
-#######
-# Database
-#######
-
-
-async def get_db_session() -> AsyncGenerator[AsyncSession]:
-    async with session_factory() as session:
-        async with session.begin():
-            yield session
-
-
-DBSession = Annotated[AsyncSession, Depends(get_db_session)]
-
-
-#######
-# Repositories
-#######
-
-
-class HandlerFactory:
-    def __init__(self, handler_cls: type[handlers.ModelHandler]):
-        self.handler_class = handler_cls
-
-    def __call__(self, session: DBSession) -> handlers.ModelHandler:
-        return self.handler_class(session)
-
-
-EntitlementRepository = Annotated[
-    handlers.EntitlementHandler, Depends(HandlerFactory(handlers.EntitlementHandler))
-]
-OrganizationRepository = Annotated[
-    handlers.OrganizationHandler, Depends(HandlerFactory(handlers.OrganizationHandler))
-]
-AccountRepository = Annotated[
-    handlers.AccountHandler, Depends(HandlerFactory(handlers.AccountHandler))
-]
-UserRepository = Annotated[handlers.UserHandler, Depends(HandlerFactory(handlers.UserHandler))]
-AccountUserRepository = Annotated[
-    handlers.AccountUserHandler, Depends(HandlerFactory(handlers.AccountUserHandler))
-]
-SystemRepository = Annotated[
-    handlers.SystemHandler, Depends(HandlerFactory(handlers.SystemHandler))
-]
-ChargesFileRepository = Annotated[
-    handlers.ChargesFileHandler, Depends(HandlerFactory(handlers.ChargesFileHandler))
-]
-#######
-# Ids path parameters
-#######
-
-EntitlementId = Annotated[str, Path(pattern=models.Entitlement.build_id_regex())]
-OrganizationId = Annotated[str, Path(pattern=models.Organization.build_id_regex())]
-SystemId = Annotated[str, Path(pattern=models.System.build_id_regex())]
-AccountId = Annotated[str, Path(pattern=models.Account.build_id_regex())]
-UserId = Annotated[str, Path(pattern=models.User.build_id_regex())]
-
-
-#######
-# Auth
-#######
+from app.dependencies.core import AppSettings
+from app.dependencies.db import DBSession
 
 
 async def get_authentication_context(

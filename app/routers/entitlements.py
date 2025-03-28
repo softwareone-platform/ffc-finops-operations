@@ -3,17 +3,16 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import ColumnExpressionArgument, Select
 
-from app.api_clients import OptscaleClient
 from app.db.handlers import NotFoundError
 from app.db.models import Account, Entitlement
-from app.dependencies import (
+from app.dependencies.api_clients import OptscaleClient
+from app.dependencies.auth import CurrentAuthContext, check_operations_account
+from app.dependencies.db import (
     AccountRepository,
-    CurrentAuthContext,
-    EntitlementId,
     EntitlementRepository,
     OrganizationRepository,
-    check_operations_account,
 )
+from app.dependencies.path import EntitlementId
 from app.enums import AccountStatus, AccountType, EntitlementStatus, OrganizationStatus
 from app.pagination import LimitOffsetPage, paginate
 from app.rql import EntitlementRules, RQLQuery

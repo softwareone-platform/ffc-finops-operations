@@ -4,7 +4,8 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy import ColumnExpressionArgument, Select
 
 from app.db.models import ChargesFile
-from app.dependencies import ChargesFileRepository, CurrentAuthContext
+from app.dependencies.auth import CurrentAuthContext
+from app.dependencies.db import ChargesFileRepository
 from app.enums import AccountType, ChargesFileStatus
 from app.pagination import LimitOffsetPage, paginate
 from app.rql import ChargesFileRules, RQLQuery

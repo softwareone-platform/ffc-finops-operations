@@ -13,7 +13,7 @@ from app.auth.auth import (
 from app.auth.context import AuthenticationContext, auth_context
 from app.conf import Settings
 from app.db.models import System, User
-from app.dependencies import (
+from app.dependencies.auth import (
     authentication_required,
     check_operations_account,
     get_authentication_context,
