@@ -32,7 +32,11 @@ dependencies = [
     "requela==0.1.*",
     # stamina uses calendar versioning meaning only the latest one is officially supported
     # ref: https://github.com/hynek/stamina/blob/main/.github/SECURITY.md
-    "stamina>=25.1.0",
+    "stamina>=25.1.0,<25.2.0",
+    "azure-identity>=1.21.0,<1.22.0",
+    "azure-storage-blob>=12.25.0,<12.26.0",
+    "aiofiles>=24.1.0,<24.2.0",
+    "aiohttp>=3.11.14,<3.12.0",
 ]
 
 [dependency-groups]
@@ -80,23 +84,23 @@ cache-dir = ".cache/ruff"
 preview = true # enable linting rules in preview (e.g. RUF029 as of 2025-02-20)
 explicit-preview-rules = true # only enable preview rules we explicitly specify
 select = [
-    "E",      # w errors
-    "W",      # pycodestyle warnings
-    "F",      # pyflakes
-    "I",      # isort
-    "B",      # flake8-bugbear
-    "C4",     # flake8-comprehensions
-    "UP",     # pyupgrade,
-    "PT",     # flake8-pytest-style
-    "T10",    # flake8-pytest-style
+    "E", # w errors
+    "W", # pycodestyle warnings
+    "F", # pyflakes
+    "I", # isort
+    "B", # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade,
+    "PT", # flake8-pytest-style
+    "T10", # flake8-pytest-style
     "RUF029", # unused-async
 ]
 ignore = [
     "PT001", # Use `@pytest.fixture()` over `@pytest.fixture`
     "PT011", # pytest.raises({exception}) is too broad, set the match parameter or use a more specific exception
     "PT023", # @pytest.mark.parametrize` is missing required arguments
-    "B008",  # do not perform function calls in argument defaults
-    "B904",  # Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+    "B008", # do not perform function calls in argument defaults
+    "B904", # Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
 ]
 
 [tool.ruff.format]

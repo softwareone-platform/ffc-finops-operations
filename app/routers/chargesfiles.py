@@ -59,4 +59,6 @@ async def get_charges_file_by_id(id: str):
 )
 async def download_charges_file(id: str):
     # pending implementation
+    # call the download
+    # return the full URL witht the SAS token
     pass  # pragma: no cover

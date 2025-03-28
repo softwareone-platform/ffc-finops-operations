@@ -3,6 +3,7 @@ import uuid
 from collections.abc import AsyncGenerator, Callable
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from unittest.mock import patch
 
 import jwt
 import pytest
@@ -611,3 +612,13 @@ def stamina_testing_mode():
         yield
     finally:
         stamina.set_testing(False)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def mock_default_azure_credentials():
+    test_key = (
+        "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
+    )
+
+    with patch("app.api_clients.azure.AZURE_SA_CREDENTIALS", test_key):
+        yield

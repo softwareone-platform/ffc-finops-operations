@@ -1,12 +1,3 @@
-# @pytest.mark.parametrize(
-#     ("useraccount_status", "http_status"),
-#     [
-#         (AccountUserStatus.ACTIVE, 200),
-#         (AccountUserStatus.INVITED, 200),
-#         (AccountUserStatus.INVITATION_EXPIRED, 200),
-#         (AccountUserStatus.DELETED, 200),
-#     ],
-# )
 import math
 
 from httpx import AsyncClient
