@@ -33,6 +33,7 @@ def common_extra_conditions(auth_ctx: CurrentAuthContext) -> list[ColumnExpressi
 
     if auth_ctx.account.type == AccountType.AFFILIATE:  # type: ignore
         conditions.append(Entitlement.owner == auth_ctx.account)  # type: ignore
+        conditions.append(Entitlement.status != EntitlementStatus.DELETED)
 
     return conditions
 
@@ -144,8 +145,14 @@ async def terminate_entitlement(
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_entitlement_by_id(
     entitlement: Annotated[Entitlement, Depends(fetch_entitlement_or_404)],
+    entitlement_repo: EntitlementRepository,
 ):
-    pass
+    if entitlement.status != EntitlementStatus.NEW:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only Entitlements in status `new` can be deleted.",
+        )
+    await entitlement_repo.delete(entitlement)
 
 
 @router.post(

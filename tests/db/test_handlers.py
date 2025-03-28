@@ -238,35 +238,35 @@ async def test_get_or_create_with_default_load_options(db_session: AsyncSession)
             DeletableModelForTestsHandler,
             DeletableModelStatus.ACTIVE,
             None,
-            id="deletable_soft_delete_active",
+            id="deletable_delete_active",
         ),
         pytest.param(
             DeletableModelForTests,
             DeletableModelForTestsHandler,
             DeletableModelStatus.DELETED,
             CannotDeleteError("DeletableModelForTests object is already deleted"),
-            id="deletable_soft_delete_deleted_fail",
+            id="deletable_delete_deleted_fail",
         ),
         pytest.param(
             DeletableAuditModelForTests,
             DeletableAuditModelForTestsHandler,
             DeletableModelStatus.ACTIVE,
             None,
-            id="deletable_audit_soft_delete_active",
+            id="deletable_audit_delete_active",
         ),
         pytest.param(
             ModelForTests,
             ModelForTestsHandler,
             "active",
             CannotDeleteError("ModelForTests status column is not an Enum"),
-            id="non_enum_status_soft_delete_fail",
+            id="non_enum_status_delete_fail",
         ),
         pytest.param(
             ParentModelForTests,
             ParentModelForTestsHandler,
             None,
             CannotDeleteError("ParentModelForTests does not have a status column"),
-            id="no_status_soft_delete_fail",
+            id="no_status_delete_fail",
         ),
         pytest.param(
             NonDeletableModelWithEnumStatusForTests,
@@ -297,12 +297,12 @@ async def test_delete(
     await handler.create(test_obj)
 
     if exception is None:
-        await handler.soft_delete(test_obj)
+        await handler.delete(test_obj)
         await db_session.refresh(test_obj)
         assert test_obj.status == DeletableModelStatus.DELETED  # type: ignore[attr-defined]
     else:
         with pytest.raises(exception.__class__, match=str(exception)):
-            await handler.soft_delete(test_obj)
+            await handler.delete(test_obj)
 
 
 async def test_deleted_by_user_id(

@@ -291,4 +291,4 @@ async def remove_user_from_account(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"The User `{user_id}` does not belong to the Account with ID `{account.id}`.",
         )
-    await accountuser_repo.soft_delete(id_or_obj=account_user)
+    await accountuser_repo.delete(id_or_obj=account_user)

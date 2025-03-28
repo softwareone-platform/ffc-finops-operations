@@ -821,3 +821,56 @@ async def test_redeem_non_existent_entitlement(operations_client: AsyncClient):
 
     assert response.status_code == 404
     assert response.json()["detail"] == f"Entitlement with ID `{entitlement_id}` wasn't found."
+
+
+####
+# delete
+####
+
+
+async def test_delete_entitlement_success(
+    operations_client: AsyncClient,
+    entitlement_factory: ModelFactory[Entitlement],
+    db_session: AsyncSession,
+):
+    entitlement = await entitlement_factory(status=EntitlementStatus.NEW)
+
+    response = await operations_client.delete(f"/entitlements/{entitlement.id}")
+
+    assert response.status_code == 204
+    await db_session.refresh(entitlement)
+    assert entitlement.status == EntitlementStatus.DELETED
+
+
+@pytest.mark.parametrize(
+    "entitlement_status",
+    [EntitlementStatus.ACTIVE, EntitlementStatus.TERMINATED, EntitlementStatus.DELETED],
+)
+async def test_delete_entitlement_invalid_status(
+    operations_client: AsyncClient,
+    entitlement_factory: ModelFactory[Entitlement],
+    db_session: AsyncSession,
+    entitlement_status: EntitlementStatus,
+):
+    entitlement = await entitlement_factory(status=entitlement_status)
+
+    response = await operations_client.delete(f"/entitlements/{entitlement.id}")
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Only Entitlements in status `new` can be deleted."
+    await db_session.refresh(entitlement)
+    assert entitlement.status == entitlement_status
+
+
+async def test_delete_deleted_entitlement_by_affiliate(
+    affiliate_client: AsyncClient,
+    gcp_account: Account,
+    entitlement_factory: ModelFactory[Entitlement],
+):
+    entitlement = await entitlement_factory(
+        status=EntitlementStatus.DELETED,
+        owner=gcp_account,
+    )
+
+    response = await affiliate_client.delete(f"/entitlements/{entitlement.id}")
+    assert response.status_code == 404
