@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     pwd_reset_token_length: int = 64
     pwd_reset_token_length_expires_minutes: int = 15
 
+    system_jwt_token_max_lifespan_minutes: int = 5
+
     optscale_auth_api_base_url: str
     optscale_rest_api_base_url: str
     optscale_cluster_secret: str

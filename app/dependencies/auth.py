@@ -1,5 +1,7 @@
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from datetime import datetime
 from typing import Annotated
 
 import jwt
@@ -13,6 +15,12 @@ from app.conf import Settings
 from app.db import handlers, models
 from app.dependencies.core import AppSettings
 from app.dependencies.db import DBSession
+
+logger = logging.getLogger(__name__)
+
+
+class MaxLifespanExceededError(Exception):
+    pass
 
 
 async def get_authentication_context(
@@ -31,7 +39,10 @@ async def get_authentication_context(
         try:
             if actor_id.startswith(models.System.PK_PREFIX):
                 context = await get_authentication_context_for_system(
-                    db_session=db_session, credentials=credentials, system_id=actor_id
+                    settings=settings,
+                    db_session=db_session,
+                    credentials=credentials,
+                    system_id=actor_id,
                 )
             else:
                 context = await get_authentication_context_for_account_user(
@@ -40,7 +51,8 @@ async def get_authentication_context(
                     credentials=credentials,
                     user_id=actor_id,
                 )
-        except (jwt.InvalidTokenError, handlers.DatabaseError) as e:
+        except (jwt.InvalidTokenError, handlers.DatabaseError, MaxLifespanExceededError) as e:
+            logger.info(f"Authentication error: {e}")
             raise UNAUTHORIZED_EXCEPTION from e
 
         reset_token = auth_context.set(context)
@@ -99,6 +111,7 @@ async def get_authentication_context_for_account_user(
 
 
 async def get_authentication_context_for_system(
+    settings: AppSettings,
     db_session: AsyncSession,
     credentials: JWTCredentials,
     system_id: str,
@@ -113,14 +126,22 @@ async def get_authentication_context_for_system(
         system_id,
         [models.System.status == models.SystemStatus.ACTIVE],
     )
-    jwt.decode(
+    decoded = jwt.decode(
         credentials.credentials,
         system.jwt_secret,
         options={"require": ["exp", "nbf", "iat", "sub"]},
         algorithms=[JWT_ALGORITHM],
         leeway=JWT_LEEWAY,
     )
-    # TODO check maximum allowed lifespan
+    exp = datetime.fromtimestamp(decoded["exp"])
+    nbf = datetime.fromtimestamp(decoded["nbf"])
+
+    if (exp - nbf).total_seconds() > settings.system_jwt_token_max_lifespan_minutes * 60:
+        raise MaxLifespanExceededError(
+            "system jwt token cannot be valid for more "
+            f"than {settings.system_jwt_token_max_lifespan_minutes} minutes."
+        )
+
     context = AuthenticationContext(
         account=system.owner,
         actor_type=models.ActorType.SYSTEM,
