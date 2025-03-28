@@ -169,20 +169,7 @@ async def test_get_account_by_id(
 
     assert response.status_code == 200
     data = response.json()
-    """
-     {'name': 'Microsoft',
-     'external_id': 'cc2f4d07-f80a-45bc-9b3e-3473e23cec63',
-     'type': 'affiliate',
-     'created_at': '2025-02-12T10:53:14.752084Z',
-     'updated_at': '2025-02-12T10:53:14.752087Z',
-     'deleted_at': None, 'created_by': {'id': 'FTKN-3532-2325', 'type': 'system',
-     'name': 'James-Wolfe'},
-      'updated_by': {'id': 'FTKN-3532-2325', 'type': 'system', 'name': 'James-Wolfe'},
-      'deleted_by': None,
-      'id': 'FACC-8751-0928',
-      'entitlements_stats': None, 'status': 'active'
-      }
-    """
+
     assert data["id"] == affiliate_account.id
     assert data["name"] == affiliate_account.name
     assert data["external_id"] == affiliate_account.external_id
@@ -196,6 +183,12 @@ async def test_get_account_by_id(
     assert data["events"]["updated"]["by"]["id"] == str(ffc_extension.id)
     assert data["events"]["updated"]["by"]["type"] == ffc_extension.type
     assert data["events"]["updated"]["by"]["name"] == ffc_extension.name
+    assert data["stats"]["entitlements"]["new"] == affiliate_account.new_entitlements_count
+    assert data["stats"]["entitlements"]["redeemed"] == affiliate_account.active_entitlements_count
+    assert (
+        data["stats"]["entitlements"]["terminated"]
+        == affiliate_account.terminated_entitlements_count
+    )
 
 
 async def test_get_account_by_id_no_auth(
