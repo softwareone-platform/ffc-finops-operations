@@ -22,6 +22,8 @@ class AsyncAzureBlobServiceClient:
             account_url=self.account_url,
             container_name=self.container_name,
             credential=AZURE_SA_CREDENTIALS,
+            max_block_size=1024 * 1024 * 4,  # 4 MiB
+            max_single_put_size=1024 * 1024 * 8,  # 8 MiB
         )
 
     async def maybe_create_container(self):
@@ -60,9 +62,9 @@ class AsyncAzureBlobServiceClient:
 
         try:
             logger.debug(f"Trying to Upload {file_path} to Azure Blob Storage {blob_name}")
+
             async with aiofiles.open(file_path, "rb") as file:
-                file_to_upload = await file.read()  # todo : to improve to address large files
-                await blob_client.upload_blob(data=file_to_upload, overwrite=True)
+                await blob_client.upload_blob(data=file, overwrite=True)
             logger.info(f"File '{blob_name}' uploaded to container '{self.container_name}'.")
             return file_path
         except FileNotFoundError:
