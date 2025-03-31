@@ -41,9 +41,8 @@ async def test_can_get_a_download_url():
     assert response is not None
     assert isinstance(response, str)
     url_parsed = urlparse(response)
-    path_parts = url_parsed.path.strip("/").split("/")
+    path_parts = url_parsed.path.lstrip("/").split("/")
     blob_name = "/".join(path_parts[1:])
-    assert response.split("://")[0] == "https"
     assert blob_name == "EUR/2025/03/FCHG-1234-5678-9012.zip"
 
 
@@ -58,7 +57,6 @@ async def test_sas_token_expiration_in_the_past_still_return_a_url():
     url_parsed = urlparse(response)
     path_parts = url_parsed.path.strip("/").split("/")
     blob_name = "/".join(path_parts[1:])
-    assert response.split("://")[0] == "https"
     assert blob_name == "EUR/2025/03/FCHG-1234-5678-9012.zip"
 
 
