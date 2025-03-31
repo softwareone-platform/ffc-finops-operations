@@ -90,31 +90,30 @@ class AsyncAzureBlobServiceClient:
         return None
 
     async def download_file_from_azure_blob(
-        self, blob_name: str, account_key: str, sas_expiration_token_min: int | None = None
+        self, blob_name: str, account_key: str, sas_expiration_token_min: int
     ) -> str:
         """
-        Download a blob from Azure Blob Storage using a time-limited SAS token.
-        Please note that the function generate_blob_sas() does not raise an exception
-        even if you pass an expiry time in the past.
-        It just returns a SAS token that is already expired and won't work when used.
+               Download a blob from Azure Blob Storage using a time-limited SAS token.
+               Please note that the function generate_blob_sas() does not raise an exception
+               even if you pass an expiry time in the past.
+               It just returns a SAS token that is already expired and won't work when used.
 
-        p.s.: If you're using Azurite, make sure you're using the local emulator URL
-        with the following format
-        http://127.0.0.1:10000/devstoreaccount1/your-container/your-blob
-        to download the file, instead of https://devstoreaccount1.blob.core.windows.net/your-container/your-blob
+               p.s.: If you're using Azurite, make sure you're using the local emulator URL
+               with the following format
+               http://127.0.0.1:10000/devstoreaccount1/your-container/your-blob
+               to download the file, instead of https://devstoreaccount1.blob.core.windows.net/your-container/your-blob
+        http://127.0.0.1:10000/devstoreaccount1/ffc-charges-files/EUR/2025/03/FCHG-1234-5678-9012.zip?se=2025-03-31T17%3A12%3A40Z&sp=r&sv=2025-05-05&sr=b&sig=OuMkcr0teQmIhFqoGPmLK/NPFX%2BRSenXJ7PkAv1v%2BEg%3D
+               Args:
+                   blob_name (str): The name to assign to the blob in Azure Storage.
+                   account_key: the primary access key of the Azure Storage account.
+                   sas_expiration_token_min: the sas token expiration time in minutes.
+                   Default is 5 minutes.
 
-        Args:
-            blob_name (str): The name to assign to the blob in Azure Storage.
-            account_key: the primary access key of the Azure Storage account.
-            sas_expiration_token_min: the sas token expiration time in minutes.
-            Default is 5 minutes.
-
-        Returns:
-            str : The url of the file to download. or None if an error occurred.
+               Returns:
+                   str : The url of the file to download. or None if an error occurred.
         """
-        if sas_expiration_token_min is None:
-            sas_expiration_token_min = 5
-        blob_client = self.container_client.get_blob_client(blob_name)
+
+        blob_client = self.container_client.get_blob_client(blob_name)  # pragma: no branch
         expiry_time = datetime.now(UTC) + timedelta(minutes=sas_expiration_token_min)
 
         account_name = blob_client.account_name
