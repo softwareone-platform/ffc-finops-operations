@@ -40,6 +40,8 @@ class Settings(BaseSettings):
 
     azure_sa_container_name: str = "ffc-charges-files"
     azure_sa_url: str
+    azure_sa_account_key: str
+    azure_sas_token_expiration_min: int = 5
     azure_sa_max_block_size: int = 1024 * 1024 * 4  # 4 MiB
     azure_sa_max_single_put_size: int = 1024 * 1024 * 8  # 8 MiB
     azure_sa_max_concurrency: int = 4

@@ -1,8 +1,10 @@
 import os
+from urllib.parse import urlparse
 
 import pytest
 
 from app.blob_storage import (
+    download_changes_file,
     upload_charges_file,
     validate_year_and_month_format,
 )
@@ -28,6 +30,36 @@ async def test_cannot_upload_file():
         month=3,
     )
     assert response is None
+
+
+async def test_can_get_a_download_url():
+    zip_file_path = os.path.join(os.path.dirname(__file__), "files_folder/FCHG-1234-5678-9012.zip")
+
+    response = await download_changes_file(
+        file_path=zip_file_path, currency="eur", year=2025, month=3, sas_expiration_token_min=1
+    )
+    assert response is not None
+    assert isinstance(response, str)
+    url_parsed = urlparse(response)
+    path_parts = url_parsed.path.strip("/").split("/")
+    blob_name = "/".join(path_parts[1:])
+    assert response.split("://")[0] == "https"
+    assert blob_name == "EUR/2025/03/FCHG-1234-5678-9012.zip"
+
+
+async def test_sas_token_expiration_in_the_past_still_return_a_url():
+    zip_file_path = os.path.join(os.path.dirname(__file__), "files_folder/FCHG-1234-5678-9012.zip")
+
+    response = await download_changes_file(
+        file_path=zip_file_path, currency="eur", year=2025, month=3, sas_expiration_token_min=20
+    )
+    assert response is not None
+    assert isinstance(response, str)
+    url_parsed = urlparse(response)
+    path_parts = url_parsed.path.strip("/").split("/")
+    blob_name = "/".join(path_parts[1:])
+    assert response.split("://")[0] == "https"
+    assert blob_name == "EUR/2025/03/FCHG-1234-5678-9012.zip"
 
 
 def test_validate_year_and_month_format():
