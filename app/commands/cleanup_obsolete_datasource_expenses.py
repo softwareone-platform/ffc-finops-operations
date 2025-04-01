@@ -17,7 +17,10 @@ async def main(settings: Settings) -> None:
     async with session_factory.begin() as session:
         logger.info("Fetching obsolete datasource expenses from the database")
 
-        where_cond = DatasourceExpense.created_at < datetime.now(UTC) - relativedelta(months=6)
+        threshold_date = datetime.now(UTC) - relativedelta(
+            months=settings.datasources_obsolete_after_months
+        )
+        where_cond = DatasourceExpense.created_at < threshold_date
 
         num_obsolete_expenses = await session.scalar(
             select(func.count(DatasourceExpense.id)).where(where_cond)
