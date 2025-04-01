@@ -1,4 +1,5 @@
 import logging
+from datetime import UTC, datetime, timedelta
 
 import aiofiles
 from azure.core.exceptions import (
@@ -7,6 +8,7 @@ from azure.core.exceptions import (
     ResourceNotFoundError,
 )
 from azure.identity.aio import DefaultAzureCredential
+from azure.storage.blob import BlobSasPermissions, generate_blob_sas
 from azure.storage.blob.aio import ContainerClient
 
 logger = logging.getLogger(__name__)
@@ -19,12 +21,17 @@ class AsyncAzureBlobServiceClient:
         self,
         account_url: str,
         container_name: str,
+        account_key: str,
         max_block_size: int = 1024 * 1024 * 4,
         max_single_put_size: int = 1024 * 8,
         max_concurrency: int = 4,
+        sas_expiration_token_mins: int = 5,
     ):
-        self.container_name = container_name
         self.account_url = account_url
+        self.container_name = container_name
+        self.account_key = account_key  # the primary access key of the Azure Storage account.
+        self.sas_expiration_token_mins = sas_expiration_token_mins
+
         self.container_client = ContainerClient(
             account_url=self.account_url,
             container_name=self.container_name,
@@ -86,3 +93,36 @@ class AsyncAzureBlobServiceClient:
         except Exception as error:  # pragma: no branch
             logger.error(f"Unexpected error occurred: {error}")
         return None
+
+    async def get_azure_blob_download_url(self, blob_name: str) -> str:
+        """
+        Download a blob from Azure Blob Storage using a time-limited SAS token.
+        Please note that the function generate_blob_sas() does not raise an exception
+        even if you pass an expiry time in the past.
+        It just returns a SAS token that is already expired and won't work when used.
+
+        p.s.: If you're using Azurite, make sure you're using the local emulator URL
+        with the following format
+        http://127.0.0.1:10000/devstoreaccount1/your-container/your-blob
+        to download the file, instead of https://devstoreaccount1.blob.core.windows.net/your-container/your-blob
+        Args:
+            blob_name (str): The name to assign to the blob in Azure Storage.
+
+        Returns:
+            str : The url of the file to download. or None if an error occurred.
+        """
+
+        blob_client = self.container_client.get_blob_client(blob_name)  # pragma: no branch
+        expiry_time = datetime.now(UTC) + timedelta(minutes=self.sas_expiration_token_mins)
+
+        account_name = blob_client.account_name
+        sas_token = generate_blob_sas(
+            account_name=account_name,
+            container_name=self.container_name,
+            blob_name=blob_name,
+            account_key=self.account_key,
+            permission=BlobSasPermissions(read=True),
+            expiry=expiry_time,
+        )
+        url = f"https://{account_name}.blob.core.windows.net/{self.container_name}/{blob_name}?{sas_token}"
+        return url
