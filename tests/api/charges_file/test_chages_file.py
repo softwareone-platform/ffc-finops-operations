@@ -349,3 +349,5 @@ async def test_get_charges_file_with_status_not_generated(
 async def test_get_charges_file_by_not_existing_id(operations_client: AsyncClient):
     response = await operations_client.get("/charges/FCHG-7147-9470-8878/download")
     assert response.status_code == 404
+
+

@@ -1,13 +1,14 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy import ColumnExpressionArgument, Select
 
 from app.blob_storage import download_charges_file
 from app.db.handlers import NotFoundError
 from app.db.models import ChargesFile
-from app.dependencies.auth import CurrentAuthContext
+from app.dependencies.auth import CurrentAuthContext, logger
 from app.dependencies.db import ChargesFileRepository
 from app.dependencies.path import ChargeFileId
 from app.enums import AccountType, ChargesFileStatus
