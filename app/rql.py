@@ -1,4 +1,4 @@
-from urllib.parse import parse_qs, quote
+from urllib.parse import parse_qs, quote, unquote
 
 from fastapi import Request
 from requela import FieldRule, ModelRQLRules, RelationshipRule, RequelaError
@@ -119,4 +119,4 @@ class RQLQuery:
             return None
 
         with wrap_exc_in_http_response(RequelaError):
-            return self.rules.build_query(rql_expression)
+            return self.rules.build_query(unquote(rql_expression))
