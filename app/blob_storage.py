@@ -7,7 +7,6 @@ async def download_changes_file(
     currency: str,
     year: int,
     month: int,
-    sas_expiration_token_min: int | None = None,
 ) -> str | None:
     """
     This function is responsible for download a blob file from Azure Blob Storage.
@@ -37,13 +36,11 @@ async def download_changes_file(
         max_concurrency=settings.azure_sa_max_concurrency,
         max_single_put_size=settings.azure_sa_max_single_put_size,
         max_block_size=settings.azure_sa_max_block_size,
+        sas_expiration_token_min=settings.azure_sa_sas_expiration_token_min,
+        account_key=settings.azure_sa_account_key,
     )
     async with azure_client:
-        return await azure_client.download_file_from_azure_blob(
-            blob_name=blob_name,
-            account_key=settings.azure_sa_account_key,
-            sas_expiration_token_min=sas_expiration_token_min,
-        )
+        return await azure_client.get_azure_blob_download_url(blob_name=blob_name)
 
 
 async def upload_charges_file(
@@ -83,6 +80,8 @@ async def upload_charges_file(
         max_concurrency=settings.azure_sa_max_concurrency,
         max_single_put_size=settings.azure_sa_max_single_put_size,
         max_block_size=settings.azure_sa_max_block_size,
+        sas_expiration_token_min=settings.azure_sa_sas_expiration_token_min,
+        account_key=settings.azure_sa_account_key,
     )
     async with azure_client:
         return await azure_client.upload_file_to_azure_blob(
