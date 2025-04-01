@@ -1,7 +1,7 @@
 import logging
 from datetime import UTC, datetime, timedelta
 
-import aiofiles
+import aiofiles  # type: ignore
 from azure.core.exceptions import (
     AzureError,
     ClientAuthenticationError,
@@ -117,7 +117,7 @@ class AsyncAzureBlobServiceClient:
 
         account_name = blob_client.account_name
         sas_token = generate_blob_sas(
-            account_name=account_name,
+            account_name=account_name,  # type: ignore
             container_name=self.container_name,
             blob_name=blob_name,
             account_key=self.account_key,

@@ -28,7 +28,7 @@ async def test_get_organization_with_name_filter(
     organization_factory: ModelFactory[Organization], api_client: AsyncClient, ffc_jwt_token: str
 ):
     organization_1 = await organization_factory(
-        operations_external_id="EXTERNAL_ID_1", name="SpiderMan"
+        operations_external_id="EXTERNAL_ID_1", name="Spider Man"
     )
     await organization_factory(operations_external_id="EXTERNAL_ID_2")
     response = await api_client.get(
@@ -40,6 +40,29 @@ async def test_get_organization_with_name_filter(
     data = response.json()
     assert data["total"] == 1
     assert data["items"][0]["name"] == organization_1.name
+    assert len(data["items"]) == data["total"]
+
+
+async def test_get_organization_with_name_filter_like_op(
+    organization_factory: ModelFactory[Organization], api_client: AsyncClient, ffc_jwt_token: str
+):
+    organization_1 = await organization_factory(
+        operations_external_id="EXTERNAL_ID_1", name="Spider Man"
+    )
+    organization_2 = await organization_factory(
+        operations_external_id="EXTERNAL_ID_2", name="Spider Car"
+    )
+    response = await api_client.get(
+        "/organizations?like(name,*Spider *)",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 2
+    assert sorted([data["items"][0]["name"], data["items"][1]["name"]]) == sorted(
+        [organization_1.name, organization_2.name]
+    )
     assert len(data["items"]) == data["total"]
 
 
