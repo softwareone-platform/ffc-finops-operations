@@ -165,6 +165,7 @@ async def test_datasource_expenses_are_updated_for_current_month(
     assert ds_exp2_this_month.month_expenses == Decimal("678.90")
 
 
+@time_machine.travel("2025-03-20T10:00:00Z", tick=False)
 async def test_organization_with_no_linked_organization_id(
     test_settings: Settings,
     db_session: AsyncSession,
@@ -188,7 +189,7 @@ async def test_organization_with_no_linked_organization_id(
     assert not httpx_mock.get_request()
 
 
-@pytest.mark.skip("not working")
+@time_machine.travel("2025-03-20T10:00:00Z", tick=False)
 async def test_organization_with_recent_updates_to_datasource_expences(
     test_settings: Settings,
     db_session: AsyncSession,
@@ -231,6 +232,7 @@ async def test_organization_with_recent_updates_to_datasource_expences(
         ),
     ],
 )
+@time_machine.travel("2025-03-20T10:00:00Z", tick=False)
 async def test_optscale_api_returns_exception(
     test_settings: Settings,
     db_session: AsyncSession,

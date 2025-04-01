@@ -36,7 +36,7 @@ async def download_changes_file(
         max_concurrency=settings.azure_sa_max_concurrency,
         max_single_put_size=settings.azure_sa_max_single_put_size,
         max_block_size=settings.azure_sa_max_block_size,
-        sas_expiration_token_min=settings.azure_sa_sas_expiration_token_min,
+        sas_expiration_token_mins=settings.azure_sa_sas_expiration_token_mins,
         account_key=settings.azure_sa_account_key,
     )
     async with azure_client:
@@ -80,7 +80,7 @@ async def upload_charges_file(
         max_concurrency=settings.azure_sa_max_concurrency,
         max_single_put_size=settings.azure_sa_max_single_put_size,
         max_block_size=settings.azure_sa_max_block_size,
-        sas_expiration_token_min=settings.azure_sa_sas_expiration_token_min,
+        sas_expiration_token_mins=settings.azure_sa_sas_expiration_token_mins,
         account_key=settings.azure_sa_account_key,
     )
     async with azure_client:

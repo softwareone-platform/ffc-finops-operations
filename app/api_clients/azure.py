@@ -25,10 +25,10 @@ class AsyncAzureBlobServiceClient:
         max_block_size: int = 1024 * 1024 * 4,
         max_single_put_size: int = 1024 * 8,
         max_concurrency: int = 4,
-        sas_expiration_token_min: int = 5,
+        sas_expiration_token_mins: int = 5,
     ):
         self.account_key = account_key  # the primary access key of the Azure Storage account.
-        self.sas_expiration_token_min = sas_expiration_token_min
+        self.sas_expiration_token_min = sas_expiration_token_mins
         self.container_name = container_name
         self.account_url = account_url
         self.container_client = ContainerClient(
