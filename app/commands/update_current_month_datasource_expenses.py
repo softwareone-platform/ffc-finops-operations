@@ -16,6 +16,24 @@ from app.db.models import DatasourceExpense, Organization
 logger = logging.getLogger(__name__)
 
 
+def filter_relevant_datasources(datasources: list[dict]) -> list[dict]:
+    result = []
+
+    for datasource in datasources:
+        if datasource["type"] in ["azure_tenant", "gcp_tenant"]:
+            logger.warning(
+                "Skipping child datasource %s of type %s since it's a child datasource "
+                "and its expenses will always be zero",
+                datasource["id"],
+                datasource["type"],
+            )
+            continue
+
+        result.append(datasource)
+
+    return result
+
+
 async def fetch_datasources_for_organizations(
     organizations: Sequence[Organization],
     optscale_client: OptscaleClient,
@@ -56,7 +74,9 @@ async def fetch_datasources_for_organizations(
             organization.id,
         )
 
-        datasources_per_organization_id[organization.id] = response_datasources
+        datasources_per_organization_id[organization.id] = filter_relevant_datasources(
+            response_datasources
+        )
 
     return datasources_per_organization_id
 

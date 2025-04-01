@@ -288,6 +288,8 @@ async def test_multiple_datasources_are_handled_correctly(
 
     org_1_datasource_id1 = str(uuid.uuid4())
     org_1_datasource_id2 = str(uuid.uuid4())
+    org_1_datasource_id3 = str(uuid.uuid4())
+    org_1_datasource_id4 = str(uuid.uuid4())
 
     org_2_datasource_id1 = str(uuid.uuid4())
     org_2_datasource_id2 = str(uuid.uuid4())
@@ -334,6 +336,8 @@ async def test_multiple_datasources_are_handled_correctly(
         [
             {"id": org_1_datasource_id1, "details": {"cost": 789.01}},
             {"id": org_1_datasource_id2, "details": {"cost": 678.90}},
+            {"id": org_1_datasource_id3, "type": "azure_tenant"},
+            {"id": org_1_datasource_id4, "type": "gcp_tenant"},
         ],
     )
 
@@ -354,6 +358,10 @@ async def test_multiple_datasources_are_handled_correctly(
 
     with caplog.at_level(logging.WARNING):
         await update_current_month_datasource_expenses.main(test_settings)
+        assert (
+            f"Skipping child datasource {org_1_datasource_id3} of type azure_tenant" in caplog.text
+        )
+        assert f"Skipping child datasource {org_1_datasource_id4} of type gcp_tenant" in caplog.text
         assert f"Organization {organization4.id} not found on Optscale. Skipping..." in caplog.text
 
     new_datasource_expenses = await datasource_expense_handler.query_db()
