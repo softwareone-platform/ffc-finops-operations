@@ -145,7 +145,7 @@ async def test_get_organization_with_status_new_filter(
 ):
     await organization_factory(operations_external_id="EXTERNAL_ID_1")
     response = await api_client.get(
-        "/organizations?eq(status,ciao)",
+        "/organizations?eq(status,new)",
         headers={"Authorization": f"Bearer {ffc_jwt_token}"},
     )
     assert response.status_code == 200
@@ -159,7 +159,7 @@ async def test_get_organization_with_not_valid_filter(
 ):
     await organization_factory(operations_external_id="EXTERNAL_ID_1")
     response = await api_client.get(
-        "/organizations?eq(ciaociao,active)",
+        "/organizations?eq(ciao,active)",
         headers={"Authorization": f"Bearer {ffc_jwt_token}"},
     )
     assert response.status_code == 400
