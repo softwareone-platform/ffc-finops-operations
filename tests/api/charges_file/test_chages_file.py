@@ -221,3 +221,27 @@ async def test_affiliate_account_cannot_see_charges_file_owned_by_operations_acc
     data = response.json()
     assert response.status_code == 200
     assert data["total"] == 0
+
+
+async def test_get_charges_file_by_id(
+    operations_client: AsyncClient,
+    charges_file_factory: ModelFactory[ChargesFile],
+    operations_account: Account,
+):
+    charge_file = await charges_file_factory(
+        owner=operations_account,
+        currency="USD",
+        amount=100.40,
+        status=ChargesFileStatus.GENERATED,
+    )
+
+    response = await operations_client.get(f"/charges/{charge_file.id}/download")
+    data = response.json()
+    assert response.status_code == 307
+    assert isinstance(data, str)
+    assert len(data) > 0
+
+
+async def test_get_charges_file_by_not_existing_id(operations_client: AsyncClient):
+    response = await operations_client.get("/charges/FCHG-7147-9470-8878/download")
+    assert response.status_code == 404

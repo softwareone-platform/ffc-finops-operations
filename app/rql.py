@@ -56,6 +56,7 @@ class UserRules(ModelRQLRules, AuditableMixin):
     __model__ = User
 
     id = FieldRule()
+    name = FieldRule()
     email = FieldRule()
     status = FieldRule()
     user_accounts = RelationshipRule(rules=UserAccountRules())

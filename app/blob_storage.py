@@ -2,8 +2,8 @@ from app.api_clients.azure import AsyncAzureBlobServiceClient
 from app.conf import get_settings
 
 
-async def download_changes_file(
-    file_path: str,
+async def download_charges_file(
+    filename: str,
     currency: str,
     year: int,
     month: int,
@@ -14,7 +14,7 @@ async def download_changes_file(
     file path.
 
     Args:
-        file_path (str): The path to the file to upload.
+        filename (str): The file name to upload.
         currency (str): The currency of the file.
         year (int): The year of the file.
         month (int): The month of the file.
@@ -26,7 +26,6 @@ async def download_changes_file(
     The start time is set to the moment the request is sent.
     """
     settings = get_settings()
-    filename = file_path.split("/")[-1]
     month, year = validate_year_and_month_format(month, year)
 
     blob_name = f"{currency.upper()}/{year}/{month}/{filename}"
@@ -76,12 +75,12 @@ async def upload_charges_file(
     settings = get_settings()
     azure_client = AsyncAzureBlobServiceClient(
         account_url=settings.azure_sa_url,
+        account_key=settings.azure_sa_account_key,
         container_name=settings.azure_sa_container_name,
         max_concurrency=settings.azure_sa_max_concurrency,
         max_single_put_size=settings.azure_sa_max_single_put_size,
         max_block_size=settings.azure_sa_max_block_size,
         sas_expiration_token_mins=settings.azure_sa_sas_expiration_token_mins,
-        account_key=settings.azure_sa_account_key,
     )
     async with azure_client:
         return await azure_client.upload_file_to_azure_blob(

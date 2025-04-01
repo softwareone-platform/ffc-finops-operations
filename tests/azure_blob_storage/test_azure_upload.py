@@ -5,7 +5,7 @@ import pytest
 import time_machine
 
 from app.blob_storage import (
-    download_changes_file,
+    download_charges_file,
     upload_charges_file,
     validate_year_and_month_format,
 )
@@ -36,10 +36,8 @@ async def test_cannot_upload_file():
 @time_machine.travel("2025-03-20T10:00:00Z", tick=False)
 async def test_can_get_a_download_url():
     zip_file_path = os.path.join(os.path.dirname(__file__), "files_folder/FCHG-1234-5678-9012.zip")
-
-    response = await download_changes_file(
-        file_path=zip_file_path, currency="eur", year=2025, month=3
-    )
+    filename = zip_file_path.split("/")[-1]
+    response = await download_charges_file(filename=filename, currency="eur", year=2025, month=3)
     assert response is not None
     assert isinstance(response, str)
     url_parsed = urlparse(response)
