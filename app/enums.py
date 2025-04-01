@@ -69,6 +69,7 @@ class OrganizationStatus(str, enum.Enum):
     ACTIVE = "active"
     CANCELLED = "cancelled"
     DELETED = "deleted"
+    NEW = "new"
 
 
 @enum.unique

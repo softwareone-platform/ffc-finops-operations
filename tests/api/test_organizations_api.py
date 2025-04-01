@@ -140,6 +140,20 @@ async def test_get_organization_with_status_filter(
     assert len(data["items"]) == data["total"]
 
 
+async def test_get_organization_with_status_new_filter(
+    organization_factory: ModelFactory[Organization], api_client: AsyncClient, ffc_jwt_token: str
+):
+    await organization_factory(operations_external_id="EXTERNAL_ID_1")
+    response = await api_client.get(
+        "/organizations?eq(status,ciao)",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 0
+    assert len(data["items"]) == data["total"]
+
+
 async def test_get_organization_with_not_valid_filter(
     organization_factory: ModelFactory[Organization], api_client: AsyncClient, ffc_jwt_token: str
 ):
