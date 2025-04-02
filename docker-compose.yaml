@@ -15,7 +15,7 @@ services:
       - .env
     ports:
       - "8000:8000"
-  azure:
+  azurite:
     image: mcr.microsoft.com/azure-storage/azurite:latest
     restart: unless-stopped
     ports:
@@ -54,6 +54,8 @@ services:
     depends_on:
       test_db:
         condition: "service_healthy"
+      azurite:
+        condition: "service_started"
     command: >
       bash -c "
         set -e
