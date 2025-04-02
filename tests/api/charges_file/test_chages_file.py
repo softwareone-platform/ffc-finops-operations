@@ -140,7 +140,7 @@ async def test_get_charges_file_with_document_data_filter(
 
     response = await operations_client.get(
         f"/charges?eq(document_date,{charge_file.document_date})"
-    )  # noqa: E501
+    )
     data = response.json()
     assert math.isclose(data["items"][0].get("amount"), 100.40)
     assert data["items"][0].get("document_date") == "2025-03-25T00:00:00"
