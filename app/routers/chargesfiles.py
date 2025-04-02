@@ -1,12 +1,13 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy import ColumnExpressionArgument, Select
 
 from app.blob_storage import download_charges_file
 from app.db.handlers import NotFoundError
 from app.db.models import ChargesFile
-from app.dependencies.auth import CurrentAuthContext, logger
+from app.dependencies.auth import CurrentAuthContext
 from app.dependencies.db import ChargesFileRepository
 from app.dependencies.path import ChargeFileId
 from app.enums import AccountType, ChargesFileStatus
@@ -78,17 +79,20 @@ async def get_charges_file_by_id(id: str):
 async def get_url_to_download_charges_file_by_id(
     charge_file: Annotated[ChargesFile, Depends(fetch_charge_file_or_404)],
 ):
-    filename = charge_file.id
-    document_date = charge_file.document_date.isoformat()
-    try:
-        year, month = map(int, document_date.split("-")[:2])
-        response = await download_charges_file(
-            filename=filename + ".zip",
-            currency=charge_file.currency,
-            year=year,
-            month=month,
+    if charge_file.status != ChargesFileStatus.GENERATED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You can only download charges files that have been generated.",
         )
-        return response
-    except (ValueError, AttributeError, IndexError) as error:  # pragma: no cover
-        logger.error("Failed to parse 'document_date' (%s): %s", document_date, error)
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND) from error
+    download_url = await download_charges_file(
+        filename=f"{charge_file.id}.zip",
+        currency=charge_file.currency,
+        year=charge_file.document_date.year,
+        month=charge_file.document_date.month,
+    )
+    if download_url is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"The file {id} does not exist. No download url for {charge_file.id}",
+        )
+    return RedirectResponse(url=download_url)

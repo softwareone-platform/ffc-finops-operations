@@ -94,7 +94,7 @@ class AsyncAzureBlobServiceClient:
             logger.error(f"Unexpected error occurred: {error}")
         return None
 
-    async def get_azure_blob_download_url(self, blob_name: str) -> str:
+    async def get_azure_blob_download_url(self, blob_name: str) -> str | None:
         """
         Download a blob from Azure Blob Storage using a time-limited SAS token.
         Please note that the function generate_blob_sas() does not raise an exception
@@ -114,7 +114,9 @@ class AsyncAzureBlobServiceClient:
 
         blob_client = self.container_client.get_blob_client(blob_name)  # pragma: no branch
         expiry_time = datetime.now(UTC) + timedelta(minutes=self.sas_expiration_token_mins)
-
+        if not await blob_client.exists():
+            logger.error(f"Blob '{blob_name}' does not exist.")
+            return None
         account_name = blob_client.account_name
         sas_token = generate_blob_sas(
             account_name=account_name,
