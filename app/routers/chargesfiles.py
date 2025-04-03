@@ -16,6 +16,7 @@ from app.enums import AccountType, ChargesFileStatus
 from app.pagination import LimitOffsetPage, paginate
 from app.rql import ChargesFileRules, RQLQuery
 from app.schemas.charges import ChargesFileRead
+from app.schemas.core import convert_model_to_schema
 
 
 def common_extra_conditions(auth_ctx: CurrentAuthContext) -> list[ColumnExpressionArgument]:
@@ -69,9 +70,10 @@ async def get_charges_files(
     "/{id}",
     response_model=ChargesFileRead,
 )
-async def get_charges_file_by_id(id: str):
-    # pending implementation
-    pass  # pragma: no cover
+async def get_charges_file_by_id(
+    charge_file: Annotated[ChargesFile, Depends(fetch_charge_file_or_404)],
+):
+    return convert_model_to_schema(ChargesFileRead, charge_file)
 
 
 @router.get(
