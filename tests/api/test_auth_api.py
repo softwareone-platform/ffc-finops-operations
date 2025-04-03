@@ -14,14 +14,19 @@ from app.enums import AccountStatus, AccountUserStatus, UserStatus
 from tests.types import ModelFactory
 
 
+@pytest.mark.parametrize(
+    "user_email",
+    ["lower.case@email.com", "Steve.McQueen@rai.tv"],
+)
 @time_machine.travel("2024-01-01T00:00:00Z", tick=False)
 async def test_get_tokens_from_credentials(
     db_session: AsyncSession,
     user_factory: ModelFactory[User],
     api_client: AsyncClient,
     test_settings: Settings,
+    user_email: str,
 ):
-    user = await user_factory(password="ThisIsOk123$")
+    user = await user_factory(password="ThisIsOk123$", email=user_email.lower())
     assert user.last_login_at is None
     account = await db_session.get(Account, user.last_used_account_id)
     payload = {

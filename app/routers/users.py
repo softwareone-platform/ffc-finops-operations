@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import ColumnExpressionArgument, Select, and_
+from sqlalchemy import ColumnExpressionArgument, Select, and_, func
 from sqlalchemy.orm import joinedload, with_loader_criteria
 
 from app.auth.constants import UNAUTHORIZED_EXCEPTION
@@ -208,7 +208,10 @@ async def validate_and_get_user(
 
     # let's fetch the first occurrence of the user with the provided email address.
     user = await user_handler.first(
-        where_clauses=[User.email == data.email, User.status != UserStatus.DELETED]
+        where_clauses=[
+            func.lower(User.email) == data.email.lower(),
+            User.status != UserStatus.DELETED,
+        ]
     )
     if not user:
         user = User(

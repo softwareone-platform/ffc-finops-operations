@@ -1,6 +1,7 @@
 from datetime import UTC, datetime, timedelta
 
 import jwt
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.constants import JWT_ALGORITHM, JWT_LEEWAY, UNAUTHORIZED_EXCEPTION
@@ -105,7 +106,10 @@ async def get_tokens_from_credentials(
     account_handler = AccountHandler(db_session)
     try:
         user = await user_handler.first(
-            where_clauses=[User.status == UserStatus.ACTIVE, User.email == login_data.email]
+            where_clauses=[
+                User.status == UserStatus.ACTIVE,
+                func.lower(User.email) == login_data.email.lower(),
+            ]
         )
         if not user:
             raise UNAUTHORIZED_EXCEPTION

@@ -6,6 +6,7 @@ from typing import Annotated
 import typer
 from email_validator import EmailNotValidError, validate_email
 from rich import print
+from sqlalchemy import func
 
 from app.conf import Settings
 from app.db.base import session_factory
@@ -50,7 +51,7 @@ async def get_account(account_handler: AccountHandler, account_id: str | None) -
 
 async def get_user(user_handler: UserHandler, email: str, name: str) -> User:
     user = await user_handler.first(
-        where_clauses=[User.email == email, User.status != UserStatus.DELETED]
+        where_clauses=[func.lower(User.email) == email.lower(), User.status != UserStatus.DELETED]
     )
     if not user:
         user = User(name=name, email=email, status=UserStatus.DRAFT)
