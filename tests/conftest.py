@@ -434,6 +434,7 @@ def datasource_expense_factory(
         month: int = 3,
         month_expenses: float = 123.45,
         datasource_id: str | None = None,
+        datasource_name: str | None = None,
         created_at: datetime | None = None,
         updated_at: datetime | None = None,
     ) -> DatasourceExpense:
@@ -442,6 +443,7 @@ def datasource_expense_factory(
         datasource_expense = DatasourceExpense(
             organization=organization,
             datasource_id=datasource_id or faker.uuid4(),
+            datasource_name=datasource_name or "Datasource Name",
             year=year,
             month=month,
             month_expenses=month_expenses,

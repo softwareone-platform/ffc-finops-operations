@@ -293,6 +293,7 @@ class DatasourceExpense(Base, HumanReadablePKMixin, TimestampMixin):
     PK_NUM_LENGTH = 12
 
     datasource_id: Mapped[str] = mapped_column(String(255), index=True)
+    datasource_name: Mapped[str] = mapped_column(String(255), nullable=False)
     organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"))
 
     organization: Mapped[Organization] = relationship(
