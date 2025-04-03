@@ -1,11 +1,15 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy import ColumnExpressionArgument, Select
 
+from app.blob_storage import download_charges_file
+from app.db.handlers import NotFoundError
 from app.db.models import ChargesFile
 from app.dependencies.auth import CurrentAuthContext
 from app.dependencies.db import ChargesFileRepository
+from app.dependencies.path import ChargeFileId
 from app.enums import AccountType, ChargesFileStatus
 from app.pagination import LimitOffsetPage, paginate
 from app.rql import ChargesFileRules, RQLQuery
@@ -23,6 +27,21 @@ def common_extra_conditions(auth_ctx: CurrentAuthContext) -> list[ColumnExpressi
 
 
 CommonConditions = Annotated[list[ColumnExpressionArgument], Depends(common_extra_conditions)]
+
+
+async def fetch_charge_file_or_404(
+    id: ChargeFileId,
+    charge_file_repo: ChargesFileRepository,
+    extra_conditions: CommonConditions,
+) -> ChargesFile:
+    try:
+        return await charge_file_repo.get(id=id, extra_conditions=extra_conditions)
+    except NotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
+
 
 router = APIRouter()
 
@@ -57,8 +76,23 @@ async def get_charges_file_by_id(id: str):
     "/{id}/download",
     status_code=status.HTTP_307_TEMPORARY_REDIRECT,
 )
-async def download_charges_file(id: str):
-    # pending implementation
-    # call the download
-    # return the full URL witht the SAS token
-    pass  # pragma: no cover
+async def get_url_to_download_charges_file_by_id(
+    charge_file: Annotated[ChargesFile, Depends(fetch_charge_file_or_404)],
+):
+    if charge_file.status != ChargesFileStatus.GENERATED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You can only download charges files that have been generated.",
+        )
+    download_url = await download_charges_file(
+        filename=f"{charge_file.id}.zip",
+        currency=charge_file.currency,
+        year=charge_file.document_date.year,
+        month=charge_file.document_date.month,
+    )
+    if download_url is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"The file {id} does not exist. No download url for {charge_file.id}",
+        )
+    return RedirectResponse(url=download_url)
