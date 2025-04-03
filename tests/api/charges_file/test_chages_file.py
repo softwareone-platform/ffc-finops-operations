@@ -243,7 +243,7 @@ async def test_get_charges_file_by_id_with_not_existing_blob(
     assert response.status_code == 404
 
 
-async def test_get_charges_file_by_id(
+async def test_get_charges_download_url_by_id(
     operations_client: AsyncClient,
     charges_file_factory: ModelFactory[ChargesFile],
     operations_account: Account,
@@ -346,6 +346,132 @@ async def test_get_charges_file_with_status_not_generated(
     assert response.status_code == 400
 
 
-async def test_get_charges_file_by_not_existing_id(operations_client: AsyncClient):
+async def test_get_charges_download_file_by_not_existing_id(operations_client: AsyncClient):
     response = await operations_client.get("/charges/FCHG-7147-9470-8878/download")
     assert response.status_code == 404
+
+
+async def test_get_charges_file_by_id(
+    operations_client: AsyncClient,
+    charges_file_factory: ModelFactory[ChargesFile],
+    operations_account: Account,
+):
+    charge_file = await charges_file_factory(
+        owner=operations_account,
+        currency="EUR",
+        amount=100.40,
+        document_date="2025-03-25",
+        status=ChargesFileStatus.DRAFT,
+    )
+    response = await operations_client.get(
+        f"/charges/{charge_file.id}",
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data.get("id") == charge_file.id
+    assert data.get("currency") == charge_file.currency
+    assert data.get("amount") == float(charge_file.amount)
+    assert data.get("status") == charge_file.status
+    assert data.get("owner").get("id") == operations_account.id
+
+
+async def test_get_charges_file_by_not_existing_id(
+    operations_client: AsyncClient,
+    charges_file_factory: ModelFactory[ChargesFile],
+    gcp_account: Account,
+):
+    response = await operations_client.get(
+        "/charges/FCHG-7147-9470-8878",
+    )
+
+    assert response.status_code == 404
+
+
+async def test_get_charges_file_by_id_with_affiliate_account(
+    affiliate_client: AsyncClient,
+    charges_file_factory: ModelFactory[ChargesFile],
+    gcp_account: Account,
+):
+    charge_file = await charges_file_factory(
+        owner=gcp_account,
+        currency="EUR",
+        amount=100.40,
+        document_date="2025-03-25",
+        status=ChargesFileStatus.DRAFT,
+    )
+    response = await affiliate_client.get(
+        f"/charges/{charge_file.id}",
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data.get("id") == charge_file.id
+    assert data.get("currency") == charge_file.currency
+    assert data.get("amount") == float(charge_file.amount)
+    assert data.get("status") == charge_file.status
+    assert data.get("owner").get("id") == gcp_account.id
+
+
+async def test_affiliate_account_cannot_get_charges_file_owned_by_others(
+    affiliate_client: AsyncClient,
+    operations_account: Account,
+    charges_file_factory: ModelFactory[ChargesFile],
+    gcp_account: Account,
+):
+    affiliate_charge_file = await charges_file_factory(
+        owner=gcp_account,
+        currency="EUR",
+        amount=100.40,
+        document_date="2025-03-25",
+        status=ChargesFileStatus.DRAFT,
+    )
+    operations_charge_file = await charges_file_factory(
+        owner=operations_account,
+        currency="EUR",
+        amount=100.40,
+        document_date="2025-03-25",
+        status=ChargesFileStatus.DRAFT,
+    )
+    response = await affiliate_client.get(
+        f"/charges/{operations_charge_file.id}",
+    )
+
+    assert response.status_code == 404
+    response = await affiliate_client.get(
+        f"/charges/{affiliate_charge_file.id}",
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data.get("id") == affiliate_charge_file.id
+    assert data.get("currency") == affiliate_charge_file.currency
+    assert data.get("amount") == float(affiliate_charge_file.amount)
+    assert data.get("status") == affiliate_charge_file.status
+    assert data.get("owner").get("id") == gcp_account.id
+
+
+async def test_operations_account_can_get_charges_file_owned_by_others(
+    operations_client: AsyncClient,
+    operations_account: Account,
+    charges_file_factory: ModelFactory[ChargesFile],
+    gcp_account: Account,
+):
+    affiliate_charge_file = await charges_file_factory(
+        owner=gcp_account,
+        currency="EUR",
+        amount=100.40,
+        document_date="2025-03-25",
+        status=ChargesFileStatus.DRAFT,
+    )
+    response = await operations_client.get(
+        f"/charges/{affiliate_charge_file.id}",
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data.get("id") == affiliate_charge_file.id
+    assert data.get("currency") == affiliate_charge_file.currency
+    assert data.get("amount") == float(affiliate_charge_file.amount)
+    assert data.get("status") == affiliate_charge_file.status
+    assert data.get("owner").get("id") == gcp_account.id
