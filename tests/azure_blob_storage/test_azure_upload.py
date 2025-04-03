@@ -36,7 +36,7 @@ async def test_cannot_upload_file():
 
 @time_machine.travel("2025-03-20T10:00:00Z", tick=False)
 async def test_can_get_a_download_url():
-    base_dir = Path(__file__).resolve().parent.parent.parent
+    base_dir = Path(__file__).resolve().parent.parent
     zip_file_path = base_dir / "azure_blob_storage/files_folder/FCHG-1234-5678-9012.zip"
     filename = str(zip_file_path).split("/")[-1]
     response = await download_charges_file(filename=filename, currency="eur", year=2025, month=3)
