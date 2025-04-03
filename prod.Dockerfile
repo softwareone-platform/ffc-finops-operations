@@ -41,6 +41,10 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
+COPY ./entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
 
 # Running gunicorn with Uvicorn workers
 CMD [ \

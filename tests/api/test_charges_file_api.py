@@ -1,7 +1,8 @@
 import math
-from pathlib import Path
+import os
+import tempfile
 
-import aiofiles
+import aiofiles  # type: ignore
 from httpx import AsyncClient
 
 from app import settings
@@ -255,14 +256,17 @@ async def test_get_charges_download_url_by_id(
         document_date="2025-03-25",
         status=ChargesFileStatus.GENERATED,
     )
-    base_dir = Path(__file__).resolve().parent.parent.parent
-    zip_file_path = base_dir / f"azure_blob_storage/files_folder/{charge_file.id}.zip"
 
-    async with aiofiles.open(zip_file_path, "w") as file:
+    filename = f"{charge_file.id}.zip"
+    temp_dir = tempfile.gettempdir()
+    file_path = os.path.join(temp_dir, filename)
+
+    async with aiofiles.open(file_path, mode="w") as file:
         await file.write("Testing File")
+        await file.flush()
 
     await upload_charges_file(
-        file_path=str(zip_file_path),
+        file_path=file_path,
         currency="EUR",
         year=2025,
         month=3,
@@ -292,14 +296,16 @@ async def test_get_charges_file_by_id_affiliate_account(
         document_date="2025-03-25",
         status=ChargesFileStatus.GENERATED,
     )
-    base_dir = Path(__file__).resolve().parent.parent.parent
-    zip_file_path = base_dir / f"azure_blob_storage/files_folder/{charge_file.id}.zip"
 
-    async with aiofiles.open(zip_file_path, "w") as file:
+    filename = f"{charge_file.id}.zip"
+    temp_dir = tempfile.gettempdir()
+    file_path = os.path.join(temp_dir, filename)
+
+    async with aiofiles.open(file_path, mode="w") as file:
         await file.write("Testing File")
 
     await upload_charges_file(
-        file_path=str(zip_file_path),
+        file_path=str(file_path),
         currency="EUR",
         year=2025,
         month=3,
@@ -329,18 +335,16 @@ async def test_get_charges_file_with_status_not_generated(
         document_date="2025-03-25",
         status=ChargesFileStatus.DRAFT,
     )
-    base_dir = Path(__file__).resolve().parent.parent.parent
-    zip_file_path = base_dir / f"azure_blob_storage/files_folder/{charge_file.id}.zip"
 
-    async with aiofiles.open(zip_file_path, "w") as file:
+    async with aiofiles.tempfile.NamedTemporaryFile(suffix=".zip", mode="w") as file:
         await file.write("Testing File")
-
-    await upload_charges_file(
-        file_path=str(zip_file_path),
-        currency="EUR",
-        year=2025,
-        month=3,
-    )
+        await file.flush()
+        await upload_charges_file(
+            file_path=file.name,
+            currency="EUR",
+            year=2025,
+            month=3,
+        )
 
     response = await affiliate_client.get(f"/charges/{charge_file.id}/download")
     assert response.status_code == 400
@@ -371,7 +375,7 @@ async def test_get_charges_file_by_id(
     data = response.json()
     assert data.get("id") == charge_file.id
     assert data.get("currency") == charge_file.currency
-    assert data.get("amount") == float(charge_file.amount)
+    assert data.get("amount") == float(charge_file.amount)  # type: ignore
     assert data.get("status") == charge_file.status
     assert data.get("owner").get("id") == operations_account.id
 
@@ -408,7 +412,7 @@ async def test_get_charges_file_by_id_with_affiliate_account(
     data = response.json()
     assert data.get("id") == charge_file.id
     assert data.get("currency") == charge_file.currency
-    assert data.get("amount") == float(charge_file.amount)
+    assert data.get("amount") == float(charge_file.amount)  # type: ignore
     assert data.get("status") == charge_file.status
     assert data.get("owner").get("id") == gcp_account.id
 
@@ -446,7 +450,7 @@ async def test_affiliate_account_cannot_get_charges_file_owned_by_others(
     data = response.json()
     assert data.get("id") == affiliate_charge_file.id
     assert data.get("currency") == affiliate_charge_file.currency
-    assert data.get("amount") == float(affiliate_charge_file.amount)
+    assert data.get("amount") == float(affiliate_charge_file.amount)  # type: ignore
     assert data.get("status") == affiliate_charge_file.status
     assert data.get("owner").get("id") == gcp_account.id
 
@@ -472,6 +476,6 @@ async def test_operations_account_can_get_charges_file_owned_by_others(
     data = response.json()
     assert data.get("id") == affiliate_charge_file.id
     assert data.get("currency") == affiliate_charge_file.currency
-    assert data.get("amount") == float(affiliate_charge_file.amount)
+    assert data.get("amount") == float(affiliate_charge_file.amount)  # type: ignore
     assert data.get("status") == affiliate_charge_file.status
     assert data.get("owner").get("id") == gcp_account.id

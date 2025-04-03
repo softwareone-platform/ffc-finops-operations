@@ -3,7 +3,6 @@ import uuid
 from collections.abc import AsyncGenerator, Callable
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from unittest.mock import patch
 
 import jwt
 import pytest
@@ -74,6 +73,11 @@ def test_settings() -> Settings:
     settings.auth_refresh_jwt_secret = "auth_refresh_jwt_secret"
     settings.exchange_rate_api_base_url = "https://v6.exchangerate-api.com/v6"
     settings.exchange_rate_api_token = "my_exchange_rate_api_token"
+    settings.azure_sa_protocol = "http"
+    settings.azure_sa_blob_endpoint = "http://azurite:10000/devstoreaccount1"
+    settings.azure_sa_account_key = (
+        "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
+    )
     settings.cli_rich_logging = False
     return settings
 
@@ -614,11 +618,11 @@ def stamina_testing_mode():
         stamina.set_testing(False)
 
 
-@pytest.fixture(scope="session", autouse=True)
-def mock_default_azure_credentials():
-    test_key = (
-        "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
-    )
+# @pytest.fixture(scope="session", autouse=True)
+# def mock_default_azure_credentials():
+#     test_key = (
+#         "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
+#     )
 
-    with patch("app.api_clients.azure.AZURE_SA_CREDENTIALS", test_key):
-        yield
+#     with patch("app.api_clients.azure.AZURE_SA_CREDENTIALS", test_key):
+#         yield

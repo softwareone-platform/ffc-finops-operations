@@ -30,7 +30,7 @@ async def download_charges_file(
 
     blob_name = f"{currency.upper()}/{year}/{month}/{filename}"
     azure_client = AsyncAzureBlobServiceClient(
-        account_url=settings.azure_sa_url,
+        connection_string=str(settings.azure_sa_connection_string),
         container_name=settings.azure_sa_container_name,
         max_concurrency=settings.azure_sa_max_concurrency,
         max_single_put_size=settings.azure_sa_max_single_put_size,
@@ -74,9 +74,9 @@ async def upload_charges_file(
     blob_name = f"{currency.upper()}/{year}/{month}/{filename}"
     settings = get_settings()
     azure_client = AsyncAzureBlobServiceClient(
-        account_url=settings.azure_sa_url,
-        account_key=settings.azure_sa_account_key,
+        connection_string=str(settings.azure_sa_connection_string),
         container_name=settings.azure_sa_container_name,
+        account_key=settings.azure_sa_account_key,
         max_concurrency=settings.azure_sa_max_concurrency,
         max_single_put_size=settings.azure_sa_max_single_put_size,
         max_block_size=settings.azure_sa_max_block_size,
@@ -98,7 +98,7 @@ def validate_year_and_month_format(month: int, year: int):
     if month <= 0 or month > 12:
         raise ValueError("Invalid month format.")
     month = int(month)  # to ensure floats will be addressed
-    month = f"{month:02}"
+    month_str = f"{month:02}"
     if year < 1970:
         raise ValueError("Invalid year format.")
-    return str(month), str(year)
+    return month_str, str(year)

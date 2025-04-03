@@ -1,4 +1,5 @@
 import pathlib
+from urllib.parse import quote
 
 from pydantic import PostgresDsn, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -18,7 +19,7 @@ class Settings(BaseSettings):
     postgres_user: str
     postgres_password: str
     postgres_host: str
-    postgres_port: int
+    postgres_port: int = 5432
 
     api_modifier_base_url: str
     api_modifier_jwt_secret: str
@@ -39,9 +40,11 @@ class Settings(BaseSettings):
     optscale_rest_api_base_url: str
     optscale_cluster_secret: str
 
-    azure_sa_container_name: str = "ffc-charges-files"
-    azure_sa_url: str
+    azure_sa_blob_endpoint: str
+    azure_sa_account_name: str
     azure_sa_account_key: str
+    azure_sa_protocol: str = "https"
+    azure_sa_container_name: str = "ffc-charges-files"
     azure_sa_max_block_size: int = 1024 * 1024 * 4  # 4 MiB
     azure_sa_max_single_put_size: int = 1024 * 1024 * 8  # 8 MiB
     azure_sa_max_concurrency: int = 4
@@ -53,11 +56,22 @@ class Settings(BaseSettings):
     debug: bool = False
 
     @computed_field
+    def azure_sa_connection_string(self) -> str:
+        return ";".join(
+            [
+                f"DefaultEndpointsProtocol={self.azure_sa_protocol}",
+                f"AccountName={self.azure_sa_account_name}",
+                f"AccountKey={self.azure_sa_account_key}",
+                f"BlobEndpoint={self.azure_sa_blob_endpoint}",
+            ]
+        )
+
+    @computed_field
     def postgres_async_url(self) -> PostgresDsn:
         return PostgresDsn.build(
             scheme="postgresql+asyncpg",
             username=self.postgres_user,
-            password=self.postgres_password,
+            password=quote(self.postgres_password),
             host=self.postgres_host,
             port=self.postgres_port,
             path=self.postgres_db,
@@ -68,7 +82,7 @@ class Settings(BaseSettings):
         return PostgresDsn.build(
             scheme="postgresql",
             username=self.postgres_user,
-            password=self.postgres_password,
+            password=quote(self.postgres_password),
             host=self.postgres_host,
             port=self.postgres_port,
             path=self.postgres_db,
