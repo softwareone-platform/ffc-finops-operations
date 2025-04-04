@@ -2,6 +2,7 @@ import secrets
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, status
+from sqlalchemy import func
 
 from app.auth.login import get_tokens_from_credentials, get_tokens_from_refresh
 from app.db.models import User
@@ -31,7 +32,7 @@ async def start_reset_password_flow(
     user_repo: UserRepository,
 ):
     user = await user_repo.first(
-        where_clauses=[User.email == email, User.status == UserStatus.ACTIVE]
+        where_clauses=[func.lower(User.email) == email.lower(), User.status == UserStatus.ACTIVE]
     )
 
     if user and (
