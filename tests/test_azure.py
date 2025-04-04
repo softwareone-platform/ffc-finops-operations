@@ -1,7 +1,4 @@
-import os
-from pathlib import Path
-from urllib.parse import urlparse
-
+import aiofiles  # type: ignore
 import pytest
 import time_machine
 
@@ -13,15 +10,17 @@ from app.blob_storage import (
 
 
 async def test_can_upload_file():
-    zip_file_path = os.path.join(os.path.dirname(__file__), "files_folder/FCHG-1234-5678-9012.zip")
-    response = await upload_charges_file(
-        file_path=zip_file_path,
-        currency="eur",
-        year=2025,
-        month=3,
-    )
+    async with aiofiles.tempfile.NamedTemporaryFile(suffix=".zip", mode="w") as fakezip:
+        await fakezip.write("test")
+        await fakezip.flush()
+        response = await upload_charges_file(
+            file_path=fakezip.name,
+            currency="eur",
+            year=2025,
+            month=3,
+        )
     assert response is not None
-    assert response == zip_file_path
+    assert response == fakezip.name
 
 
 async def test_cannot_upload_file():
@@ -36,16 +35,21 @@ async def test_cannot_upload_file():
 
 @time_machine.travel("2025-03-20T10:00:00Z", tick=False)
 async def test_can_get_a_download_url():
-    base_dir = Path(__file__).resolve().parent.parent
-    zip_file_path = base_dir / "azure_blob_storage/files_folder/FCHG-1234-5678-9012.zip"
-    filename = str(zip_file_path).split("/")[-1]
-    response = await download_charges_file(filename=filename, currency="eur", year=2025, month=3)
+    async with aiofiles.tempfile.NamedTemporaryFile(suffix=".zip", mode="w") as fakezip:
+        await fakezip.write("test")
+        await fakezip.flush()
+        response = await upload_charges_file(
+            file_path=fakezip.name,
+            currency="eur",
+            year=2025,
+            month=3,
+        )
+        _, filename = fakezip.name.rsplit("/", 1)
+        response = await download_charges_file(
+            filename=filename, currency="eur", year=2025, month=3
+        )
     assert response is not None
-    assert isinstance(response, str)
-    url_parsed = urlparse(response)
-    path_parts = url_parsed.path.lstrip("/").split("/")
-    blob_name = "/".join(path_parts[1:])
-    assert blob_name == "EUR/2025/03/FCHG-1234-5678-9012.zip"
+    assert f"EUR/2025/03/{filename}" in response
 
 
 def test_validate_year_and_month_format():

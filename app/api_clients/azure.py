@@ -7,19 +7,16 @@ from azure.core.exceptions import (
     ClientAuthenticationError,
     ResourceNotFoundError,
 )
-from azure.identity.aio import DefaultAzureCredential
 from azure.storage.blob import BlobSasPermissions, generate_blob_sas
 from azure.storage.blob.aio import ContainerClient
 
 logger = logging.getLogger(__name__)
 
-AZURE_SA_CREDENTIALS = DefaultAzureCredential()
-
 
 class AsyncAzureBlobServiceClient:
     def __init__(
         self,
-        account_url: str,
+        connection_string: str,
         container_name: str,
         account_key: str,
         max_block_size: int = 1024 * 1024 * 4,
@@ -27,15 +24,14 @@ class AsyncAzureBlobServiceClient:
         max_concurrency: int = 4,
         sas_expiration_token_mins: int = 5,
     ):
-        self.account_url = account_url
+        self.connection_string = connection_string
         self.container_name = container_name
         self.account_key = account_key  # the primary access key of the Azure Storage account.
         self.sas_expiration_token_mins = sas_expiration_token_mins
 
-        self.container_client = ContainerClient(
-            account_url=self.account_url,
-            container_name=self.container_name,
-            credential=AZURE_SA_CREDENTIALS,
+        self.container_client = ContainerClient.from_connection_string(
+            self.connection_string,
+            self.container_name,
             max_block_size=max_block_size,
             max_single_put_size=max_single_put_size,
             max_concurrency=max_concurrency,
