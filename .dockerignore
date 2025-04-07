@@ -7,3 +7,7 @@ htmlcov
 .venv
 .cache
 .devcontainer
+LICENSE.txt
+.git
+.gitignore
+.github
