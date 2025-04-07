@@ -3,6 +3,7 @@ import uuid
 from collections.abc import AsyncGenerator, Callable
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from typing import Final
 
 import jwt
 import pytest
@@ -631,6 +632,26 @@ def stamina_testing_mode():
 #     test_key = (
 #         "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
 #     )
-
 #     with patch("app.api_clients.azure.AZURE_SA_CREDENTIALS", test_key):
 #         yield
+
+
+FIXED_SEED: Final[int] = 42
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_call(item: pytest.Item) -> None:
+    """Set the randomly_seed to a fixed value for tests with the `fixed_random_seed` marker."""
+
+    marker = item.get_closest_marker("fixed_random_seed")
+    if not marker:
+        yield
+        return
+
+    orig_randomly_seed = item.config.getoption("randomly_seed")
+
+    item.config.option.randomly_seed = FIXED_SEED
+    try:
+        yield
+    finally:
+        item.config.option.randomly_seed = orig_randomly_seed

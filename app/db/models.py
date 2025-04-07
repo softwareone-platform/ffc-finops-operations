@@ -304,6 +304,15 @@ class DatasourceExpense(Base, HumanReadablePKMixin, TimestampMixin):
     month: Mapped[int] = mapped_column(Integer(), nullable=False)
     month_expenses: Mapped[Decimal] = mapped_column(sa.Numeric(18, 4))
 
+    entitlements: Mapped[list[Entitlement]] = relationship(
+        "Entitlement",
+        primaryjoin=lambda: DatasourceExpense.datasource_id == Entitlement.datasource_id,
+        foreign_keys=lambda: [DatasourceExpense.datasource_id],
+        viewonly=True,
+        uselist=True,
+        lazy="joined",
+    )
+
     __table_args__ = (
         Index("ix_datasource_expenses_year_and_month", year, month),
         UniqueConstraint(

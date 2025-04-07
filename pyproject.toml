@@ -39,6 +39,7 @@ dependencies = [
     "python-dateutil==2.9.*",
     "aiohttp==3.11.*",
     "jinja2==3.1.*",
+    "pytest-snapshot>=0.9.0",
 ]
 
 [dependency-groups]
@@ -86,23 +87,23 @@ cache-dir = ".cache/ruff"
 preview = true # enable linting rules in preview (e.g. RUF029 as of 2025-02-20)
 explicit-preview-rules = true # only enable preview rules we explicitly specify
 select = [
-    "E", # w errors
-    "W", # pycodestyle warnings
-    "F", # pyflakes
-    "I", # isort
-    "B", # flake8-bugbear
-    "C4", # flake8-comprehensions
-    "UP", # pyupgrade,
-    "PT", # flake8-pytest-style
-    "T10", # flake8-pytest-style
+    "E",      # w errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade,
+    "PT",     # flake8-pytest-style
+    "T10",    # flake8-pytest-style
     "RUF029", # unused-async
 ]
 ignore = [
     "PT001", # Use `@pytest.fixture()` over `@pytest.fixture`
     "PT011", # pytest.raises({exception}) is too broad, set the match parameter or use a more specific exception
     "PT023", # @pytest.mark.parametrize` is missing required arguments
-    "B008", # do not perform function calls in argument defaults
-    "B904", # Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+    "B008",  # do not perform function calls in argument defaults
+    "B904",  # Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
 ]
 
 [tool.ruff.format]
@@ -121,6 +122,9 @@ addopts = "--cov=app --cov-report=term-missing --cov-report=html --cov-report=xm
 cache_dir = ".cache/pytest"
 env_override_existing_values = 1
 env_files = [".env", ".env.test"]
+markers = """
+    fixed_random_seed: Set the randomly_seed to a fixed value to tests using random values deterministic
+"""
 
 [tool.coverage.run]
 branch = true

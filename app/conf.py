@@ -35,6 +35,7 @@ class Settings(BaseSettings):
 
     system_jwt_token_max_lifespan_minutes: int = 5
     datasources_obsolete_after_months: int = 6
+    billing_percentage: float = 1.0
 
     optscale_auth_api_base_url: str
     optscale_rest_api_base_url: str

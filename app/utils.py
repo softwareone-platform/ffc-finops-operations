@@ -1,4 +1,5 @@
 import contextlib
+import csv
 import logging
 import os
 import smtplib
@@ -6,12 +7,15 @@ from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr
+from collections.abc import Iterable
+from typing import IO, Any
 
 import httpx
 from fastapi import HTTPException, status
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from app.conf import Settings
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +66,7 @@ def wrap_exc_in_http_response(
             f"returning a {status_code} HTTP response: {error_msg}"
         )
         raise HTTPException(status_code=status_code, detail=error_msg) from e
+<<<<<<< HEAD
 
 
 def send_email(
@@ -92,3 +97,60 @@ def generate_invitation_email(id: str, name: str, token: str, expires: datetime)
         token=token,
         expires=expires,
     )
+
+
+class PydanticWriter[M: BaseModel]:
+    """
+    A CSV writer that uses Pydantic models to write rows.
+    """
+
+    _dict_writer: csv.DictWriter
+    _fieldnames: list[str] | None
+    model_cls: type[M]
+
+    def __init__(
+        self,
+        model_cls: type[M],
+        file: IO,
+        *dict_writer_args: Any,
+        **dict_writer_kwargs: Any,
+    ) -> None:
+        self._fieldnames = dict_writer_kwargs.pop("fieldnames", None)
+        self.model_cls = model_cls
+
+        self._dict_writer = csv.DictWriter(
+            file, *dict_writer_args, **{**dict_writer_kwargs, "fieldnames": self.fieldnames}
+        )
+
+    @property
+    def fieldnames(self) -> list[str]:
+        model_fieldnames = list(self.model_cls.model_fields.keys())
+
+        if self._fieldnames is not None:
+            if len(model_fieldnames) != len(self._fieldnames):
+                raise ValueError(
+                    "Invalid number of fieldnames: "
+                    f"expected {len(model_fieldnames)}, got {len(self._fieldnames)}"
+                )
+
+            return self._fieldnames
+
+        return model_fieldnames
+
+    @property
+    def headernames(self) -> list[str]:
+        return [
+            field.serialization_alias if field.serialization_alias is not None else field_name
+            for field_name, field in zip(
+                self.fieldnames, self.model_cls.model_fields.values(), strict=True
+            )
+        ]
+
+    def writerow(self, row: M) -> None:
+        self._dict_writer.writerow(row.model_dump(mode="json"))
+
+    def writerows(self, rows: Iterable[M]) -> None:
+        self._dict_writer.writerows([row.model_dump(mode="json") for row in rows])
+
+    def writeheader(self) -> None:
+        return self._dict_writer.writerow(dict(zip(self.fieldnames, self.headernames, strict=True)))
