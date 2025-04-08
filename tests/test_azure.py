@@ -38,7 +38,7 @@ async def test_can_get_a_download_url():
     async with aiofiles.tempfile.NamedTemporaryFile(suffix=".zip", mode="w") as fakezip:
         await fakezip.write("test")
         await fakezip.flush()
-        response = await upload_charges_file(
+        await upload_charges_file(
             file_path=fakezip.name,
             currency="eur",
             year=2025,
