@@ -79,6 +79,7 @@ class OrganizationRules(ModelRQLRules, AuditableMixin):
     currency = FieldRule()
     billing_currency = FieldRule()
     status = FieldRule()
+    operations_external_id = FieldRule()
 
 
 class EntitlementRules(ModelRQLRules, AuditableMixin):
