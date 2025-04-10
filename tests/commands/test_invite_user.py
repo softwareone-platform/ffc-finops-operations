@@ -19,11 +19,13 @@ from tests.types import ModelFactory
 
 @time_machine.travel("2025-03-07T10:00:00Z", tick=False)
 async def test_invite_user(
+    mocker: MockerFixture,
     test_settings: Settings,
     db_session: AsyncSession,
     operations_account: Account,
     capsys: pytest.CaptureFixture,
 ):
+    mocked_send_email = mocker.patch("app.commands.invite_user.send_email")
     await invite_user(test_settings, "test@example.com", "Test User", None)
 
     captured = capsys.readouterr()
@@ -42,10 +44,18 @@ async def test_invite_user(
     assert account_user.invitation_token_expires_at == (
         datetime.now(UTC) + timedelta(days=test_settings.invitation_token_expires_days)
     )
+    mocked_send_email.assert_called_once_with(
+        test_settings,
+        user.email,
+        user.name,
+        f"Join the FinOps for Cloud {operations_account.name} Account!",
+        mocker.ANY,
+    )
 
 
 @time_machine.travel("2025-03-07T10:00:00Z", tick=False)
 async def test_invite_user_already_invited_force(
+    mocker: MockerFixture,
     test_settings: Settings,
     db_session: AsyncSession,
     operations_account: Account,
@@ -53,6 +63,7 @@ async def test_invite_user_already_invited_force(
     accountuser_factory: ModelFactory[AccountUser],
     capsys: pytest.CaptureFixture,
 ):
+    mocked_send_email = mocker.patch("app.commands.invite_user.send_email")
     user = await user_factory(
         email="test@example.com",
         name="Test User",
@@ -94,10 +105,12 @@ async def test_invite_user_already_invited_force(
     assert db_account_user.invitation_token_expires_at == (
         datetime.now(UTC) + timedelta(days=test_settings.invitation_token_expires_days)
     )
+    mocked_send_email.assert_not_called()
 
 
 @time_machine.travel("2025-03-07T10:00:00Z", tick=False)
 async def test_invite_user_already_invited(
+    mocker: MockerFixture,
     test_settings: Settings,
     db_session: AsyncSession,
     operations_account: Account,
@@ -105,6 +118,7 @@ async def test_invite_user_already_invited(
     accountuser_factory: ModelFactory[AccountUser],
     capsys: pytest.CaptureFixture,
 ):
+    mocked_send_email = mocker.patch("app.commands.invite_user.send_email")
     user = await user_factory(
         email="test@example.com",
         name="Test User",
@@ -137,14 +151,17 @@ async def test_invite_user_already_invited(
     assert db_account_user.status == AccountUserStatus.INVITED
     assert db_account_user.invitation_token == account_user.invitation_token
     assert db_account_user.invitation_token_expires_at == account_user.invitation_token_expires_at
+    mocked_send_email.assert_not_called()
 
 
 async def test_invite_user_user_disabled(
+    mocker: MockerFixture,
     test_settings: Settings,
     user_factory: ModelFactory[User],
     operations_account: Account,
     capsys: pytest.CaptureFixture,
 ):
+    mocked_send_email = mocker.patch("app.commands.invite_user.send_email")
     await user_factory(
         email="test@example.com",
         name="Test User",
@@ -157,15 +174,18 @@ async def test_invite_user_user_disabled(
     captured = capsys.readouterr()
 
     assert "The user test@example.com is disabled." in captured.out.replace("\n", "")
+    mocked_send_email.assert_not_called()
 
 
 @time_machine.travel("2025-03-07T10:00:00Z", tick=False)
 async def test_invite_user_non_default_account(
+    mocker: MockerFixture,
     test_settings: Settings,
     db_session: AsyncSession,
     account_factory: ModelFactory[Account],
     capsys: pytest.CaptureFixture,
 ):
+    mocked_send_email = mocker.patch("app.commands.invite_user.send_email")
     account = await account_factory()
 
     await invite_user(test_settings, "test@example.com", "Test User", account.id)
@@ -187,6 +207,13 @@ async def test_invite_user_non_default_account(
     assert account_user.invitation_token_expires_at == (
         datetime.now(UTC) + timedelta(days=test_settings.invitation_token_expires_days)
     )
+    mocked_send_email.assert_called_once_with(
+        test_settings,
+        user.email,
+        user.name,
+        f"Join the FinOps for Cloud {account.name} Account!",
+        mocker.ANY,
+    )
 
 
 @pytest.mark.parametrize(
@@ -194,17 +221,20 @@ async def test_invite_user_non_default_account(
     [AccountStatus.DELETED, AccountStatus.DISABLED],
 )
 async def test_invite_user_non_default_account_not_active(
+    mocker: MockerFixture,
     test_settings: Settings,
     account_factory: ModelFactory[Account],
     account_status: AccountStatus,
     capsys: pytest.CaptureFixture,
 ):
+    mocked_send_email = mocker.patch("app.commands.invite_user.send_email")
     account = await account_factory(status=account_status)
     with pytest.raises(Abort):
         await invite_user(test_settings, "test@example.com", "Test User", account.id)
     captured = capsys.readouterr()
     stderr_output = captured.out.replace("\n", "")
     assert f"No Active Account with ID {account.id} has been found." in stderr_output
+    mocked_send_email.assert_not_called()
 
 
 async def test_invite_user_no_operations_account(
