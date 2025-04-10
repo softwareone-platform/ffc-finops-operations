@@ -49,8 +49,16 @@ class Settings(BaseSettings):
     azure_sa_max_single_put_size: int = 1024 * 1024 * 8  # 8 MiB
     azure_sa_max_concurrency: int = 4
     azure_sa_sas_expiration_token_mins: int = 5
+
     exchange_rate_api_base_url: str
     exchange_rate_api_token: str
+
+    smtp_host: str
+    smtp_port: int = 587
+    smtp_user: str
+    smtp_password: str
+    smtp_sender_email: str
+    smtp_sender_name: str
 
     cli_rich_logging: bool = True
     debug: bool = False

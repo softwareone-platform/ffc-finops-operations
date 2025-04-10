@@ -100,29 +100,22 @@
                 <tr>
                     <td style="padding: 0 40px 34px 40px;">
                         <div style="font-family: Arial, 'Trebuchet MS', Tahoma, sans-serif; color: #434952; font-size: 15px; line-height: 1.4;">
-                            <p style="margin-bottom: 20px;">Hi {{text.user_name}},</p>
+                            <p style="margin-bottom: 20px;">Hi {{ name }},</p>
 
                             <p style="margin-bottom: 25px;">
                                 You have been invited to use the SoftwareOne FinOps for Cloud Admin Portal.
                             </p>
 
                             <p style="margin-bottom: 0;">
-                                Get started by clicking <a href="{{links.portal_link}}" target="_blank" style="color: #434952; text-decoration: underline;">here</a> or use this link:
-                            </p>
-
-                            <p style="margin-bottom: 20px; margin-top: 0;">
-                                <a href="{{links.portal_link}}" target="_blank" style="color: #434952; text-decoration: underline;">
-                                    {{links.portal_link}}
-                                </a>
+                                Your invitation token is: <strong>{{ token }}</strong>
                             </p>
 
                             <p style="margin-bottom: 20px;">
-                                This is a personalized invitation that will expire on <strong>{{text.expire_date}}</strong>. If you have any questions, contact the Marketplace support team at
-                                <a href="mailto:{{email.support}}" target="_blank" style="color: #434952; text-decoration: underline;">{{email.support}}</a>.
+                                This is a personalized invitation that will expire on <strong>{{ expires | dateformat }}</strong>.
                             </p>
 
                             <p style="margin-bottom: 0;">Kind Regards,</p>
-                            <p style="margin: 0;">The SoftwareOne Team</p>
+                            <p style="margin: 0;">The SoftwareOne FinOps for Cloud Team</p>
                         </div>
                     </td>
                 </tr>

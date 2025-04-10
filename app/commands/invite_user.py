@@ -13,6 +13,7 @@ from app.db.base import session_factory
 from app.db.handlers import AccountHandler, AccountUserHandler, UserHandler
 from app.db.models import Account, AccountUser, User
 from app.enums import AccountStatus, AccountType, AccountUserStatus, UserStatus
+from app.utils import generate_invitation_email, send_email
 
 
 def validate_invited_email(email: str):
@@ -65,7 +66,11 @@ async def get_user(user_handler: UserHandler, email: str, name: str) -> User:
 async def invite_user(
     settings: Settings, email: str, name: str, account_id: str | None, force: bool = False
 ):
-    """ """
+    """
+    Invite a user to join an account.
+    If the user does not exist, create a new user and send an invitation email.
+    """
+    invitation_exists = False
     async with session_factory.begin() as session:
         account_handler = AccountHandler(session)
         user_handler = UserHandler(session)
@@ -92,6 +97,9 @@ async def invite_user(
             )
             action = "invited successfully!"
             color = "green"
+
+        invitation_exists = account_user.id is not None
+
         if not force and account_user.id:
             action = "has already been invited!"
 
@@ -110,6 +118,22 @@ Account: [blue][bold]{account.id}[/bold] - {account.name} ({account.type.value.c
         elif force:  # pragma no branch
             account_user = await accountuser_handler.update(account_user)
         formatted_expires = account_user.invitation_token_expires_at.strftime("%c")  # type: ignore
+
+        if not invitation_exists:
+            email_body = generate_invitation_email(
+                user.id,
+                user.name,
+                account_user.invitation_token,  # type: ignore
+                account_user.invitation_token_expires_at,  # type: ignore
+            )
+            send_email(
+                settings,
+                user.email,
+                user.name,
+                f"Join the FinOps for Cloud {account.name} Account!",
+                email_body,
+            )
+
         print(f"""
 [{color}]User [bold]{user.id} - {user.name} ({user.email})[/bold] {action}[/{color}]
 
