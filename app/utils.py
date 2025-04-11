@@ -3,19 +3,19 @@ import csv
 import logging
 import os
 import smtplib
+from collections.abc import Iterable
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr
-from collections.abc import Iterable
 from typing import IO, Any
 
 import httpx
 from fastapi import HTTPException, status
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from pydantic import BaseModel
 
 from app.conf import Settings
-from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,6 @@ def wrap_exc_in_http_response(
             f"returning a {status_code} HTTP response: {error_msg}"
         )
         raise HTTPException(status_code=status_code, detail=error_msg) from e
-<<<<<<< HEAD
 
 
 def send_email(
