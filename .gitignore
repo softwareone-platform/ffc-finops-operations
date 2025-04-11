@@ -181,3 +181,6 @@ ffc_operations_openapi_spec.yml
 
 # local dev tools configs
 taplo.toml
+
+# MacOS
+.DS_Store
