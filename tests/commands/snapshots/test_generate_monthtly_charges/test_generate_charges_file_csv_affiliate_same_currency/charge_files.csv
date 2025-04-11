@@ -1,2 +1,2 @@
 Entry ID,Subscription Search Criteria,Subscription Search Value,Item Search Criteria,Item Search Value,Usage Start Time,Usage End Time,Quantity,Purchase Price,Total Purchase Price,External Reference,Vendor Description 1,Vendor Description 2,Vendor Reference
-1,subscription.externalIds.vendor,FORG-2230-0540-1501,item.externalIds.vendor,FDSX-2512-8253-8206,1-Mar-2025,31-Mar-2025,1,0.70,0.70,organization_id_1,Datasource 2,ds_id2,
+1,subscription.externalIds.vendor,FORG-2230-0540-1501,item.externalIds.vendor,FIN-0001-P1M,1-Mar-2025,31-Mar-2025,1,0.70,0.70,organization_id_1,Datasource 2,ds_id2,

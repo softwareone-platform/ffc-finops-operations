@@ -4,7 +4,7 @@ import logging
 from collections.abc import Sequence
 from copy import copy
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import IO, Self
 
@@ -20,7 +20,7 @@ from app.db.handlers import (
     OrganizationHandler,
 )
 from app.db.models import Account, DatasourceExpense, Entitlement, Organization
-from app.enums import AccountType, EntitlementStatus, OrganizationStatus
+from app.enums import AccountType, EntitlementStatus
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +33,8 @@ class ChargeEntry:
     subscription_search_value: str
     item_search_criteria: str
     item_search_value: str
-    usage_start_time: datetime
-    usage_end_time: datetime
+    usage_start_time: date
+    usage_end_time: date
     price: Decimal
     external_reference: str
     vendor_description_1: str
@@ -42,7 +42,9 @@ class ChargeEntry:
     vendor_reference: str
 
     @classmethod
-    def from_datasource_expense(cls, exp: DatasourceExpense) -> Self:
+    def from_datasource_expense(
+        cls, exp: DatasourceExpense, currency_converter: CurrencyConverter
+    ) -> Self:
         settings = get_settings()
 
         if exp.organization.linked_organization_id is None:
@@ -51,17 +53,22 @@ class ChargeEntry:
                 f"Organization {exp.organization.id} does not have a linked organization ID."
             )
 
-        month_start = datetime(exp.year, exp.month, 1)
-        month_end = month_start + relativedelta(day=31)
-        price = exp.month_expenses * Decimal(settings.billing_percentage) / 100
+        usage_start = max(datetime(exp.year, exp.month, 1).date(), exp.created_at.date())
+        usage_end = min(usage_start + relativedelta(day=31), exp.updated_at.date())
+
+        price = currency_converter.convert_currency(
+            exp.month_expenses * Decimal(settings.billing_percentage) / 100,
+            from_currency=exp.organization.currency,
+            to_currency=exp.organization.billing_currency,
+        )
 
         return cls(
             subscription_search_criteria="subscription.externalIds.vendor",
             subscription_search_value=exp.organization_id,
             item_search_criteria="item.externalIds.vendor",
-            item_search_value=exp.id,  # TODO: Pretty sure this is not the correct value
-            usage_start_time=month_start,
-            usage_end_time=month_end,
+            item_search_value=settings.ffc_external_product_id,
+            usage_start_time=usage_start,
+            usage_end_time=usage_end,
             price=price,
             external_reference=exp.organization.linked_organization_id,
             vendor_description_1=exp.datasource_name,
@@ -71,8 +78,6 @@ class ChargeEntry:
 
     def contra_entry(self, entitlement: Entitlement) -> Self:
         contra_entry = copy(self)
-        # TODO: Pretty sure this is not the correct value
-        contra_entry.item_search_value = entitlement.id
         contra_entry.price = -self.price
 
         return contra_entry
@@ -108,18 +113,7 @@ class ChargesFileGenerator:
             self.currency,
         )
 
-        currency_filter = (
-            Organization.currency == self.currency
-            if self.account.type == AccountType.AFFILIATE
-            else Organization.billing_currency == self.currency
-        )
-
-        organizations = await organization_handler.query_db(
-            # TODO: What is the organization was deleted after the last billing period
-            #       but before the the current one? Maybe this filter should never be applied?
-            # TODO: What about cancelled status?
-            where_clauses=[Organization.status != OrganizationStatus.DELETED, currency_filter],
-        )
+        organizations = await organization_handler.query_db()
         logger.info("Found %d organizations to process", len(organizations))
 
         for organization in organizations:
@@ -159,7 +153,7 @@ class ChargesFileGenerator:
     def charge_entries_for_datasource_expense(
         self, datasource_expense: DatasourceExpense
     ) -> list[ChargeEntry]:
-        entry = ChargeEntry.from_datasource_expense(datasource_expense)
+        entry = ChargeEntry.from_datasource_expense(datasource_expense, self.currency_converter)
 
         if self.account.type == AccountType.AFFILIATE:
             for entitlement in datasource_expense.entitlements:
@@ -177,14 +171,7 @@ class ChargesFileGenerator:
             return []
 
         if self.account.type == AccountType.OPERATIONS:
-            charge_entries = []
-
-            entry.price = self.currency_converter.convert_currency(
-                entry.price,
-                from_currency=datasource_expense.organization.currency,
-                to_currency=datasource_expense.organization.billing_currency,
-            )
-            charge_entries.append(entry)
+            charge_entries = [entry]
 
             for entitlement in datasource_expense.entitlements:
                 if entitlement.status != EntitlementStatus.ACTIVE:
@@ -257,30 +244,17 @@ class ChargesFileGenerator:
         return True
 
 
-async def fetch_account_currencies(session: AsyncSession, account: Account) -> Sequence[str]:
-    """Fetch unique currencies from the database."""
+async def fetch_unique_billing_currencies(session: AsyncSession) -> Sequence[str]:
+    """Fetch unique billing currencies from the database."""
 
     logger.info(
-        "Fetching unique currencies for account %s of type %s",
-        account.id,
-        account.type,
+        "Fetching all the unique billing currencies",
     )
 
-    if account.type == AccountType.AFFILIATE:
-        logger.info("Account is of type AFFILIATE, using Organization.currency")
-        currencies_stmt = select(Organization.currency).distinct()
-    elif account.type == AccountType.OPERATIONS:
-        logger.info("Account is of type OPERATIONS, using Organization.billing_currency")
-        currencies_stmt = select(Organization.billing_currency).distinct()
-    else:  # pragma: no cover
-        raise ValueError(f"Unknown account type: {account.type}")
-
-    currencies = (await session.scalars(currencies_stmt)).all()
+    currencies = (await session.scalars(select(Organization.currency).distinct())).all()
 
     logger.info(
-        "Found the following currencies for account %s of type %s: %s",
-        account.id,
-        account.type,
+        "Found the following unique billing currencies from the database: %s",
         ", ".join(currencies),
     )
     return currencies

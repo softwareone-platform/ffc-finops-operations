@@ -1,7 +1,9 @@
 import io
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
+import time_machine
 from pytest_snapshot.plugin import Snapshot
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,6 +26,7 @@ def currency_converter() -> CurrencyConverter:
 
 
 @pytest.mark.fixed_random_seed
+@time_machine.travel("2025-04-10T10:00:00Z", tick=False)
 async def test_generate_charges_file_csv_operations_same_currency(
     currency_converter: CurrencyConverter,
     organization_factory: ModelFactory[Organization],
@@ -48,6 +51,8 @@ async def test_generate_charges_file_csv_operations_same_currency(
         month=2,
         year=2025,
         month_expenses=Decimal("50.00"),
+        created_at=datetime(2025, 2, 1, 10, 0, 0, tzinfo=UTC),
+        updated_at=datetime(2025, 2, 28, 10, 0, 0, tzinfo=UTC),
     )
     ds_exp_2 = await datasource_expense_factory(  # noqa: F841
         datasource_id="ds_id1",
@@ -56,6 +61,8 @@ async def test_generate_charges_file_csv_operations_same_currency(
         month=3,
         year=2025,
         month_expenses=Decimal("60.00"),
+        created_at=datetime(2025, 3, 1, 10, 0, 0, tzinfo=UTC),
+        updated_at=datetime(2025, 3, 31, 10, 0, 0, tzinfo=UTC),
     )
     ds_exp_3 = await datasource_expense_factory(
         datasource_id="ds_id2",
@@ -64,6 +71,8 @@ async def test_generate_charges_file_csv_operations_same_currency(
         month=3,
         year=2025,
         month_expenses=Decimal("70.00"),
+        created_at=datetime(2025, 3, 1, 10, 0, 0, tzinfo=UTC),
+        updated_at=datetime(2025, 3, 31, 10, 0, 0, tzinfo=UTC),
     )
     await entitlement_factory(
         name="entitlement_1",
@@ -86,6 +95,7 @@ async def test_generate_charges_file_csv_operations_same_currency(
 
 
 @pytest.mark.fixed_random_seed
+@time_machine.travel("2025-04-10T10:00:00Z", tick=False)
 async def test_generate_charges_file_csv_affiliate_same_currency(
     currency_converter: CurrencyConverter,
     organization_factory: ModelFactory[Organization],
@@ -111,6 +121,8 @@ async def test_generate_charges_file_csv_affiliate_same_currency(
         month=2,
         year=2025,
         month_expenses=Decimal("50.00"),
+        created_at=datetime(2025, 2, 1, 10, 0, 0, tzinfo=UTC),
+        updated_at=datetime(2025, 2, 28, 10, 0, 0, tzinfo=UTC),
     )
     ds_exp_2 = await datasource_expense_factory(  # noqa: F841
         datasource_id="ds_id1",
@@ -119,6 +131,8 @@ async def test_generate_charges_file_csv_affiliate_same_currency(
         month=3,
         year=2025,
         month_expenses=Decimal("60.00"),
+        created_at=datetime(2025, 3, 1, 10, 0, 0, tzinfo=UTC),
+        updated_at=datetime(2025, 3, 31, 10, 0, 0, tzinfo=UTC),
     )
     ds_exp_3 = await datasource_expense_factory(
         datasource_id="ds_id2",
@@ -127,6 +141,8 @@ async def test_generate_charges_file_csv_affiliate_same_currency(
         month=3,
         year=2025,
         month_expenses=Decimal("70.00"),
+        created_at=datetime(2025, 3, 1, 10, 0, 0, tzinfo=UTC),
+        updated_at=datetime(2025, 3, 31, 10, 0, 0, tzinfo=UTC),
     )
     another_affiliate_account = await account_factory(type=AccountType.AFFILIATE)
 
