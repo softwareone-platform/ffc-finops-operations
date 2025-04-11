@@ -13,9 +13,11 @@ from dateutil.relativedelta import relativedelta  # type: ignore[import-untyped]
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_object_session
 
-from app.conf import get_settings
+from app.conf import Settings, get_settings
 from app.currency import CurrencyConverter
+from app.db.base import session_factory
 from app.db.handlers import (
+    AccountHandler,
     DatasourceExpenseHandler,
     OrganizationHandler,
 )
@@ -258,6 +260,38 @@ async def fetch_unique_billing_currencies(session: AsyncSession) -> Sequence[str
         ", ".join(currencies),
     )
     return currencies
+
+
+async def fetch_accounts(session: AsyncSession) -> Sequence[Account]:
+    """Fetch all accounts from the database."""
+
+    logger.info("Fetching all the accounts")
+    account_handler = AccountHandler(session)
+    accounts = await account_handler.query_db(unique=True)
+
+    logger.info("Found %d accounts in the database", len(accounts))
+    return accounts
+
+
+async def main(settings: Settings) -> None:
+    today = datetime.now(UTC).date()
+
+    async with session_factory() as session:
+        unique_billing_currencies = await fetch_unique_billing_currencies(session)
+        currency_converter = await CurrencyConverter.from_db(session)
+        accounts = await fetch_accounts(session)
+
+        for currency in unique_billing_currencies:
+            for account in accounts:
+                logger.info(
+                    "Generating charges file for account %s and currency %s",
+                    account.id,
+                    currency,
+                )
+                charges_file = ChargesFileGenerator(account, currency, currency_converter)
+
+                with open(f"charges_{account.id}_{currency}_{today}.csv", "w") as file:
+                    await charges_file.generate_charges_file(file)
 
 
 def command(ctx: typer.Context) -> None:
