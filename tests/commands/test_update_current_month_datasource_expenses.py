@@ -54,12 +54,12 @@ async def test_create_new_datasource_expenses_single_organization(
         ],
     )
 
-    existing_datasource_expenses = await datasource_expense_handler.query_db()
+    existing_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
     assert len(existing_datasource_expenses) == 0
 
     await update_current_month_datasource_expenses.main(test_settings)
 
-    new_datasource_expenses = await datasource_expense_handler.query_db()
+    new_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
     assert len(new_datasource_expenses) == 2
 
     ds_exp1 = next(
@@ -122,12 +122,12 @@ async def test_datasource_expenses_are_updated_for_current_month(
         ],
     )
 
-    existing_datasource_expenses = await datasource_expense_handler.query_db()
+    existing_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
     assert len(existing_datasource_expenses) == 2
 
     await update_current_month_datasource_expenses.main(test_settings)
 
-    new_datasource_expenses = await datasource_expense_handler.query_db()
+    new_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
     assert len(new_datasource_expenses) == 3
 
     ds_exp1 = next(
@@ -190,7 +190,7 @@ async def test_organization_with_no_linked_organization_id(
         f"Organization {organization.id} has no linked organization ID. Skipping..." in caplog.text
     )
 
-    new_datasource_expenses = await datasource_expense_handler.query_db()
+    new_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
     assert len(new_datasource_expenses) == 0
 
     assert not httpx_mock.get_request()
@@ -266,7 +266,7 @@ async def test_optscale_api_returns_exception(
         expected_log_format % organization.id,
     ) in caplog.record_tuples
 
-    new_datasource_expenses = await datasource_expense_handler.query_db()
+    new_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
     assert len(new_datasource_expenses) == 0
 
 
@@ -335,7 +335,7 @@ async def test_multiple_datasources_are_handled_correctly(
         month_expenses=Decimal("999.88"),
     )
 
-    existing_datasource_expenses = await datasource_expense_handler.query_db()
+    existing_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
     assert len(existing_datasource_expenses) == 4
 
     mock_optscale_client.mock_fetch_datasources_for_organization(
@@ -371,7 +371,7 @@ async def test_multiple_datasources_are_handled_correctly(
         assert f"Skipping child datasource {org_1_datasource_id4} of type gcp_tenant" in caplog.text
         assert f"Organization {organization4.id} not found on Optscale. Skipping..." in caplog.text
 
-    new_datasource_expenses = await datasource_expense_handler.query_db()
+    new_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
 
     expenses_data = {
         (
