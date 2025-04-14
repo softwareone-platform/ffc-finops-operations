@@ -21,12 +21,10 @@ from app.db.handlers import (
     DatasourceExpenseHandler,
     OrganizationHandler,
 )
-from app.db.models import Account, DatasourceExpense, Entitlement, Organization
+from app.db.models import Account, DatasourceExpense, Organization
 from app.enums import AccountType, EntitlementStatus
 
 logger = logging.getLogger(__name__)
-
-# TODO: Use excel instead of csv
 
 
 @dataclass
@@ -78,7 +76,7 @@ class ChargeEntry:
             vendor_reference="",
         )
 
-    def contra_entry(self, entitlement: Entitlement) -> Self:
+    def contra_entry(self) -> Self:
         contra_entry = copy(self)
         contra_entry.price = -self.price
 
@@ -97,7 +95,7 @@ class ChargesFileGenerator:
 
         session = async_object_session(self.account)
 
-        if session is None:
+        if session is None:  # pragma: no cover
             # This can happen if we only create an account python object but we haven't yet
             # added it to the database. If that's the case, that's incrrect usage of the class,
             # so we should raise an error.
@@ -110,13 +108,17 @@ class ChargesFileGenerator:
         datasource_expense_handler = DatasourceExpenseHandler(session)
 
         logger.info(
-            "Querying organizations to process for account %s and currency %s",
+            "Querying organizations to process for account %s with billing currency = %s",
             self.account.id,
             self.currency,
         )
 
-        organizations = await organization_handler.query_db()
+        organizations = await organization_handler.query_db(
+            where_clauses=[Organization.billing_currency == self.currency]
+        )
         logger.info("Found %d organizations to process", len(organizations))
+
+        all_orgs_expenses: list[DatasourceExpense] = []
 
         for organization in organizations:
             logger.info(
@@ -141,7 +143,9 @@ class ChargesFileGenerator:
                 last_month.year,
             )
 
-        return org_expenses
+            all_orgs_expenses.extend(org_expenses)
+
+        return all_orgs_expenses
 
     def get_charge_entries(
         self, datasource_expenses: Sequence[DatasourceExpense]
@@ -179,7 +183,7 @@ class ChargesFileGenerator:
                 if entitlement.status != EntitlementStatus.ACTIVE:
                     continue
 
-                charge_entries.append(entry.contra_entry(entitlement))
+                charge_entries.append(entry.contra_entry())
 
                 # If multiple entitlements match the same datasource expense, we need to
                 # add only the contra entry for the first one (the entitlements are
@@ -188,8 +192,7 @@ class ChargesFileGenerator:
 
             return charge_entries
 
-        # pragma: no cover
-        raise ValueError(f"Unknown account type: {self.account.type}")
+        raise ValueError(f"Unknown account type: {self.account.type}")  # pragma: no cover
 
     async def generate_charges_file(self, file: IO) -> bool:
         datasource_expenses = await self.fetch_datasource_expenses()
@@ -197,8 +200,6 @@ class ChargesFileGenerator:
 
         if not charge_entries:
             return False  # not creating an empty file
-
-        # TODO: Create the db record for the generated file with DRAFT status
 
         dict_writer = csv.DictWriter(
             file,
@@ -253,7 +254,7 @@ async def fetch_unique_billing_currencies(session: AsyncSession) -> Sequence[str
         "Fetching all the unique billing currencies",
     )
 
-    currencies = (await session.scalars(select(Organization.currency).distinct())).all()
+    currencies = (await session.scalars(select(Organization.billing_currency).distinct())).all()
 
     logger.info(
         "Found the following unique billing currencies from the database: %s",
@@ -273,7 +274,16 @@ async def fetch_accounts(session: AsyncSession) -> Sequence[Account]:
     return accounts
 
 
-async def main(settings: Settings) -> None:
+# NOTE: This is still work in progress as we need to implement the items bellow. As such, the
+# main function only functions as a usage example and not the final implmentation, thus the
+# pragma: no cover. Once this is finalized the function will be covered by the tests like any other.
+#
+# Remaining work:
+#   - Use excel file format instead of CSV
+#   - Create the ChargesFile db record for the generated file
+#   - ZIP the charges file with the relevant exchange rates
+#   - Upload the ZIP file to S3
+async def main(settings: Settings) -> None:  # pragma: no cover
     today = datetime.now(UTC).date()
 
     async with session_factory() as session:
@@ -294,9 +304,9 @@ async def main(settings: Settings) -> None:
                     await charges_file.generate_charges_file(file)
 
 
-def command(ctx: typer.Context) -> None:
+def command(ctx: typer.Context) -> None:  # pragma: no cover
     """
-    Delete all datasource expenses older than 6 months from the database.
+    Generate monthly charges for all accounts and currencies.
     """
     logger.info("Starting command function")
     asyncio.run(main(ctx.obj))

@@ -640,7 +640,7 @@ FIXED_SEED: Final[int] = 42
 
 
 @pytest.hookimpl(hookwrapper=True)
-def pytest_runtest_call(item: pytest.Item) -> None:
+def _set_fixed_random_seed(item: pytest.Item) -> None:
     """Set the randomly_seed to a fixed value for tests with the `fixed_random_seed` marker."""
 
     marker = item.get_closest_marker("fixed_random_seed")
@@ -655,3 +655,7 @@ def pytest_runtest_call(item: pytest.Item) -> None:
         yield
     finally:
         item.config.option.randomly_seed = orig_randomly_seed
+
+
+pytest_runtest_call = _set_fixed_random_seed
+pytest_runtest_setup = _set_fixed_random_seed

@@ -297,7 +297,7 @@ class DatasourceExpense(Base, HumanReadablePKMixin, TimestampMixin):
     organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"))
 
     organization: Mapped[Organization] = relationship(
-        "Organization", back_populates="datasource_expenses"
+        "Organization", back_populates="datasource_expenses", lazy="joined"
     )
 
     year: Mapped[int] = mapped_column(Integer(), nullable=False)
@@ -383,7 +383,7 @@ class Entitlement(Base, HumanReadablePKMixin, AuditableMixin):
     )
     linked_datasource_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     owner_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), nullable=False)
-    owner: Mapped[Account] = relationship(foreign_keys=[owner_id])
+    owner: Mapped[Account] = relationship(foreign_keys=[owner_id], lazy="joined")
     status: Mapped[EntitlementStatus] = mapped_column(
         Enum(EntitlementStatus, values_callable=lambda obj: [e.value for e in obj]),
         nullable=False,
