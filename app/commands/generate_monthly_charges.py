@@ -279,10 +279,10 @@ async def fetch_accounts(session: AsyncSession) -> Sequence[Account]:
 # pragma: no cover. Once this is finalized the function will be covered by the tests like any other.
 #
 # Remaining work:
-#   - Use excel file format instead of CSV
-#   - Create the ChargesFile db record for the generated file
-#   - ZIP the charges file with the relevant exchange rates
-#   - Upload the ZIP file to S3
+#   - MPT-8991: Use excel file format instead of CSV
+#   - MPT-8992: Create the ChargesFile db record for the generated file
+#   - MPT-8993: ZIP the charges file with the relevant exchange rates
+#   - MPT-8994: Upload the ZIP file to S3
 async def main(settings: Settings) -> None:  # pragma: no cover
     today = datetime.now(UTC).date()
 
