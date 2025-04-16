@@ -1,11 +1,12 @@
 import asyncio
 import logging
+import pathlib
 from collections.abc import Sequence
 from copy import copy
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
-from typing import Self
+from typing import Annotated, Self
 
 import pandas as pd
 import typer
@@ -88,6 +89,7 @@ class ChargesFileGenerator:
     account: Account
     currency: str
     currency_converter: CurrencyConverter
+    exports_dir: pathlib.Path
 
     async def fetch_datasource_expenses(self) -> Sequence[DatasourceExpense]:
         today = datetime.now(UTC).date()
@@ -218,6 +220,18 @@ class ChargesFileGenerator:
 
         return df
 
+    def export_to_excel(self, df: pd.DataFrame) -> pathlib.Path:
+        last_month = datetime.now(UTC).date() - relativedelta(months=1)
+        filename = (
+            f"charges_{self.account.id}_{self.currency}_"
+            f"{last_month.year}_{last_month.month:02d}.xlsx"
+        )
+        filepath = self.exports_dir / filename
+
+        df.to_excel(filepath, header=True, index=False)
+
+        return filepath
+
 
 async def fetch_unique_billing_currencies(session: AsyncSession) -> Sequence[str]:
     """Fetch unique billing currencies from the database."""
@@ -251,12 +265,16 @@ async def fetch_accounts(session: AsyncSession) -> Sequence[Account]:
 # pragma: no cover. Once this is finalized the function will be covered by the tests like any other.
 #
 # Remaining work:
-#   - MPT-8991: Use excel file format instead of CSV
 #   - MPT-8992: Create the ChargesFile db record for the generated file
 #   - MPT-8993: ZIP the charges file with the relevant exchange rates
 #   - MPT-8994: Upload the ZIP file to S3
-async def main(settings: Settings) -> None:  # pragma: no cover
-    today = datetime.now(UTC).date()
+async def main(exports_dir: pathlib.Path, settings: Settings) -> None:  # pragma: no cover
+    if exports_dir.is_file():
+        raise ValueError("The exports directory must be a directory, not a file.")
+
+    if not exports_dir.exists():
+        logger.info("Exports directory %s does not exist, creating it", str(exports_dir.resolve()))
+        exports_dir.mkdir(parents=True)
 
     async with session_factory() as session:
         unique_billing_currencies = await fetch_unique_billing_currencies(session)
@@ -270,16 +288,40 @@ async def main(settings: Settings) -> None:  # pragma: no cover
                     account.id,
                     currency,
                 )
-                charges_file = ChargesFileGenerator(account, currency, currency_converter)
+                charges_file_generator = ChargesFileGenerator(
+                    account, currency, currency_converter, exports_dir
+                )
 
-                with open(f"charges_{account.id}_{currency}_{today}.csv", "w") as file:
-                    await charges_file.generate_charges_file(file)
+                df = await charges_file_generator.generate_charges_file_dataframe()
+
+                if df is None:
+                    logger.info(
+                        "No charge entries found for account %s and currency %s, "
+                        "skipping generating charges file",
+                        account.id,
+                        currency,
+                    )
+                    continue
+
+                exported_filepath = charges_file_generator.export_to_excel(df)
+
+                logger.info(
+                    "Charges file generated for account %s and currency %s and saved to %s",
+                    account.id,
+                    currency,
+                    str(exported_filepath.resolve()),
+                )
 
 
-def command(ctx: typer.Context) -> None:  # pragma: no cover
+def command(
+    ctx: typer.Context,
+    exports_dir: Annotated[
+        pathlib.Path, typer.Option("--exports-dir", help="Directory to export the charge files to")
+    ],
+) -> None:  # pragma: no cover
     """
     Generate monthly charges for all accounts and currencies.
     """
     logger.info("Starting command function")
-    asyncio.run(main(ctx.obj))
+    asyncio.run(main(exports_dir, ctx.obj))
     logger.info("Completed command function")
