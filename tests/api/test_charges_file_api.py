@@ -479,3 +479,54 @@ async def test_operations_account_can_get_charges_file_owned_by_others(
     assert data.get("amount") == float(affiliate_charge_file.amount)  # type: ignore
     assert data.get("status") == affiliate_charge_file.status
     assert data.get("owner").get("id") == gcp_account.id
+
+
+async def test_mark_processed_charge_file_status_with_operation_account(
+    operations_client: AsyncClient,
+    charges_file_factory: ModelFactory[ChargesFile],
+    gcp_account: Account,
+    operations_account: Account,
+):
+    operations_charge_file = await charges_file_factory(
+        owner=operations_account,
+        currency="EUR",
+        amount=100.40,
+        document_date="2025-03-25",
+        status=ChargesFileStatus.GENERATED,
+    )
+    response = await operations_client.post(f"/charges/{operations_charge_file.id}/mark-processed")
+    assert response.status_code == 200
+
+
+async def test_cannot_mark_an_already_processed_charge_file_with_operation_account(
+    operations_client: AsyncClient,
+    charges_file_factory: ModelFactory[ChargesFile],
+    gcp_account: Account,
+    operations_account: Account,
+):
+    operations_charge_file = await charges_file_factory(
+        owner=operations_account,
+        currency="EUR",
+        amount=100.40,
+        document_date="2025-03-25",
+        status=ChargesFileStatus.PROCESSED,
+    )
+    response = await operations_client.post(f"/charges/{operations_charge_file.id}/mark-processed")
+    assert response.status_code == 400
+
+
+async def test_cannot_mark_processed_charge_file_status_with_affiliate_account(
+    affiliate_client: AsyncClient,
+    charges_file_factory: ModelFactory[ChargesFile],
+    gcp_account: Account,
+    affiliate_account: Account,
+):
+    operations_charge_file = await charges_file_factory(
+        owner=affiliate_account,
+        currency="EUR",
+        amount=100.40,
+        document_date="2025-03-25",
+        status=ChargesFileStatus.GENERATED,
+    )
+    response = await affiliate_client.post(f"/charges/{operations_charge_file.id}/mark-processed")
+    assert response.status_code == 403
