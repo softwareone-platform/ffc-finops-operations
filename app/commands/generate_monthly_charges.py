@@ -240,7 +240,7 @@ class ChargesFileGenerator:
         with zipfile.ZipFile(filepath, mode="w") as archive:
             archive.write(self.export_to_excel(df), arcname=excel_filepath.name)
             archive.writestr(
-                f"exchange_rates_{self.currency}.json",
+                f"exchange_rates_{self.currency_converter.base_currency}.json",
                 self.currency_converter.get_exchangerate_api_response_json(),
             )
 

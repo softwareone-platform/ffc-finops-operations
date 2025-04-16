@@ -348,7 +348,7 @@ async def test_export_to_excel(
 async def test_export_to_zip(
     exchange_rates_factory: ModelFactory[ExchangeRates],
     operations_account: Account,
-    usd_org_billed_in_usd_expenses: Organization,
+    usd_org_billed_in_eur_expenses: Organization,
     db_session: AsyncSession,
     snapshot: Snapshot,
     tmpdir: pathlib.Path,
@@ -364,7 +364,7 @@ async def test_export_to_zip(
     currency_converter = await CurrencyConverter.from_db(db_session)
 
     charges_file_generator = ChargesFileGenerator(
-        operations_account, "USD", currency_converter, pathlib.Path(tmpdir)
+        operations_account, "EUR", currency_converter, pathlib.Path(tmpdir)
     )
 
     df = await charges_file_generator.generate_charges_file_dataframe()
@@ -372,17 +372,17 @@ async def test_export_to_zip(
 
     filepath = charges_file_generator.export_to_zip(df)
 
-    assert filepath.name == f"charges_{operations_account.id}_USD_2025_03.zip"
+    assert filepath.name == f"charges_{operations_account.id}_EUR_2025_03.zip"
     assert filepath.parent == tmpdir
 
     with zipfile.ZipFile(filepath, "r") as archive:
         assert sorted(archive.namelist()) == [
-            f"charges_{operations_account.id}_USD_2025_03.xlsx",
+            f"charges_{operations_account.id}_EUR_2025_03.xlsx",
             "exchange_rates_USD.json",
         ]
 
         snapshot.assert_match(
-            archive.read(f"charges_{operations_account.id}_USD_2025_03.xlsx"),
+            archive.read(f"charges_{operations_account.id}_EUR_2025_03.xlsx"),
             "charges_file.xlsx",
         )
         snapshot.assert_match(archive.read("exchange_rates_USD.json"), "exchange_rates.json")
