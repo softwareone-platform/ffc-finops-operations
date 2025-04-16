@@ -30,6 +30,7 @@ from app.db.models import (
 from app.db.models import Base as BaseModel
 from app.enums import (
     AccountUserStatus,
+    ChargesFileStatus,
     EntitlementStatus,
 )
 
@@ -495,6 +496,12 @@ class ChargesFileHandler(ModelHandler[ChargesFile]):
         self.default_options = [
             joinedload(ChargesFile.owner),
         ]
+
+    async def mark_processed(self, charge_file: ChargesFile) -> ChargesFile:
+        return await self.update(
+            charge_file,
+            data={"status": ChargesFileStatus.PROCESSED},
+        )
 
 
 class ExchangeRatesHandler(ModelHandler[ExchangeRates]):

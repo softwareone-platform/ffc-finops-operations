@@ -7,7 +7,7 @@ from sqlalchemy import ColumnExpressionArgument, Select
 from app.blob_storage import download_charges_file
 from app.db.handlers import NotFoundError
 from app.db.models import ChargesFile
-from app.dependencies.auth import CurrentAuthContext
+from app.dependencies.auth import CurrentAuthContext, check_operations_account
 from app.dependencies.db import ChargesFileRepository
 from app.dependencies.path import ChargeFileId
 from app.enums import AccountType, ChargesFileStatus
@@ -98,3 +98,21 @@ async def get_url_to_download_charges_file_by_id(
             detail=f"The file {id} does not exist. No download url for {charge_file.id}",
         )
     return RedirectResponse(url=download_url)
+
+
+@router.post(
+    "/{id}/mark-processed",
+    response_model=ChargesFileRead,
+    dependencies=[Depends(check_operations_account)],
+)
+async def mark_charge_file_status_as_processed(
+    charge_file_repo: ChargesFileRepository,
+    charge_file: Annotated[ChargesFile, Depends(fetch_charge_file_or_404)],
+):
+    if charge_file.status != ChargesFileStatus.GENERATED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You can only mark charges files as PROCESSED that have been generated.",
+        )
+    charge_file = await charge_file_repo.mark_processed(charge_file)
+    return convert_model_to_schema(ChargesFileRead, charge_file)

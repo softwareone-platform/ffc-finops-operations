@@ -76,3 +76,4 @@ class ChargesFileStatus(str, enum.Enum):
     DRAFT = "draft"
     GENERATED = "generated"
     DELETED = "deleted"
+    PROCESSED = "processed"
