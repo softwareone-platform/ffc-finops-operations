@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import pathlib
+import zipfile
 from collections.abc import Sequence
 from copy import copy
 from dataclasses import dataclass
@@ -232,6 +233,21 @@ class ChargesFileGenerator:
 
         return filepath
 
+    def export_to_zip(self, df: pd.DataFrame) -> pathlib.Path:
+        excel_filepath = self.export_to_excel(df)
+        filepath = self.exports_dir / (excel_filepath.stem + ".zip")
+
+        with zipfile.ZipFile(filepath, mode="w") as archive:
+            archive.write(self.export_to_excel(df), arcname=excel_filepath.name)
+            archive.writestr(
+                f"exchange_rates_{self.currency_converter.base_currency}.json",
+                self.currency_converter.get_exchangerate_api_response_json(),
+            )
+
+        excel_filepath.unlink(missing_ok=True)
+
+        return filepath
+
 
 async def fetch_unique_billing_currencies(session: AsyncSession) -> Sequence[str]:
     """Fetch unique billing currencies from the database."""
@@ -266,7 +282,6 @@ async def fetch_accounts(session: AsyncSession) -> Sequence[Account]:
 #
 # Remaining work:
 #   - MPT-8992: Create the ChargesFile db record for the generated file
-#   - MPT-8993: ZIP the charges file with the relevant exchange rates
 #   - MPT-8994: Upload the ZIP file to S3
 async def main(exports_dir: pathlib.Path, settings: Settings) -> None:  # pragma: no cover
     if exports_dir.is_file():
