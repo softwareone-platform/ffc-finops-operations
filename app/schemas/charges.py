@@ -11,7 +11,3 @@ class ChargesFileRead(IdSchema, CommonEventsSchema):
     currency: str
     owner: AccountReference
     status: ChargesFileStatus
-
-
-class ChargesFileStatusWrite(IdSchema, CommonEventsSchema):
-    status: ChargesFileStatus

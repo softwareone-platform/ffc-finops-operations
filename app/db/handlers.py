@@ -500,10 +500,7 @@ class ChargesFileHandler(ModelHandler[ChargesFile]):
     async def mark_processed(self, charge_file: ChargesFile) -> ChargesFile:
         return await self.update(
             charge_file,
-            data={
-                "status": ChargesFileStatus.PROCESSED,
-                "updated_at": datetime.now(UTC),
-            },
+            data={"status": ChargesFileStatus.PROCESSED},
         )
 
 

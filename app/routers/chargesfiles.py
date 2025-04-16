@@ -109,10 +109,10 @@ async def mark_charge_file_status_as_processed(
     charge_file_repo: ChargesFileRepository,
     charge_file: Annotated[ChargesFile, Depends(fetch_charge_file_or_404)],
 ):
-    if charge_file.status == ChargesFileStatus.PROCESSED:
+    if charge_file.status != ChargesFileStatus.GENERATED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="The Status of the Charge File is already PROCESSED.",
+            detail="You can only mark charges files as PROCESSED that have been generated.",
         )
     charge_file = await charge_file_repo.mark_processed(charge_file)
     return convert_model_to_schema(ChargesFileRead, charge_file)
