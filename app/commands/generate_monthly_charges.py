@@ -118,32 +118,25 @@ class ChargesFileGenerator:
         )
         logger.info("Found %d organizations to process", len(organizations))
 
-        all_orgs_expenses: list[DatasourceExpense] = []
-
-        for organization in organizations:
-            logger.info(
-                "Querying datasource expenses for organization %s for month = %s, year = %s",
-                organization.id,
-                last_month.month,
-                last_month.year,
-            )
-            org_expenses = await datasource_expense_handler.query_db(
-                where_clauses=[
-                    DatasourceExpense.organization == organization,
-                    DatasourceExpense.month == last_month.month,
-                    DatasourceExpense.year == last_month.year,
-                ],
-                unique=True,
-            )
-            logger.info(
-                "Found %d datasource expenses for organization %s for month = %s, year = %s",
-                len(org_expenses),
-                organization.id,
-                last_month.month,
-                last_month.year,
-            )
-
-            all_orgs_expenses.extend(org_expenses)
+        logger.info(
+            "Querying datasource expenses for all organization for month = %s, year = %s",
+            last_month.month,
+            last_month.year,
+        )
+        all_orgs_expenses = await datasource_expense_handler.query_db(
+            where_clauses=[
+                DatasourceExpense.organization_id.in_(org.id for org in organizations),
+                DatasourceExpense.month == last_month.month,
+                DatasourceExpense.year == last_month.year,
+            ],
+            unique=True,
+        )
+        logger.info(
+            "Found %d datasource expenses for all organization for month = %s, year = %s",
+            len(all_orgs_expenses),
+            last_month.month,
+            last_month.year,
+        )
 
         return all_orgs_expenses
 
