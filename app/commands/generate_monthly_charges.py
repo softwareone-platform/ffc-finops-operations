@@ -5,7 +5,7 @@ from copy import copy
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
-from typing import IO, Self
+from typing import Self
 
 import pandas as pd
 import typer
@@ -187,12 +187,12 @@ class ChargesFileGenerator:
 
         raise ValueError(f"Unknown account type: {self.account.type}")  # pragma: no cover
 
-    async def generate_charges_file(self, file: IO) -> bool:
+    async def generate_charges_file_dataframe(self) -> pd.DataFrame | None:
         datasource_expenses = await self.fetch_datasource_expenses()
         charge_entries = self.get_charge_entries(datasource_expenses)
 
         if not charge_entries:
-            return False  # not creating an empty file
+            return None
 
         df = pd.DataFrame(
             [
@@ -215,9 +215,8 @@ class ChargesFileGenerator:
                 for row_num, entry in enumerate(charge_entries, start=1)
             ]
         )
-        df.to_csv(file, index=False, header=True)
 
-        return True
+        return df
 
 
 async def fetch_unique_billing_currencies(session: AsyncSession) -> Sequence[str]:
