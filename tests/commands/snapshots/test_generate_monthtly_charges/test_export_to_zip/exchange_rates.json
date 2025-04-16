@@ -1,0 +1,10 @@
+{
+    "result": "success",
+    "base_code": "USD",
+    "conversion_rates": {
+        "EUR": 0.9252,
+        "GBP": 0.7737
+    },
+    "time_last_update_unix": 1744279200,
+    "time_next_update_unix": 1744365600
+}

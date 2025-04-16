@@ -1,9 +1,11 @@
+import json
 from decimal import Decimal
 from typing import Final, Self
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.handlers import ExchangeRatesHandler
+from app.db.models import ExchangeRates
 
 type Number = int | float | Decimal
 
@@ -21,9 +23,15 @@ class MissingExchangeRateError(CurrencyConverterError):
 class CurrencyConverter:
     DECIMAL_PRECISION: Final[int] = 4
 
-    def __init__(self, base_currency: str, exchange_rates: dict[str, Decimal]) -> None:
+    def __init__(
+        self,
+        base_currency: str,
+        exchange_rates: dict[str, Decimal],
+        exchange_rates_db_record: ExchangeRates | None = None,
+    ) -> None:
         self.base_currency = base_currency
         self.exchange_rates = exchange_rates
+        self.exchange_rates_db_record = exchange_rates_db_record
 
     @classmethod
     async def from_db(cls, db_session: AsyncSession) -> Self:
@@ -37,7 +45,7 @@ class CurrencyConverter:
             currency: cls._normalize(rate)
             for currency, rate in exchange_rates.api_response["conversion_rates"].items()
         }
-        return cls(exchange_rates.base_currency, conversion_rate)
+        return cls(exchange_rates.base_currency, conversion_rate, exchange_rates)
 
     @classmethod
     def _normalize(cls, amount: Number) -> Decimal:
@@ -67,3 +75,11 @@ class CurrencyConverter:
         from_currency_rate = self._get_exchange_rate_against_base(from_currency)
 
         return self._normalize(amount * to_currency_rate / from_currency_rate)
+
+    def get_exchangerate_api_response_json(self) -> str:
+        if self.exchange_rates_db_record is None:  # pragma: no cover
+            raise CurrencyConverterError(
+                "Currency converter not initialized from a database record"
+            )
+
+        return json.dumps(self.exchange_rates_db_record.api_response, indent=4)
