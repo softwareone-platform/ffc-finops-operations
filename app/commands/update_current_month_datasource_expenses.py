@@ -96,6 +96,7 @@ async def store_datasource_expenses(
                 month=month,
                 defaults={
                     "month_expenses": datasource["details"]["cost"],
+                    "datasource_name": datasource["name"],
                 },
             )
             if not created:

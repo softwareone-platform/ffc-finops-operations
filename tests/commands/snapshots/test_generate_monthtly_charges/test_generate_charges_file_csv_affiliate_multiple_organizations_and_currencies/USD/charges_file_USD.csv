@@ -1,0 +1,2 @@
+Entry ID,Subscription Search Criteria,Subscription Search Value,Item Search Criteria,Item Search Value,Usage Start Time,Usage End Time,Quantity,Purchase Price,Total Purchase Price,External Reference,Vendor Description 1,Vendor Description 2,Vendor Reference
+1,subscription.externalIds.vendor,FORG-2846-5181-3940,item.externalIds.vendor,FIN-0001-P1M,1-Mar-2025,31-Mar-2025,1,0.60,0.60,9a1de644-815e-46d1-bb8f-aa1837f8a88b,AWS Account,b74d0fb1-32e7-4629-8fad-c1a606cb0fb3,

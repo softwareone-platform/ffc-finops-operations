@@ -49,17 +49,17 @@ async def test_create_new_datasource_expenses_single_organization(
     mock_optscale_client.mock_fetch_datasources_for_organization(
         organization,
         [
-            {"id": datasource_id1, "details": {"cost": 123.45}},
-            {"id": datasource_id2, "details": {"cost": 567.89}},
+            {"id": datasource_id1, "name": "First cloud account", "details": {"cost": 123.45}},
+            {"id": datasource_id2, "name": "Second cloud account", "details": {"cost": 567.89}},
         ],
     )
 
-    existing_datasource_expenses = await datasource_expense_handler.query_db()
+    existing_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
     assert len(existing_datasource_expenses) == 0
 
     await update_current_month_datasource_expenses.main(test_settings)
 
-    new_datasource_expenses = await datasource_expense_handler.query_db()
+    new_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
     assert len(new_datasource_expenses) == 2
 
     ds_exp1 = next(
@@ -73,11 +73,13 @@ async def test_create_new_datasource_expenses_single_organization(
     assert ds_exp1.year == 2025
     assert ds_exp1.month == 3
     assert ds_exp1.month_expenses == Decimal("123.45")
+    assert ds_exp1.datasource_name == "First cloud account"
 
     assert ds_exp2.organization_id == organization.id
     assert ds_exp2.year == 2025
     assert ds_exp2.month == 3
     assert ds_exp2.month_expenses == Decimal("567.89")
+    assert ds_exp2.datasource_name == "Second cloud account"
 
 
 @time_machine.travel("2025-03-20T10:00:00Z", tick=False)
@@ -97,6 +99,7 @@ async def test_datasource_expenses_are_updated_for_current_month(
     existing_datasource_expense1 = await datasource_expense_factory(
         organization=organization,
         datasource_id=datasource_id1,
+        datasource_name="First cloud account",
         year=2025,
         month=3,  # NOTE: This is for the current month, so it should be updated
         month_expenses=Decimal("123.45"),
@@ -105,6 +108,7 @@ async def test_datasource_expenses_are_updated_for_current_month(
     existing_datasource_expense2 = await datasource_expense_factory(
         organization=organization,
         datasource_id=datasource_id2,
+        datasource_name="Second cloud account",
         year=2025,
         month=2,  # NOTE: this is for the previous month, so it should NOT be updated
         month_expenses=Decimal("567.89"),
@@ -113,17 +117,17 @@ async def test_datasource_expenses_are_updated_for_current_month(
     mock_optscale_client.mock_fetch_datasources_for_organization(
         organization,
         [
-            {"id": datasource_id1, "details": {"cost": 234.56}},
-            {"id": datasource_id2, "details": {"cost": 678.90}},
+            {"id": datasource_id1, "name": "First cloud account", "details": {"cost": 234.56}},
+            {"id": datasource_id2, "name": "Second cloud account", "details": {"cost": 678.90}},
         ],
     )
 
-    existing_datasource_expenses = await datasource_expense_handler.query_db()
+    existing_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
     assert len(existing_datasource_expenses) == 2
 
     await update_current_month_datasource_expenses.main(test_settings)
 
-    new_datasource_expenses = await datasource_expense_handler.query_db()
+    new_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
     assert len(new_datasource_expenses) == 3
 
     ds_exp1 = next(
@@ -144,12 +148,14 @@ async def test_datasource_expenses_are_updated_for_current_month(
     await db_session.refresh(existing_datasource_expense1)
 
     assert ds_exp1.id == existing_datasource_expense1.id
+    assert ds_exp1.datasource_name == "First cloud account"
     assert ds_exp1.organization_id == organization.id
     assert ds_exp1.year == 2025
     assert ds_exp1.month == 3
     assert ds_exp1.month_expenses == Decimal("234.56")
 
     assert ds_exp2_current_month.id == existing_datasource_expense2.id
+    assert ds_exp2_current_month.datasource_name == "Second cloud account"
     assert ds_exp2_current_month.organization_id == organization.id
     assert ds_exp2_current_month.year == 2025
     assert ds_exp2_current_month.month == 2
@@ -159,6 +165,7 @@ async def test_datasource_expenses_are_updated_for_current_month(
         existing_datasource_expense1.id,
         existing_datasource_expense2.id,
     )
+    assert ds_exp2_this_month.datasource_name == "Second cloud account"
     assert ds_exp2_this_month.organization_id == organization.id
     assert ds_exp2_this_month.year == 2025
     assert ds_exp2_this_month.month == 3
@@ -183,7 +190,7 @@ async def test_organization_with_no_linked_organization_id(
         f"Organization {organization.id} has no linked organization ID. Skipping..." in caplog.text
     )
 
-    new_datasource_expenses = await datasource_expense_handler.query_db()
+    new_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
     assert len(new_datasource_expenses) == 0
 
     assert not httpx_mock.get_request()
@@ -259,7 +266,7 @@ async def test_optscale_api_returns_exception(
         expected_log_format % organization.id,
     ) in caplog.record_tuples
 
-    new_datasource_expenses = await datasource_expense_handler.query_db()
+    new_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
     assert len(new_datasource_expenses) == 0
 
 
@@ -328,7 +335,7 @@ async def test_multiple_datasources_are_handled_correctly(
         month_expenses=Decimal("999.88"),
     )
 
-    existing_datasource_expenses = await datasource_expense_handler.query_db()
+    existing_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
     assert len(existing_datasource_expenses) == 4
 
     mock_optscale_client.mock_fetch_datasources_for_organization(
@@ -364,7 +371,7 @@ async def test_multiple_datasources_are_handled_correctly(
         assert f"Skipping child datasource {org_1_datasource_id4} of type gcp_tenant" in caplog.text
         assert f"Organization {organization4.id} not found on Optscale. Skipping..." in caplog.text
 
-    new_datasource_expenses = await datasource_expense_handler.query_db()
+    new_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
 
     expenses_data = {
         (

@@ -3,6 +3,7 @@ import uuid
 from collections.abc import AsyncGenerator, Callable
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from typing import Final
 
 import jwt
 import pytest
@@ -434,6 +435,7 @@ def datasource_expense_factory(
         month: int = 3,
         month_expenses: float = 123.45,
         datasource_id: str | None = None,
+        datasource_name: str | None = None,
         created_at: datetime | None = None,
         updated_at: datetime | None = None,
     ) -> DatasourceExpense:
@@ -442,6 +444,7 @@ def datasource_expense_factory(
         datasource_expense = DatasourceExpense(
             organization=organization,
             datasource_id=datasource_id or faker.uuid4(),
+            datasource_name=datasource_name or "Datasource Name",
             year=year,
             month=month,
             month_expenses=month_expenses,
@@ -629,6 +632,30 @@ def stamina_testing_mode():
 #     test_key = (
 #         "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
 #     )
-
 #     with patch("app.api_clients.azure.AZURE_SA_CREDENTIALS", test_key):
 #         yield
+
+
+FIXED_SEED: Final[int] = 42
+
+
+@pytest.hookimpl(hookwrapper=True)
+def _set_fixed_random_seed(item: pytest.Item) -> None:
+    """Set the randomly_seed to a fixed value for tests with the `fixed_random_seed` marker."""
+
+    marker = item.get_closest_marker("fixed_random_seed")
+    if not marker:
+        yield
+        return
+
+    orig_randomly_seed = item.config.getoption("randomly_seed")
+
+    item.config.option.randomly_seed = FIXED_SEED
+    try:
+        yield
+    finally:
+        item.config.option.randomly_seed = orig_randomly_seed
+
+
+pytest_runtest_call = _set_fixed_random_seed
+pytest_runtest_setup = _set_fixed_random_seed

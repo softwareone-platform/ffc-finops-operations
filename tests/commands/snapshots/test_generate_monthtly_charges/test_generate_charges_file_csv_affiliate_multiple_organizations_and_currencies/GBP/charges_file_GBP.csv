@@ -1,0 +1,2 @@
+Entry ID,Subscription Search Criteria,Subscription Search Value,Item Search Criteria,Item Search Value,Usage Start Time,Usage End Time,Quantity,Purchase Price,Total Purchase Price,External Reference,Vendor Description 1,Vendor Description 2,Vendor Reference
+1,subscription.externalIds.vendor,FORG-2817-5822-3531,item.externalIds.vendor,FIN-0001-P1M,1-Mar-2025,31-Mar-2025,1,0.33,0.33,60e7a113-ec1b-4ca1-b91e-1d4c1ff49b78,Azure Account,dc98d2c1-e2ac-472f-9e57-4f7aa0ee89ae,

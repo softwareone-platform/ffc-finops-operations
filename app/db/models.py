@@ -293,15 +293,25 @@ class DatasourceExpense(Base, HumanReadablePKMixin, TimestampMixin):
     PK_NUM_LENGTH = 12
 
     datasource_id: Mapped[str] = mapped_column(String(255), index=True)
+    datasource_name: Mapped[str] = mapped_column(String(255), nullable=False)
     organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"))
 
     organization: Mapped[Organization] = relationship(
-        "Organization", back_populates="datasource_expenses"
+        "Organization", back_populates="datasource_expenses", lazy="joined"
     )
 
     year: Mapped[int] = mapped_column(Integer(), nullable=False)
     month: Mapped[int] = mapped_column(Integer(), nullable=False)
     month_expenses: Mapped[Decimal] = mapped_column(sa.Numeric(18, 4))
+
+    entitlements: Mapped[list[Entitlement]] = relationship(
+        "Entitlement",
+        primaryjoin=lambda: DatasourceExpense.datasource_id == Entitlement.datasource_id,
+        foreign_keys=lambda: [DatasourceExpense.datasource_id],
+        viewonly=True,
+        uselist=True,
+        lazy="joined",
+    )
 
     __table_args__ = (
         Index("ix_datasource_expenses_year_and_month", year, month),
@@ -373,7 +383,7 @@ class Entitlement(Base, HumanReadablePKMixin, AuditableMixin):
     )
     linked_datasource_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     owner_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), nullable=False)
-    owner: Mapped[Account] = relationship(foreign_keys=[owner_id])
+    owner: Mapped[Account] = relationship(foreign_keys=[owner_id], lazy="joined")
     status: Mapped[EntitlementStatus] = mapped_column(
         Enum(EntitlementStatus, values_callable=lambda obj: [e.value for e in obj]),
         nullable=False,

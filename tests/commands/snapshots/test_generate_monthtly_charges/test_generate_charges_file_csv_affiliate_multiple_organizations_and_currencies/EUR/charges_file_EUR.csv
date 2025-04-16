@@ -1,0 +1,2 @@
+Entry ID,Subscription Search Criteria,Subscription Search Value,Item Search Criteria,Item Search Value,Usage Start Time,Usage End Time,Quantity,Purchase Price,Total Purchase Price,External Reference,Vendor Description 1,Vendor Description 2,Vendor Reference
+1,subscription.externalIds.vendor,FORG-7346-3834-0781,item.externalIds.vendor,FIN-0001-P1M,1-Mar-2025,31-Mar-2025,1,0.65,0.65,47229389-571a-4876-ac30-7511b2b9437a,GCP Account,6142ea7d-17be-4111-9a2a-73ed562b0f79,
