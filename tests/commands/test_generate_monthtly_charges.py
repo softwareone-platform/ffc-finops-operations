@@ -1,7 +1,9 @@
 import io
+import pathlib
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
+import pandas as pd
 import pytest
 import time_machine
 from faker import Faker
@@ -237,55 +239,62 @@ async def usd_org_billed_in_usd_expenses(
     )
 
 
+def assert_df_matches_snapshot(df: pd.DataFrame, snapshot: Snapshot) -> None:
+    # We're exporting the dataframe to CSV format, so that we can save it in a snapshot file.
+    # We're intentionally using CSV instead of Excel format, as .xlsx is a binary format and
+    # should the test fail, the diff would be unreadable and won't be obvious what's wrong.
+    # There is a seperate test specifically for the excel exporting
+
+    file = io.StringIO()
+    df.to_csv(file, index=False, header=True)
+
+    file.seek(0)
+    snapshot.assert_match(file.read(), "charges_file.csv")
+
+
 @pytest.mark.fixed_random_seed
 @time_machine.travel("2025-04-10T10:00:00Z", tick=False)
-async def test_generate_charges_file_csv_operations_same_currency(
+async def test_generate_charges_file_dataframe_operations_same_currency(
     currency_converter: CurrencyConverter,
     operations_account: Account,
     usd_org_billed_in_usd_expenses: Organization,
     snapshot: Snapshot,
+    tmpdir: pathlib.Path,
 ):
-    file = io.StringIO()
-    charges_file_generator = ChargesFileGenerator(operations_account, "USD", currency_converter)
-    created = await charges_file_generator.generate_charges_file(file)
-
-    assert created
-
-    file.seek(0)
-    snapshot.assert_match(file.read(), "charges_file.csv")
+    charges_file_generator = ChargesFileGenerator(
+        operations_account, "USD", currency_converter, pathlib.Path(tmpdir)
+    )
+    df = await charges_file_generator.generate_charges_file_dataframe()
+    assert_df_matches_snapshot(df, snapshot)
 
 
 @pytest.mark.fixed_random_seed
 @time_machine.travel("2025-04-10T10:00:00Z", tick=False)
-async def test_generate_charges_file_csv_affiliate_same_currency(
+async def test_generate_charges_file_dataframe_affiliate_same_currency(
     currency_converter: CurrencyConverter,
     affiliate_account: Account,
     usd_org_billed_in_usd_expenses: Organization,
     snapshot: Snapshot,
+    tmpdir: pathlib.Path,
 ):
-    file = io.StringIO()
-    charges_file_generator = ChargesFileGenerator(affiliate_account, "USD", currency_converter)
-    created = await charges_file_generator.generate_charges_file(file)
-
-    assert created
-
-    file.seek(0)
-    snapshot.assert_match(file.read(), "charges_file.csv")
+    charges_file_generator = ChargesFileGenerator(
+        affiliate_account, "USD", currency_converter, pathlib.Path(tmpdir)
+    )
+    df = await charges_file_generator.generate_charges_file_dataframe()
+    assert_df_matches_snapshot(df, snapshot)
 
 
-async def test_generate_charges_file_csv_empty_file(
+async def test_generate_charges_file_dataframe_empty_file(
     currency_converter: CurrencyConverter,
     usd_org_billed_in_usd_expenses: Organization,
     affiliate_account: Account,
+    tmpdir: pathlib.Path,
 ):
-    file = io.StringIO()
-    charges_file_generator = ChargesFileGenerator(affiliate_account, "EUR", currency_converter)
-    created = await charges_file_generator.generate_charges_file(file)
-
-    assert not created
-
-    file.seek(0)
-    assert file.read() == ""
+    charges_file_generator = ChargesFileGenerator(
+        affiliate_account, "EUR", currency_converter, pathlib.Path(tmpdir)
+    )
+    df = await charges_file_generator.generate_charges_file_dataframe()
+    assert df is None
 
 
 @pytest.mark.parametrize(
@@ -294,23 +303,43 @@ async def test_generate_charges_file_csv_empty_file(
 )
 @pytest.mark.fixed_random_seed
 @time_machine.travel("2025-04-10T10:00:00Z", tick=False)
-async def test_generate_charges_file_csv_affiliate_multiple_organizations_and_currencies(
+async def test_generate_charges_file_dataframe_affiliate_multiple_organizations_and_currencies(
     currency_converter: CurrencyConverter,
     affiliate_account: Account,
     usd_org_billed_in_usd_expenses: Organization,
     usd_org_billed_in_eur_expenses: Organization,
     eur_org_billed_in_gbp_expenses: Organization,
     snapshot: Snapshot,
+    tmpdir: pathlib.Path,
     currency: str,
 ):
-    file = io.StringIO()
-    charges_file_generator = ChargesFileGenerator(affiliate_account, currency, currency_converter)
-    created = await charges_file_generator.generate_charges_file(file)
+    charges_file_generator = ChargesFileGenerator(
+        affiliate_account, currency, currency_converter, pathlib.Path(tmpdir)
+    )
+    df = await charges_file_generator.generate_charges_file_dataframe()
+    assert_df_matches_snapshot(df, snapshot)
 
-    assert created
 
-    file.seek(0)
-    snapshot.assert_match(file.read(), f"charges_file_{currency}.csv")
+@pytest.mark.fixed_random_seed
+@time_machine.travel("2025-04-10T10:00:00Z", tick=False)
+async def test_export_to_excel(
+    currency_converter: CurrencyConverter,
+    operations_account: Account,
+    usd_org_billed_in_usd_expenses: Organization,
+    snapshot: Snapshot,
+    tmpdir: pathlib.Path,
+):
+    charges_file_generator = ChargesFileGenerator(
+        operations_account, "USD", currency_converter, pathlib.Path(tmpdir)
+    )
+    df = await charges_file_generator.generate_charges_file_dataframe()
+    assert df is not None
+
+    filepath = charges_file_generator.export_to_excel(df)
+
+    assert filepath.name == f"charges_{operations_account.id}_USD_2025_03.xlsx"
+    assert filepath.parent == tmpdir
+    snapshot.assert_match(filepath.read_bytes(), "charges_file.xlsx")
 
 
 @pytest.mark.parametrize(
