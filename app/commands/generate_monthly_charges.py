@@ -1,5 +1,4 @@
 import asyncio
-import csv
 import logging
 from collections.abc import Sequence
 from copy import copy
@@ -8,6 +7,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import IO, Self
 
+import pandas as pd
 import typer
 from dateutil.relativedelta import relativedelta  # type: ignore[import-untyped]
 from sqlalchemy import select
@@ -194,31 +194,8 @@ class ChargesFileGenerator:
         if not charge_entries:
             return False  # not creating an empty file
 
-        dict_writer = csv.DictWriter(
-            file,
-            fieldnames=[
-                "Entry ID",
-                "Subscription Search Criteria",
-                "Subscription Search Value",
-                "Item Search Criteria",
-                "Item Search Value",
-                "Usage Start Time",
-                "Usage End Time",
-                "Quantity",
-                "Purchase Price",
-                "Total Purchase Price",
-                "External Reference",
-                "Vendor Description 1",
-                "Vendor Description 2",
-                "Vendor Reference",
-            ],
-            lineterminator="\n",
-        )
-
-        dict_writer.writeheader()
-
-        for row_num, entry in enumerate(charge_entries, start=1):
-            dict_writer.writerow(
+        df = pd.DataFrame(
+            [
                 {
                     "Entry ID": row_num,
                     "Subscription Search Criteria": "subscription.externalIds.vendor",
@@ -235,7 +212,10 @@ class ChargesFileGenerator:
                     "Vendor Description 2": entry.vendor_description_2,
                     "Vendor Reference": "",
                 }
-            )
+                for row_num, entry in enumerate(charge_entries, start=1)
+            ]
+        )
+        df.to_csv(file, index=False, header=True)
 
         return True
 
