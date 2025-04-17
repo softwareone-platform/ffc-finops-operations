@@ -11,20 +11,23 @@ from typing import Annotated, Self
 
 import pandas as pd
 import typer
+from azure.core.exceptions import AzureError, ClientAuthenticationError, ResourceNotFoundError
 from dateutil.relativedelta import relativedelta  # type: ignore[import-untyped]
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, async_object_session
+from sqlalchemy import extract, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.blob_storage import upload_charges_file
 from app.conf import Settings, get_settings
 from app.currency import CurrencyConverter
 from app.db.base import session_factory
 from app.db.handlers import (
     AccountHandler,
+    ChargesFileHandler,
     DatasourceExpenseHandler,
     OrganizationHandler,
 )
-from app.db.models import Account, DatasourceExpense, Organization
-from app.enums import AccountType, EntitlementStatus
+from app.db.models import Account, ChargesFile, DatasourceExpense, Organization
+from app.enums import AccountType, ChargesFileStatus, EntitlementStatus
 
 logger = logging.getLogger(__name__)
 
@@ -92,57 +95,6 @@ class ChargesFileGenerator:
     currency_converter: CurrencyConverter
     exports_dir: pathlib.Path
 
-    async def fetch_datasource_expenses(self) -> Sequence[DatasourceExpense]:
-        today = datetime.now(UTC).date()
-        last_month = today - relativedelta(months=1)
-
-        session = async_object_session(self.account)
-
-        if session is None:  # pragma: no cover
-            # This can happen if we only create an account python object but we haven't yet
-            # added it to the database. If that's the case, that's incrrect usage of the class,
-            # so we should raise an error.
-
-            raise ValueError(
-                "Account must be associated with a session to fetch datasource expenses."
-            )
-
-        organization_handler = OrganizationHandler(session)
-        datasource_expense_handler = DatasourceExpenseHandler(session)
-
-        logger.info(
-            "Querying organizations to process for account %s with billing currency = %s",
-            self.account.id,
-            self.currency,
-        )
-
-        organizations = await organization_handler.query_db(
-            where_clauses=[Organization.billing_currency == self.currency]
-        )
-        logger.info("Found %d organizations to process", len(organizations))
-
-        logger.info(
-            "Querying datasource expenses for all organization for month = %s, year = %s",
-            last_month.month,
-            last_month.year,
-        )
-        all_orgs_expenses = await datasource_expense_handler.query_db(
-            where_clauses=[
-                DatasourceExpense.organization_id.in_(org.id for org in organizations),
-                DatasourceExpense.month == last_month.month,
-                DatasourceExpense.year == last_month.year,
-            ],
-            unique=True,
-        )
-        logger.info(
-            "Found %d datasource expenses for all organization for month = %s, year = %s",
-            len(all_orgs_expenses),
-            last_month.month,
-            last_month.year,
-        )
-
-        return all_orgs_expenses
-
     def get_charge_entries(
         self, datasource_expenses: Sequence[DatasourceExpense]
     ) -> list[ChargeEntry]:
@@ -190,8 +142,9 @@ class ChargesFileGenerator:
 
         raise ValueError(f"Unknown account type: {self.account.type}")  # pragma: no cover
 
-    async def generate_charges_file_dataframe(self) -> pd.DataFrame | None:
-        datasource_expenses = await self.fetch_datasource_expenses()
+    def generate_charges_file_dataframe(
+        self, datasource_expenses: Sequence[DatasourceExpense]
+    ) -> pd.DataFrame | None:
         charge_entries = self.get_charge_entries(datasource_expenses)
 
         if not charge_entries:
@@ -248,6 +201,105 @@ class ChargesFileGenerator:
 
         return filepath
 
+    def get_total_amount(self, df: pd.DataFrame) -> Decimal:
+        return df["Total Purchase Price"].sum()
+
+    async def upload_to_azure(self, filepath: pathlib.Path, month: int, year: int) -> str | None:
+        try:
+            return await upload_charges_file(
+                file_path=str(filepath.resolve()),
+                currency=self.currency,
+                month=month,
+                year=year,
+                silence_exceptions=False,
+            )
+        except (ResourceNotFoundError, AzureError, ClientAuthenticationError):
+            logger.exception(
+                "Unable to upload any files to Azure Blob Storage, aborting the process"
+            )
+            # raising the exception as we need to stop the process -- all the other uploads
+            # will fail too
+            raise
+        except Exception:
+            logger.exception(
+                "Unexpected error occurred while uploading %s to Azure, skipping this file",
+                str(filepath.resolve()),
+            )
+
+        return None
+
+
+async def fetch_existing_charges_file(
+    session: AsyncSession, account: Account, currency: str
+) -> ChargesFile | None:
+    charges_file_handler = ChargesFileHandler(session)
+    today = datetime.now(UTC).date()
+
+    latest_matching_charge_file_stmt = (
+        select(ChargesFile)
+        .where(
+            (ChargesFile.owner == account)
+            & (ChargesFile.currency == currency)
+            & (extract("year", ChargesFile.document_date) == today.year)
+            & (extract("month", ChargesFile.document_date) == today.month)
+        )
+        .order_by(ChargesFile.document_date.desc())
+        .limit(1)
+    )
+
+    return await charges_file_handler.first(latest_matching_charge_file_stmt)
+
+
+async def fetch_datasource_expenses(
+    session: AsyncSession, account: Account, currency: str
+) -> Sequence[DatasourceExpense]:
+    today = datetime.now(UTC).date()
+    last_month = today - relativedelta(months=1)
+
+    organization_handler = OrganizationHandler(session)
+    datasource_expense_handler = DatasourceExpenseHandler(session)
+
+    logger.info(
+        "Querying organizations to process for account %s with billing currency = %s",
+        account.id,
+        currency,
+    )
+
+    organizations = await organization_handler.query_db(
+        where_clauses=[Organization.billing_currency == currency]
+    )
+    logger.info(
+        "Found %d organizations to process for billing currency %s",
+        len(organizations),
+        currency,
+    )
+
+    logger.info(
+        "Querying datasource expenses for all organizations "
+        "with %s billing currency for month = %s, year = %s",
+        currency,
+        last_month.month,
+        last_month.year,
+    )
+    all_orgs_expenses = await datasource_expense_handler.query_db(
+        where_clauses=[
+            DatasourceExpense.organization_id.in_(org.id for org in organizations),
+            DatasourceExpense.month == last_month.month,
+            DatasourceExpense.year == last_month.year,
+        ],
+        unique=True,
+    )
+    logger.info(
+        "Found %d datasource expenses for all organizations "
+        "with %s billing currency for month = %s, year = %s",
+        len(all_orgs_expenses),
+        currency,
+        last_month.month,
+        last_month.year,
+    )
+
+    return all_orgs_expenses
+
 
 async def fetch_unique_billing_currencies(session: AsyncSession) -> Sequence[str]:
     """Fetch unique billing currencies from the database."""
@@ -276,38 +328,99 @@ async def fetch_accounts(session: AsyncSession) -> Sequence[Account]:
     return accounts
 
 
-# NOTE: This is still work in progress as we need to implement the items bellow. As such, the
-# main function only functions as a usage example and not the final implmentation, thus the
-# pragma: no cover. Once this is finalized the function will be covered by the tests like any other.
-#
-# Remaining work:
-#   - MPT-8992: Create the ChargesFile db record for the generated file
-#   - MPT-8994: Upload the ZIP file to S3
-async def main(exports_dir: pathlib.Path, settings: Settings) -> None:  # pragma: no cover
-    if exports_dir.is_file():
+async def main(exports_dir: pathlib.Path, settings: Settings) -> None:
+    if exports_dir.is_file():  # pragma: no cover
         raise ValueError("The exports directory must be a directory, not a file.")
 
-    if not exports_dir.exists():
+    if not exports_dir.exists():  # pragma: no cover
         logger.info("Exports directory %s does not exist, creating it", str(exports_dir.resolve()))
         exports_dir.mkdir(parents=True)
 
+    today = datetime.now(UTC).date()
+
     async with session_factory() as session:
-        unique_billing_currencies = await fetch_unique_billing_currencies(session)
-        currency_converter = await CurrencyConverter.from_db(session)
-        accounts = await fetch_accounts(session)
+        async with session.begin():
+            unique_billing_currencies = await fetch_unique_billing_currencies(session)
+            currency_converter = await CurrencyConverter.from_db(session)
+            accounts = await fetch_accounts(session)
+
+            charges_file_handler = ChargesFileHandler(session)
 
         for currency in unique_billing_currencies:
             for account in accounts:
+                charges_file_generator = ChargesFileGenerator(
+                    account, currency, currency_converter, exports_dir
+                )
+
+                logger.info(
+                    "Checking if a database record for charges file already exists "
+                    "for account %s and currency %s",
+                    account.id,
+                    currency,
+                )
+
+                charges_file_db_record: ChargesFile | None = None
+
+                async with session.begin():
+                    latest_matching_charge_file = await fetch_existing_charges_file(
+                        session, account, currency
+                    )
+
+                if latest_matching_charge_file is None:
+                    logger.info(
+                        "No existing charges file found for account %s and currency %s, "
+                        "proceeding to generate a new one if there are any charge entries",
+                        account.id,
+                        currency,
+                    )
+                else:
+                    logger.info(
+                        "Found matching charges file in the database: %s",
+                        latest_matching_charge_file.id,
+                    )
+
+                    status = latest_matching_charge_file.status
+
+                    if status == ChargesFileStatus.DRAFT:
+                        logger.warning(
+                            "Charges file for account %s and currency %s already exists "
+                            "but it's in DRAFT status, using the existing one as it was not "
+                            "uploaded to Azure blob storage",
+                            account.id,
+                            currency,
+                        )
+                        charges_file_db_record = latest_matching_charge_file
+                    elif status in (ChargesFileStatus.GENERATED, ChargesFileStatus.PROCESSED):
+                        logger.info(
+                            "Charges file for account %s and currency %s is already generated "
+                            "and uploaded to Azure blob storage, skipping the generation",
+                            account.id,
+                            currency,
+                        )
+                        continue
+                    elif status == ChargesFileStatus.DELETED:
+                        logger.warning(
+                            "Charges file for account %s and currency %s is deleted, "
+                            "proceeding to generate a new one if there are any charge entries",
+                            account.id,
+                            currency,
+                        )
+                        charges_file_db_record = latest_matching_charge_file
+                    else:  # pragma: no cover
+                        raise ValueError(f"Unknown charges file status: {status}")
+
                 logger.info(
                     "Generating charges file for account %s and currency %s",
                     account.id,
                     currency,
                 )
-                charges_file_generator = ChargesFileGenerator(
-                    account, currency, currency_converter, exports_dir
-                )
 
-                df = await charges_file_generator.generate_charges_file_dataframe()
+                async with session.begin():
+                    datasource_expenses = await fetch_datasource_expenses(
+                        session, account, currency
+                    )
+
+                df = charges_file_generator.generate_charges_file_dataframe(datasource_expenses)
 
                 if df is None:
                     logger.info(
@@ -318,7 +431,7 @@ async def main(exports_dir: pathlib.Path, settings: Settings) -> None:  # pragma
                     )
                     continue
 
-                exported_filepath = charges_file_generator.export_to_excel(df)
+                exported_filepath = charges_file_generator.export_to_zip(df)
 
                 logger.info(
                     "Charges file generated for account %s and currency %s and saved to %s",
@@ -327,13 +440,78 @@ async def main(exports_dir: pathlib.Path, settings: Settings) -> None:  # pragma
                     str(exported_filepath.resolve()),
                 )
 
+                if charges_file_db_record is None:
+                    logger.info(
+                        "Creating a database record for the charges file for "
+                        "account %s and currency %s",
+                        account.id,
+                        currency,
+                    )
+
+                    async with session.begin():
+                        charges_file_db_record = await charges_file_handler.create(
+                            ChargesFile(
+                                owner=account,
+                                currency=currency,
+                                document_date=today,
+                                amount=charges_file_generator.get_total_amount(df),
+                                status=ChargesFileStatus.DRAFT,
+                            )
+                        )
+
+                    logger.info(
+                        "Charges file database record created in %s status: %s",
+                        charges_file_db_record.status,
+                        charges_file_db_record.id,
+                    )
+
+                logging.info("Uploading the charges file to Azure Blob Storage")
+
+                azure_blob_name = await charges_file_generator.upload_to_azure(
+                    exported_filepath, today.month, today.year
+                )
+
+                if azure_blob_name is None:
+                    logger.error(
+                        "Charges file %s was not uploaded to Azure Blob Storage",
+                        charges_file_db_record.id,
+                    )
+                    continue
+
+                logger.info(
+                    "Charges file %s uploaded to Azure Blob Storage at %s",
+                    charges_file_db_record.id,
+                    azure_blob_name,
+                )
+
+                logger.info(
+                    "Updating the charges file %s in the database to status %s",
+                    charges_file_db_record.id,
+                    ChargesFileStatus.GENERATED,
+                )
+
+                async with session.begin():
+                    await charges_file_handler.update(
+                        charges_file_db_record,
+                        {
+                            "status": ChargesFileStatus.GENERATED,
+                            "azure_blob_name": azure_blob_name,
+                        },
+                    )
+
+                logger.info(
+                    "Charges file %s updated in the database to status %s",
+                    charges_file_db_record.id,
+                    ChargesFileStatus.GENERATED,
+                )
+
 
 def command(
     ctx: typer.Context,
     exports_dir: Annotated[
         pathlib.Path, typer.Option("--exports-dir", help="Directory to export the charge files to")
     ],
-) -> None:  # pragma: no cover
+) -> None:
     """
     Generate monthly charges for all accounts and currencies.
     """

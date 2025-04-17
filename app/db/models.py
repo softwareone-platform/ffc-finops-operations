@@ -416,3 +416,4 @@ class ChargesFile(Base, HumanReadablePKMixin, TimestampMixin):
         default=ChargesFileStatus.DRAFT,
         server_default=ChargesFileStatus.DRAFT.value,
     )
+    azure_blob_name: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
