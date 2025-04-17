@@ -291,9 +291,10 @@ class ModelHandler[M: BaseModel]:
 
     async def first(
         self,
+        base_query: Select | None = None,
         where_clauses: Sequence[ColumnExpressionArgument] | None = None,
     ) -> M | None:
-        query = select(self.model_cls)
+        query = select(self.model_cls) if base_query is None else base_query
         query = self._apply_conditions_to_the_query(query=query, where_clauses=where_clauses)
 
         result = await self.session.execute(query)

@@ -47,6 +47,8 @@ async def upload_charges_file(
     currency: str,
     year: int,
     month: int,
+    *,
+    silence_exceptions: bool = True,
 ) -> str | None:
     """
     This function is responsible for uploading the given file to Azure Blob Storage.
@@ -56,10 +58,11 @@ async def upload_charges_file(
         currency (str): The currency of the file.
         year (int): The year of the file.
         month (int): The month of the file.
+        silence_exceptions (bool): If True, suppresses exceptions and returns None instead
 
     Returns: a string that the path of the uploaded file.
 
-    Raises (Propagated):
+    Raises (Propagated if silence_exceptions is False):
         ValueError: If the format of month and/or year is invalid.
         FileNotFoundError: If the file path does not exist.
         ResourceNotFoundError: If the container does not exist.

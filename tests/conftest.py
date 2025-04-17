@@ -401,6 +401,7 @@ def charges_file_factory(
         owner: Account | None = None,
         status: str | None = None,
         document_date: str | None = None,
+        azure_blob_name: str | None = None,
     ):
         owner = owner or gcp_account
         charges_file = ChargesFile(
@@ -414,6 +415,7 @@ def charges_file_factory(
             owner=owner,
             owner_id=owner.id or gcp_account.id,
             status=status or ChargesFileStatus.DRAFT,
+            azure_blob_name=azure_blob_name,
         )
         db_session.add(charges_file)
         await db_session.commit()
