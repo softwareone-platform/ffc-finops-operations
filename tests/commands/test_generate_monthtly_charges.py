@@ -1,4 +1,5 @@
 import io
+import logging
 import pathlib
 import zipfile
 from datetime import UTC, date, datetime
@@ -7,20 +8,42 @@ from decimal import Decimal
 import pandas as pd
 import pytest
 import time_machine
+from azure.core.exceptions import AzureError, ClientAuthenticationError, ResourceNotFoundError
 from faker import Faker
+from pytest_mock import MockerFixture
 from pytest_snapshot.plugin import Snapshot
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from typer.testing import CliRunner
 
+from app.cli import app
 from app.commands.generate_monthly_charges import (
     ChargeEntry,
     ChargesFileGenerator,
     fetch_accounts,
+    fetch_datasource_expenses,
+    fetch_existing_charges_file,
     fetch_unique_billing_currencies,
 )
+from app.commands.generate_monthly_charges import main as generate_monthly_charges_main
 from app.conf import Settings
 from app.currency import CurrencyConverter
-from app.db.models import Account, DatasourceExpense, Entitlement, ExchangeRates, Organization
-from app.enums import AccountStatus, AccountType, EntitlementStatus, OrganizationStatus
+from app.db.handlers import ChargesFileHandler
+from app.db.models import (
+    Account,
+    ChargesFile,
+    DatasourceExpense,
+    Entitlement,
+    ExchangeRates,
+    Organization,
+)
+from app.enums import (
+    AccountStatus,
+    AccountType,
+    ChargesFileStatus,
+    EntitlementStatus,
+    OrganizationStatus,
+)
 from tests.conftest import ModelFactory
 
 
@@ -36,12 +59,17 @@ def currency_converter() -> CurrencyConverter:
 
 
 @pytest.fixture
+async def another_affiliate_account(account_factory: ModelFactory[Account]):
+    return await account_factory(type=AccountType.AFFILIATE)
+
+
+@pytest.fixture
 async def usd_org_billed_in_eur_expenses(
     organization_factory: ModelFactory[Organization],
     datasource_expense_factory: ModelFactory[DatasourceExpense],
     entitlement_factory: ModelFactory[Entitlement],
     affiliate_account: Account,
-    account_factory: ModelFactory[Account],
+    another_affiliate_account: Account,
     db_session: AsyncSession,
     faker: Faker,
 ):
@@ -83,7 +111,6 @@ async def usd_org_billed_in_eur_expenses(
         created_at=datetime(2025, 3, 1, 10, 0, 0, tzinfo=UTC),
         updated_at=datetime(2025, 3, 31, 10, 0, 0, tzinfo=UTC),
     )
-    another_affiliate_account = await account_factory(type=AccountType.AFFILIATE)
 
     await entitlement_factory(
         name="free GCP account",
@@ -115,7 +142,6 @@ async def eur_org_billed_in_gbp_expenses(
     datasource_expense_factory: ModelFactory[DatasourceExpense],
     entitlement_factory: ModelFactory[Entitlement],
     affiliate_account: Account,
-    account_factory: ModelFactory[Account],
     db_session: AsyncSession,
     faker: Faker,
 ):
@@ -179,7 +205,6 @@ async def usd_org_billed_in_usd_expenses(
     datasource_expense_factory: ModelFactory[DatasourceExpense],
     entitlement_factory: ModelFactory[Entitlement],
     affiliate_account: Account,
-    account_factory: ModelFactory[Account],
     db_session: AsyncSession,
     faker: Faker,
 ):
@@ -260,12 +285,14 @@ async def test_generate_charges_file_dataframe_operations_same_currency(
     operations_account: Account,
     usd_org_billed_in_usd_expenses: Organization,
     snapshot: Snapshot,
-    tmpdir: pathlib.Path,
+    db_session: AsyncSession,
+    tmp_path: pathlib.Path,
 ):
     charges_file_generator = ChargesFileGenerator(
-        operations_account, "USD", currency_converter, pathlib.Path(tmpdir)
+        operations_account, "USD", currency_converter, tmp_path
     )
-    df = await charges_file_generator.generate_charges_file_dataframe()
+    datasource_expenses = await fetch_datasource_expenses(db_session, operations_account, "USD")
+    df = charges_file_generator.generate_charges_file_dataframe(datasource_expenses)
     assert_df_matches_snapshot(df, snapshot)
 
 
@@ -275,13 +302,15 @@ async def test_generate_charges_file_dataframe_affiliate_same_currency(
     currency_converter: CurrencyConverter,
     affiliate_account: Account,
     usd_org_billed_in_usd_expenses: Organization,
+    db_session: AsyncSession,
     snapshot: Snapshot,
-    tmpdir: pathlib.Path,
+    tmp_path: pathlib.Path,
 ):
     charges_file_generator = ChargesFileGenerator(
-        affiliate_account, "USD", currency_converter, pathlib.Path(tmpdir)
+        affiliate_account, "USD", currency_converter, tmp_path
     )
-    df = await charges_file_generator.generate_charges_file_dataframe()
+    datasource_expenses = await fetch_datasource_expenses(db_session, affiliate_account, "USD")
+    df = charges_file_generator.generate_charges_file_dataframe(datasource_expenses)
     assert_df_matches_snapshot(df, snapshot)
 
 
@@ -289,12 +318,14 @@ async def test_generate_charges_file_dataframe_empty_file(
     currency_converter: CurrencyConverter,
     usd_org_billed_in_usd_expenses: Organization,
     affiliate_account: Account,
-    tmpdir: pathlib.Path,
+    db_session: AsyncSession,
+    tmp_path: pathlib.Path,
 ):
     charges_file_generator = ChargesFileGenerator(
-        affiliate_account, "EUR", currency_converter, pathlib.Path(tmpdir)
+        affiliate_account, "EUR", currency_converter, tmp_path
     )
-    df = await charges_file_generator.generate_charges_file_dataframe()
+    datasource_expenses = await fetch_datasource_expenses(db_session, affiliate_account, "EUR")
+    df = charges_file_generator.generate_charges_file_dataframe(datasource_expenses)
     assert df is None
 
 
@@ -310,14 +341,16 @@ async def test_generate_charges_file_dataframe_affiliate_multiple_organizations_
     usd_org_billed_in_usd_expenses: Organization,
     usd_org_billed_in_eur_expenses: Organization,
     eur_org_billed_in_gbp_expenses: Organization,
+    db_session: AsyncSession,
     snapshot: Snapshot,
-    tmpdir: pathlib.Path,
+    tmp_path: pathlib.Path,
     currency: str,
 ):
     charges_file_generator = ChargesFileGenerator(
-        affiliate_account, currency, currency_converter, pathlib.Path(tmpdir)
+        affiliate_account, currency, currency_converter, tmp_path
     )
-    df = await charges_file_generator.generate_charges_file_dataframe()
+    datasource_expenses = await fetch_datasource_expenses(db_session, affiliate_account, currency)
+    df = charges_file_generator.generate_charges_file_dataframe(datasource_expenses)
     assert_df_matches_snapshot(df, snapshot)
 
 
@@ -327,19 +360,21 @@ async def test_export_to_excel(
     currency_converter: CurrencyConverter,
     operations_account: Account,
     usd_org_billed_in_usd_expenses: Organization,
+    db_session: AsyncSession,
     snapshot: Snapshot,
-    tmpdir: pathlib.Path,
+    tmp_path: pathlib.Path,
 ):
     charges_file_generator = ChargesFileGenerator(
-        operations_account, "USD", currency_converter, pathlib.Path(tmpdir)
+        operations_account, "USD", currency_converter, tmp_path
     )
-    df = await charges_file_generator.generate_charges_file_dataframe()
+    datasource_expenses = await fetch_datasource_expenses(db_session, operations_account, "USD")
+    df = charges_file_generator.generate_charges_file_dataframe(datasource_expenses)
     assert df is not None
 
     filepath = charges_file_generator.export_to_excel(df)
 
     assert filepath.name == f"charges_{operations_account.id}_USD_2025_03.xlsx"
-    assert filepath.parent == tmpdir
+    assert filepath.parent == tmp_path
     snapshot.assert_match(filepath.read_bytes(), "charges_file.xlsx")
 
 
@@ -351,7 +386,7 @@ async def test_export_to_zip(
     usd_org_billed_in_eur_expenses: Organization,
     db_session: AsyncSession,
     snapshot: Snapshot,
-    tmpdir: pathlib.Path,
+    tmp_path: pathlib.Path,
 ):
     await exchange_rates_factory(
         base_currency="USD",
@@ -364,16 +399,17 @@ async def test_export_to_zip(
     currency_converter = await CurrencyConverter.from_db(db_session)
 
     charges_file_generator = ChargesFileGenerator(
-        operations_account, "EUR", currency_converter, pathlib.Path(tmpdir)
+        operations_account, "EUR", currency_converter, tmp_path
     )
 
-    df = await charges_file_generator.generate_charges_file_dataframe()
+    datasource_expenses = await fetch_datasource_expenses(db_session, operations_account, "EUR")
+    df = charges_file_generator.generate_charges_file_dataframe(datasource_expenses)
     assert df is not None
 
     filepath = charges_file_generator.export_to_zip(df)
 
     assert filepath.name == f"charges_{operations_account.id}_EUR_2025_03.zip"
-    assert filepath.parent == tmpdir
+    assert filepath.parent == tmp_path
 
     with zipfile.ZipFile(filepath, "r") as archive:
         assert sorted(archive.namelist()) == [
@@ -386,6 +422,117 @@ async def test_export_to_zip(
             "charges_file.xlsx",
         )
         snapshot.assert_match(archive.read("exchange_rates_USD.json"), "exchange_rates.json")
+
+
+@pytest.mark.parametrize(
+    ("currency", "expected_total_amount"),
+    [
+        ("USD", Decimal("1.10")),
+        ("EUR", Decimal("0.00")),
+        ("GBP", Decimal("0.42")),
+    ],
+)
+@pytest.mark.fixed_random_seed
+@time_machine.travel("2025-04-10T10:00:00Z", tick=False)
+async def test_get_total_amount(
+    currency_converter: CurrencyConverter,
+    operations_account: Account,
+    usd_org_billed_in_usd_expenses: Organization,
+    usd_org_billed_in_eur_expenses: Organization,
+    eur_org_billed_in_gbp_expenses: Organization,
+    snapshot: Snapshot,
+    tmp_path: pathlib.Path,
+    db_session: AsyncSession,
+    currency: str,
+    expected_total_amount: Decimal,
+):
+    charges_file_generator = ChargesFileGenerator(
+        operations_account, currency, currency_converter, tmp_path
+    )
+    datasource_expenses = await fetch_datasource_expenses(db_session, operations_account, currency)
+    df = charges_file_generator.generate_charges_file_dataframe(datasource_expenses)
+
+    assert df is not None
+
+    total_amount = charges_file_generator.get_total_amount(df)
+
+    assert total_amount == expected_total_amount
+    assert total_amount == df["Purchase Price"].sum()  # type: ignore[index]
+    assert total_amount == df["Total Purchase Price"].sum()  # type: ignore[index]
+
+
+@pytest.mark.parametrize(
+    ("side_effect", "return_value", "should_raise"),
+    [
+        (None, "fancy_blob_name", False),
+        (OSError("File is not readable"), None, False),
+        (FileNotFoundError("File not found"), None, False),
+        (ResourceNotFoundError("Azure resource not found"), None, True),
+        (AzureError("Azure is down, what a surprise!"), None, True),
+        (ClientAuthenticationError("Invalid credentials"), None, True),
+    ],
+)
+async def test_upload_to_azure(
+    currency_converter: CurrencyConverter,
+    operations_account: Account,
+    tmp_path: pathlib.Path,
+    mocker: MockerFixture,
+    side_effect: Exception | None,
+    return_value: str | None,
+    should_raise: bool,
+):
+    mocker.patch(
+        "app.commands.generate_monthly_charges.upload_charges_file",
+        side_effect=side_effect,
+        return_value=return_value,
+    )
+    charges_file_generator = ChargesFileGenerator(
+        operations_account, "USD", currency_converter, tmp_path
+    )
+
+    dummy_file = tmp_path / "dummy_file.xlsx"
+    dummy_file.touch()
+
+    if should_raise:
+        with pytest.raises(side_effect.__class__, match=str(side_effect)):
+            await charges_file_generator.upload_to_azure(dummy_file, month=4, year=2025)
+    else:
+        result = await charges_file_generator.upload_to_azure(dummy_file, month=4, year=2025)
+        assert result == return_value
+
+
+@pytest.mark.parametrize(
+    ("existing_file_date", "existing_file_currency", "should_match"),
+    [
+        ("2025-04-10", "USD", True),
+        ("2025-04-01", "USD", True),
+        ("2025-04-01", "EUR", False),
+        ("2025-03-31", "USD", False),
+    ],
+)
+@time_machine.travel("2025-04-10T10:00:00Z", tick=False)
+async def test_fetch_existing_charges_file(
+    charges_file_factory: ModelFactory[ChargesFile],
+    operations_account: Account,
+    db_session: AsyncSession,
+    existing_file_date: str,
+    existing_file_currency: str,
+    should_match: bool,
+):
+    charges_file = await charges_file_factory(
+        currency=existing_file_currency,
+        owner=operations_account,
+        status=ChargesFileStatus.DRAFT,
+        document_date=existing_file_date,
+    )
+
+    returned_charges_file = await fetch_existing_charges_file(db_session, operations_account, "USD")
+
+    if should_match:
+        assert returned_charges_file is not None
+        assert charges_file.id == returned_charges_file.id
+    else:
+        assert returned_charges_file is None
 
 
 @pytest.mark.parametrize(
@@ -546,3 +693,188 @@ async def test_fetch_accounts(
         "GCP Affiliate Account",
         "Operations Account",
     ]
+
+
+@time_machine.travel("2025-04-10T10:00:00Z", tick=False)
+async def test_full_run(
+    exchange_rates_factory: ModelFactory[ExchangeRates],
+    usd_org_billed_in_usd_expenses: Organization,
+    usd_org_billed_in_eur_expenses: Organization,
+    eur_org_billed_in_gbp_expenses: Organization,
+    charges_file_factory: ModelFactory[ChargesFile],
+    affiliate_account: Account,
+    another_affiliate_account: Account,
+    operations_account: Account,
+    gcp_account: Account,
+    test_settings: Settings,
+    db_session: AsyncSession,
+    caplog: pytest.LogCaptureFixture,
+    tmp_path: pathlib.Path,
+):
+    charges_file_handler = ChargesFileHandler(db_session)
+    assert await charges_file_handler.count() == 0
+
+    await exchange_rates_factory(
+        base_currency="USD",
+        exchange_rates={
+            "EUR": 0.9252,
+            "GBP": 0.7737,
+        },
+    )
+
+    # Add some existing charges files to the database to test that they are handled correctly
+
+    # file is already generated, don't re-generate it
+    await charges_file_factory(
+        currency="EUR",
+        owner=operations_account,
+        status=ChargesFileStatus.GENERATED,
+        document_date="2025-04-01",
+        azure_blob_name="dummy_operations_eur_blob_name",
+    )
+
+    # file is already processed, don't re-generate it
+    await charges_file_factory(
+        currency="EUR",
+        owner=affiliate_account,
+        status=ChargesFileStatus.PROCESSED,
+        document_date="2025-04-01",
+        azure_blob_name="dummy_affiliate_eur_blob_name",
+    )
+
+    # file is already processed but it's old, shouldn't affect the run
+    await charges_file_factory(
+        currency="USD",
+        owner=affiliate_account,
+        status=ChargesFileStatus.PROCESSED,
+        document_date="2025-03-01",
+        azure_blob_name="dummy_old_blob_name",
+    )
+
+    # deleted file, should be re-generated using the same db record
+    deleted_charges_file = await charges_file_factory(
+        currency="USD",
+        owner=operations_account,
+        status=ChargesFileStatus.DELETED,
+        document_date="2025-04-01",
+    )
+
+    # draft file, should be re-generated using the same db record
+    draft_charges_file = await charges_file_factory(
+        currency="GBP",
+        owner=operations_account,
+        status=ChargesFileStatus.DRAFT,
+        document_date="2025-04-01",
+    )
+
+    with caplog.at_level(logging.INFO):
+        await generate_monthly_charges_main(tmp_path, test_settings)
+
+    await db_session.refresh(deleted_charges_file)
+    await db_session.refresh(draft_charges_file)
+
+    charges_files = (
+        await db_session.scalars(
+            select(ChargesFile).where(~ChargesFile.azure_blob_name.startswith("dummy_"))
+        )
+    ).all()
+
+    generated_file_names = sorted(file.name for file in tmp_path.glob("*"))
+    azure_blobs = sorted(
+        charge_file.azure_blob_name for charge_file in charges_files if charge_file.azure_blob_name
+    )
+
+    assert generated_file_names == sorted(
+        [
+            f"charges_{operations_account.id}_GBP_2025_03.zip",
+            f"charges_{operations_account.id}_USD_2025_03.zip",
+            f"charges_{affiliate_account.id}_GBP_2025_03.zip",
+            f"charges_{affiliate_account.id}_USD_2025_03.zip",
+            f"charges_{another_affiliate_account.id}_EUR_2025_03.zip",
+        ]
+    )
+
+    assert f"charges_{operations_account.id}_EUR_2025_03.zip" not in generated_file_names
+    assert f"charges_{affiliate_account.id}_EUR_2025_03.zip" not in generated_file_names
+
+    assert azure_blobs == sorted(
+        [
+            f"GBP/2025/04/charges_{operations_account.id}_GBP_2025_03.zip",
+            f"USD/2025/04/charges_{operations_account.id}_USD_2025_03.zip",
+            f"GBP/2025/04/charges_{affiliate_account.id}_GBP_2025_03.zip",
+            f"USD/2025/04/charges_{affiliate_account.id}_USD_2025_03.zip",
+            f"EUR/2025/04/charges_{another_affiliate_account.id}_EUR_2025_03.zip",
+        ]
+    )
+
+    assert f"EUR/2025/04/charges_{operations_account.id}_EUR_2025_03.zip" not in azure_blobs
+    assert f"EUR/2025/04/charges_{affiliate_account.id}_EUR_2025_03.zip" not in azure_blobs
+
+    assert all(charges_file.status == ChargesFileStatus.GENERATED for charges_file in charges_files)
+    assert deleted_charges_file.status == ChargesFileStatus.GENERATED
+    assert draft_charges_file.status == ChargesFileStatus.GENERATED
+
+    # filtering "Found ..." logs, so that tests failures are easier to debug
+    found_logs = [msg for msg in caplog.messages if msg.startswith("Found ")]
+
+    assert (
+        "Found the following unique billing currencies from the database: EUR, GBP, USD"
+        in found_logs
+    )
+    assert "Found 4 accounts in the database" in found_logs
+
+    assert "Found 1 organizations to process for billing currency EUR" in found_logs
+    assert "Found 1 organizations to process for billing currency GBP" in found_logs
+    assert "Found 1 organizations to process for billing currency USD" in found_logs
+
+    assert (
+        "Found 2 datasource expenses for all organizations "
+        "with EUR billing currency for month = 3, year = 2025"
+    ) in found_logs
+    assert (
+        "Found 2 datasource expenses for all organizations "
+        "with GBP billing currency for month = 3, year = 2025"
+    ) in found_logs
+    assert (
+        "Found 3 datasource expenses for all organizations "
+        "with USD billing currency for month = 3, year = 2025"
+    ) in found_logs
+
+    # filtering "Charges file ..." logs, so that tests failures are easier to debug
+    charges_file_logs = [msg for msg in caplog.messages if msg.startswith("Charges file ")]
+
+    assert (
+        f"Charges file for account {operations_account.id} and currency GBP already exists "
+        "but it's in DRAFT status, using the existing one as it was not "
+        "uploaded to Azure blob storage"
+    ) in charges_file_logs
+
+    assert (
+        f"Charges file for account {operations_account.id} and currency EUR is already generated "
+        "and uploaded to Azure blob storage, skipping the generation"
+    ) in charges_file_logs
+
+    assert (
+        f"Charges file for account {affiliate_account.id} and currency EUR is already generated "
+        "and uploaded to Azure blob storage, skipping the generation"
+    ) in charges_file_logs
+
+    assert (
+        f"Charges file for account {operations_account.id} and currency USD is deleted, "
+        "proceeding to generate a new one if there are any charge entries"
+    ) in charges_file_logs
+
+
+def test_cli_command(mocker: MockerFixture, test_settings: Settings, tmp_path: pathlib.Path):
+    mocker.patch("app.cli.get_settings", return_value=test_settings)
+    mock_command_coro = mocker.MagicMock()
+    mock_command = mocker.MagicMock(return_value=mock_command_coro)
+
+    mocker.patch("app.commands.generate_monthly_charges.main", mock_command)
+    mock_run = mocker.patch("app.commands.generate_monthly_charges.asyncio.run")
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["generate-monthly-charges", "--exports-dir", str(tmp_path)])
+    assert result.exit_code == 0
+    mock_run.assert_called_once_with(mock_command_coro)
+    mock_command.assert_called_once_with(tmp_path, test_settings)
