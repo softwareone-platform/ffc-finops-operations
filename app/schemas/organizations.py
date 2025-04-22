@@ -88,8 +88,9 @@ class OrganizationReference(IdSchema):
 
 class DatasourceRead(BaseSchema):
     id: uuid.UUID
-    organization_id: str
+    name: str
     type: DatasourceType
-    resources_changed_this_month: int
+    parent_id: uuid.UUID | None
+    resources_charged_this_month: int
     expenses_so_far_this_month: float
     expenses_forecast_this_month: float
