@@ -789,10 +789,14 @@ async def test_full_run(
     assert draft_charges_file in updated_charges_files
 
     generated_file_names = sorted(file.name for file in tmp_path.glob("*"))
-    azure_blobs = sorted(charge_file.azure_blob_name for charge_file in updated_charges_files)
-
     assert generated_file_names == sorted(
-        [f"{charges_file.id}.zip" for charges_file in updated_charges_files]
+        f"{charges_file.id}.zip" for charges_file in updated_charges_files
+    )
+
+    azure_blobs = sorted(charge_file.azure_blob_name for charge_file in updated_charges_files)
+    assert azure_blobs == sorted(
+        f"{charges_file.currency}/{charges_file.document_date.year}/{charges_file.document_date.month:02}/{charges_file.id}.zip"
+        for charges_file in updated_charges_files
     )
 
     assert all(
@@ -801,8 +805,17 @@ async def test_full_run(
     assert deleted_charges_file.status == ChargesFileStatus.GENERATED
     assert draft_charges_file.status == ChargesFileStatus.GENERATED
 
-    assert azure_blobs == sorted(
-        [charges_file.azure_blob_name for charges_file in updated_charges_files]
+    charge_file_amounts = sorted(
+        (cf.owner.id, cf.currency, cf.amount) for cf in updated_charges_files
+    )
+    assert charge_file_amounts == sorted(
+        [
+            (operations_account.id, "GBP", Decimal("0.42")),
+            (operations_account.id, "USD", Decimal("1.10")),
+            (affiliate_account.id, "GBP", Decimal("0.33")),
+            (affiliate_account.id, "USD", Decimal("0.60")),
+            (another_affiliate_account.id, "EUR", Decimal("0.56")),
+        ]
     )
 
     # filtering "Found ..." logs, so that tests failures are easier to debug

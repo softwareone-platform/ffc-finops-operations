@@ -441,7 +441,7 @@ async def main(exports_dir: pathlib.Path, settings: Settings) -> None:
                                 owner=account,
                                 currency=currency,
                                 document_date=today,
-                                amount=charges_file_generator.get_total_amount(df),
+                                amount=None,
                                 status=ChargesFileStatus.DRAFT,
                             )
                         )
@@ -492,6 +492,7 @@ async def main(exports_dir: pathlib.Path, settings: Settings) -> None:
                     await charges_file_handler.update(
                         charges_file_db_record,
                         {
+                            "amount": charges_file_generator.get_total_amount(df),
                             "status": ChargesFileStatus.GENERATED,
                         },
                     )
