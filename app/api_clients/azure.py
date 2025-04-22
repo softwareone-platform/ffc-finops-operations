@@ -89,16 +89,16 @@ class AsyncAzureBlobServiceClient:
         except FileNotFoundError:
             logger.exception("The file %s could not be found.", file_path)
             raise
-        except ResourceNotFoundError:
+        except ResourceNotFoundError:  # pragma: no branch
             logger.exception("Error: The container %s does not exist.", self.container_name)
             raise
-        except AzureError:
+        except AzureError:  # pragma: no branch
             logger.exception("Azure General Error occurred")
             raise
-        except ClientAuthenticationError:
+        except ClientAuthenticationError:  # pragma: no branch
             logger.exception("Credentials or SAS token Error occurred")
             raise
-        except Exception:
+        except Exception:  # pragma: no branch
             logger.exception("Unexpected error occurred")
             raise
 
