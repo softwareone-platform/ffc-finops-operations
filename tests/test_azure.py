@@ -1,5 +1,3 @@
-import pathlib
-
 import aiofiles  # type: ignore
 import pytest
 import time_machine
@@ -22,8 +20,7 @@ async def test_can_upload_file():
             month=3,
         )
     assert response is not None
-    filepath = pathlib.Path(fakezip.name)
-    assert response == f"EUR/2025/03/{filepath.name}"
+    assert response == fakezip.name
 
 
 async def test_cannot_upload_file():
