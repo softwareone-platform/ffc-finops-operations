@@ -206,7 +206,6 @@ class ChargesFileGenerator:
                 currency=self.currency,
                 month=month,
                 year=year,
-                silence_exceptions=False,
             )
 
             return True

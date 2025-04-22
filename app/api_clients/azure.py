@@ -54,9 +54,7 @@ class AsyncAzureBlobServiceClient:
         self,
         blob_name: str,  # the blob name to create or use
         file_path: str,  # Path to the file to upload
-        *,
-        silence_exceptions: bool = True,
-    ) -> str | None:
+    ) -> str:
         """
         Uploads a local file to an Azure Blob Storage container.
 
@@ -66,11 +64,17 @@ class AsyncAzureBlobServiceClient:
         Args:
             blob_name (str): The name to assign to the blob in Azure Storage.
             file_path (str): The path to the local file to be uploaded.
-            silence_exceptions (bool): If True, suppresses exceptions and returns None instead
 
         Returns:
-            str | None: The file path if upload succeeds; otherwise, None.
+            str: The file path if upload succeeds; otherwise, an exception will be raised.
 
+        Raises:
+            ValueError: If the format of month and/or year is invalid.
+            FileNotFoundError: If the file path does not exist.
+            ResourceNotFoundError: If the container does not exist.
+            AzureError: If a general error occurs on Azure.
+            ClientAuthenticationError: If the authentication error occurs.
+            Generic Exception: If the general error occurs.
         """
         blob_client = self.container_client.get_blob_client(blob_name)  # create the blob client
 
@@ -84,31 +88,19 @@ class AsyncAzureBlobServiceClient:
             return file_path
         except FileNotFoundError:
             logger.exception("The file %s could not be found.", file_path)
-
-            if not silence_exceptions:
-                raise
-        except ResourceNotFoundError:  # pragma: no branch
+            raise
+        except ResourceNotFoundError:
             logger.exception("Error: The container %s does not exist.", self.container_name)
-
-            if not silence_exceptions:
-                raise
-        except AzureError:  # pragma: no branch
+            raise
+        except AzureError:
             logger.exception("Azure General Error occurred")
-
-            if not silence_exceptions:
-                raise
-        except ClientAuthenticationError:  # pragma: no branch
+            raise
+        except ClientAuthenticationError:
             logger.exception("Credentials or SAS token Error occurred")
-
-            if not silence_exceptions:
-                raise
-        except Exception:  # pragma: no branch
+            raise
+        except Exception:
             logger.exception("Unexpected error occurred")
-
-            if not silence_exceptions:
-                raise
-
-        return None
+            raise
 
     async def get_azure_blob_download_url(self, blob_name: str) -> str | None:
         """
