@@ -329,11 +329,15 @@ async def fetch_datasource_expenses(
 async def fetch_unique_billing_currencies(session: AsyncSession) -> Sequence[str]:
     """Fetch unique billing currencies from the database."""
 
-    logger.info(
-        "Fetching all the unique billing currencies",
+    logger.info("Fetching all the unique billing currencies from the database")
+
+    currencies_stmt = (
+        select(Organization.billing_currency)
+        .distinct()
+        .order_by(Organization.billing_currency.asc())
     )
 
-    currencies = (await session.scalars(select(Organization.billing_currency).distinct())).all()
+    currencies = (await session.scalars(currencies_stmt)).all()
 
     logger.info(
         "Found the following unique billing currencies from the database: %s",

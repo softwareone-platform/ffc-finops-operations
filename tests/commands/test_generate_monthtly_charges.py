@@ -766,12 +766,11 @@ async def test_full_run(
     )
 
     time_before_run = datetime.now(UTC)
+
     # travel forward in time to set the updated_at date to all records affected by the main function
     # (both new records and updating existing ones), so that we can filter the affected records
     # bellow
-    time_machine.travel("2025-04-10T11:00:00Z").start()
-
-    with caplog.at_level(logging.INFO):
+    with caplog.at_level(logging.INFO), time_machine.travel("2025-04-10T11:00:00Z", tick=False):
         await generate_monthly_charges_main(tmp_path, test_settings)
 
     await db_session.refresh(generated_charges_file)
