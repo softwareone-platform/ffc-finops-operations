@@ -224,7 +224,7 @@ async def make_organization_user_admin(
 async def update_organization(
     db_organization: Annotated[Organization, Depends(fetch_organization_or_404)],
     organization_repo: OrganizationRepository,
-    api_modifier_client: APIModifierClient,
+    optscale_client: OptscaleClient,
     data: OrganizationUpdate,
 ):
     original_external_id = db_organization.operations_external_id
@@ -268,7 +268,7 @@ async def update_organization(
         # data.name and db_organization.linked_organization_id are not None
         # due to the checks above, so we're ignoring the type checks here
 
-        await api_modifier_client.update_organization_name(
+        await optscale_client.update_organization_name(
             db_organization.linked_organization_id,  # type: ignore[arg-type]
             data.name,  # type: ignore[arg-type]
         )

@@ -92,6 +92,18 @@ class OptscaleClient(BaseAPIClient):
         response.raise_for_status()
         return response
 
+    async def update_organization_name(
+        self,
+        id: str,
+        name: str,
+    ) -> httpx.Response:
+        response = await self.httpx_client.patch(
+            f"/organizations/{id}",
+            json={"name": name},
+        )
+        response.raise_for_status()
+        return response
+
 
 class OptscaleAuthClient(BaseAPIClient):
     @property
