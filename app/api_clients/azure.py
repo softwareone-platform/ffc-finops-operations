@@ -81,8 +81,7 @@ class AsyncAzureBlobServiceClient:
                 await blob_client.upload_blob(data=file, overwrite=True)
 
             logger.info(f"File '{blob_name}' uploaded to container '{self.container_name}'.")
-
-            return blob_name
+            return file_path
         except FileNotFoundError:
             logger.exception("The file %s could not be found.", file_path)
 
