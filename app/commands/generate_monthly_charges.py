@@ -196,7 +196,8 @@ class ChargesFileGenerator:
 
         return filepath
 
-    def get_total_amount(self, df: pd.DataFrame) -> Decimal:
+    @staticmethod
+    def get_total_amount(df: pd.DataFrame) -> Decimal:
         return df["Total Purchase Price"].sum()
 
     async def upload_to_azure(self, filepath: pathlib.Path, month: int, year: int) -> bool:
@@ -228,6 +229,12 @@ class ChargesFileGenerator:
 async def fetch_existing_generated_charges_file(
     session: AsyncSession, account: Account, currency: str
 ) -> ChargesFile | None:
+    logger.info(
+        "Checking if the charges file for account %s and currency %s is already generated",
+        account.id,
+        currency,
+    )
+
     charges_file_handler = ChargesFileHandler(session)
     today = datetime.now(UTC).date()
 
@@ -244,7 +251,28 @@ async def fetch_existing_generated_charges_file(
         .limit(1)
     )
 
-    return await charges_file_handler.first(latest_matching_generated_charge_file_stmt)
+    generated_charges_file = await charges_file_handler.first(
+        latest_matching_generated_charge_file_stmt
+    )
+
+    if generated_charges_file is None:
+        logger.info(
+            "Charges file for account %s and currency %s hasn't been generated yet, "
+            "proceeding to generate it",
+            account.id,
+            currency,
+        )
+    else:
+        logger.info(
+            "Charges file for account %s and currency %s already exists (%s) "
+            "and it's in %s status, skipping generating a new one",
+            account.id,
+            currency,
+            generated_charges_file.id,
+            generated_charges_file.status.value,
+        )
+
+    return generated_charges_file
 
 
 async def fetch_datasource_expenses(
@@ -325,14 +353,78 @@ async def fetch_accounts(session: AsyncSession) -> Sequence[Account]:
     return accounts
 
 
+async def get_or_create_charges_file(
+    charges_file_handler: ChargesFileHandler, account: Account, currency: str, document_date: date
+) -> ChargesFile:
+    logger.info(
+        "Checking if a database record for the charges file for "
+        "account %s and currency %s already exists in draft status",
+        account.id,
+        currency,
+    )
+
+    charges_file_db_record, created = await charges_file_handler.get_or_create(
+        owner=account,
+        currency=currency,
+        status=ChargesFileStatus.DRAFT,
+        extra_conditions=[
+            extract("year", ChargesFile.document_date) == document_date.year,
+            extract("month", ChargesFile.document_date) == document_date.month,
+        ],
+        defaults={
+            "amount": None,
+            "document_date": document_date,
+        },
+    )
+
+    if created:
+        logger.info(
+            "Charges file database record created for account %s and currency %s "
+            "in DRAFT status: %s",
+            account.id,
+            currency,
+            charges_file_db_record.id,
+        )
+    else:
+        logger.info(
+            "Charges file database record for account %s and currency %s "
+            "already exists in DRAFT status: %s, re-using it",
+            account.id,
+            currency,
+            charges_file_db_record.id,
+        )
+
+    return charges_file_db_record
+
+
+async def set_charges_file_status_to_generated(
+    charges_file_handler: ChargesFileHandler,
+    charges_file_db_record: ChargesFile,
+    amount: Decimal,
+) -> None:
+    logger.info(
+        "Updating the charges file %s in the database to status %s",
+        charges_file_db_record.id,
+        ChargesFileStatus.GENERATED,
+    )
+
+    await charges_file_handler.update(
+        charges_file_db_record,
+        {
+            "amount": amount,
+            "status": ChargesFileStatus.GENERATED,
+        },
+    )
+
+    logger.info(
+        "Charges file %s updated in the database to status %s with amount %s",
+        charges_file_db_record.id,
+        ChargesFileStatus.GENERATED,
+        charges_file_db_record.amount,
+    )
+
+
 async def main(exports_dir: pathlib.Path, settings: Settings) -> None:
-    if exports_dir.is_file():  # pragma: no cover
-        raise ValueError("The exports directory must be a directory, not a file.")
-
-    if not exports_dir.exists():  # pragma: no cover
-        logger.info("Exports directory %s does not exist, creating it", str(exports_dir.resolve()))
-        exports_dir.mkdir(parents=True)
-
     today = datetime.now(UTC).date()
 
     async with session_factory() as session:
@@ -349,34 +441,12 @@ async def main(exports_dir: pathlib.Path, settings: Settings) -> None:
                     account, currency, currency_converter, exports_dir
                 )
 
-                logger.info(
-                    "Checking if the charges file for account %s "
-                    "and currency %s is already generated",
-                    account.id,
-                    currency,
-                )
-
                 async with session.begin():
                     generated_charges_file = await fetch_existing_generated_charges_file(
                         session, account, currency
                     )
 
-                if generated_charges_file is None:
-                    logger.info(
-                        "Charges file for account %s and currency %s hasn't been generated yet, "
-                        "proceeding to generate it",
-                        account.id,
-                        currency,
-                    )
-                else:
-                    logger.info(
-                        "Charges file for account %s and currency %s already exists (%s) "
-                        "and it's in %s status, skipping generating a new one",
-                        account.id,
-                        currency,
-                        generated_charges_file.id,
-                        generated_charges_file.status.value,
-                    )
+                if generated_charges_file is not None:
                     continue
 
                 logger.info(
@@ -401,43 +471,9 @@ async def main(exports_dir: pathlib.Path, settings: Settings) -> None:
                     )
                     continue
 
-                logger.info(
-                    "Checking if a database record for the charges file for "
-                    "account %s and currency %s already exists in draft status",
-                    account.id,
-                    currency,
-                )
-
                 async with session.begin():
-                    charges_file_db_record, created = await charges_file_handler.get_or_create(
-                        owner=account,
-                        currency=currency,
-                        status=ChargesFileStatus.DRAFT,
-                        extra_conditions=[
-                            extract("year", ChargesFile.document_date) == today.year,
-                            extract("month", ChargesFile.document_date) == today.month,
-                        ],
-                        defaults={
-                            "amount": None,
-                            "document_date": today,
-                        },
-                    )
-
-                if created:
-                    logger.info(
-                        "Charges file database record created for account %s and currency %s "
-                        "in DRAFT status: %s",
-                        account.id,
-                        currency,
-                        charges_file_db_record.id,
-                    )
-                else:
-                    logger.info(
-                        "Charges file database record for account %s and currency %s "
-                        "already exists in DRAFT status: %s, re-using it",
-                        account.id,
-                        currency,
-                        charges_file_db_record.id,
+                    charges_file_db_record = await get_or_create_charges_file(
+                        charges_file_handler, account, currency, today
                     )
 
                 exported_filepath = charges_file_generator.export_to_zip(
@@ -470,27 +506,12 @@ async def main(exports_dir: pathlib.Path, settings: Settings) -> None:
                     charges_file_db_record.azure_blob_name,
                 )
 
-                logger.info(
-                    "Updating the charges file %s in the database to status %s",
-                    charges_file_db_record.id,
-                    ChargesFileStatus.GENERATED,
-                )
-
                 async with session.begin():
-                    await charges_file_handler.update(
+                    await set_charges_file_status_to_generated(
+                        charges_file_handler,
                         charges_file_db_record,
-                        {
-                            "amount": charges_file_generator.get_total_amount(df),
-                            "status": ChargesFileStatus.GENERATED,
-                        },
+                        amount=charges_file_generator.get_total_amount(df),
                     )
-
-                logger.info(
-                    "Charges file %s updated in the database to status %s with amount %s",
-                    charges_file_db_record.id,
-                    ChargesFileStatus.GENERATED,
-                    charges_file_db_record.amount,
-                )
 
 
 def command(
@@ -503,5 +524,14 @@ def command(
     Generate monthly charges for all accounts and currencies.
     """
     logger.info("Starting command function")
+
+    if exports_dir.is_file():  # pragma: no cover
+        raise ValueError("The exports directory must be a directory, not a file.")
+
+    if not exports_dir.exists():  # pragma: no cover
+        logger.info("Exports directory %s does not exist, creating it", str(exports_dir.resolve()))
+        exports_dir.mkdir(parents=True)
+
     asyncio.run(main(exports_dir, ctx.obj))
+
     logger.info("Completed command function")
