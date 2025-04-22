@@ -275,7 +275,7 @@ def assert_df_matches_snapshot(df: pd.DataFrame, snapshot: Snapshot) -> None:
     df.to_csv(file, index=False, header=True)
 
     file.seek(0)
-    snapshot.assert_match(file.read(), "charges_file.csv")
+    snapshot.assert_match(file.read(), "charges.csv")
 
 
 @pytest.mark.fixed_random_seed
@@ -371,11 +371,11 @@ async def test_export_to_excel(
     df = charges_file_generator.generate_charges_file_dataframe(datasource_expenses)
     assert df is not None
 
-    filepath = charges_file_generator.export_to_excel(df)
+    filepath = charges_file_generator.export_to_excel(df, "charges.xlsx")
 
-    assert filepath.name == f"charges_{operations_account.id}_USD_2025_03.xlsx"
+    assert filepath.name == "charges.xlsx"
     assert filepath.parent == tmp_path
-    snapshot.assert_match(filepath.read_bytes(), "charges_file.xlsx")
+    snapshot.assert_match(filepath.read_bytes(), "charges.xlsx")
 
 
 @pytest.mark.fixed_random_seed
@@ -406,21 +406,15 @@ async def test_export_to_zip(
     df = charges_file_generator.generate_charges_file_dataframe(datasource_expenses)
     assert df is not None
 
-    filepath = charges_file_generator.export_to_zip(df)
+    filepath = charges_file_generator.export_to_zip(df, filename="charges.zip")
 
-    assert filepath.name == f"charges_{operations_account.id}_EUR_2025_03.zip"
+    assert filepath.name == "charges.zip"
     assert filepath.parent == tmp_path
 
     with zipfile.ZipFile(filepath, "r") as archive:
-        assert sorted(archive.namelist()) == [
-            f"charges_{operations_account.id}_EUR_2025_03.xlsx",
-            "exchange_rates_USD.json",
-        ]
+        assert sorted(archive.namelist()) == ["charges.xlsx", "exchange_rates_USD.json"]
 
-        snapshot.assert_match(
-            archive.read(f"charges_{operations_account.id}_EUR_2025_03.xlsx"),
-            "charges_file.xlsx",
-        )
+        snapshot.assert_match(archive.read("charges.xlsx"), "charges.xlsx")
         snapshot.assert_match(archive.read("exchange_rates_USD.json"), "exchange_rates.json")
 
 
@@ -462,14 +456,14 @@ async def test_get_total_amount(
 
 
 @pytest.mark.parametrize(
-    ("side_effect", "return_value", "should_raise"),
+    ("side_effect", "should_upload", "should_raise"),
     [
-        (None, "fancy_blob_name", False),
-        (OSError("File is not readable"), None, False),
-        (FileNotFoundError("File not found"), None, False),
-        (ResourceNotFoundError("Azure resource not found"), None, True),
-        (AzureError("Azure is down, what a surprise!"), None, True),
-        (ClientAuthenticationError("Invalid credentials"), None, True),
+        (None, True, False),
+        (OSError("File is not readable"), False, False),
+        (FileNotFoundError("File not found"), False, False),
+        (ResourceNotFoundError("Azure resource not found"), True, True),
+        (AzureError("Azure is down, what a surprise!"), True, True),
+        (ClientAuthenticationError("Invalid credentials"), True, True),
     ],
 )
 async def test_upload_to_azure(
@@ -478,13 +472,13 @@ async def test_upload_to_azure(
     tmp_path: pathlib.Path,
     mocker: MockerFixture,
     side_effect: Exception | None,
-    return_value: str | None,
+    should_upload: bool,
     should_raise: bool,
 ):
     mocker.patch(
         "app.commands.generate_monthly_charges.upload_charges_file",
         side_effect=side_effect,
-        return_value=return_value,
+        return_value=should_upload,
     )
     charges_file_generator = ChargesFileGenerator(
         operations_account, "USD", currency_converter, tmp_path
@@ -494,11 +488,13 @@ async def test_upload_to_azure(
     dummy_file.touch()
 
     if should_raise:
+        assert isinstance(side_effect, Exception)
+
         with pytest.raises(side_effect.__class__, match=str(side_effect)):
             await charges_file_generator.upload_to_azure(dummy_file, month=4, year=2025)
     else:
         result = await charges_file_generator.upload_to_azure(dummy_file, month=4, year=2025)
-        assert result == return_value
+        assert result == should_upload
 
 
 @pytest.mark.parametrize(
@@ -725,30 +721,27 @@ async def test_full_run(
     # Add some existing charges files to the database to test that they are handled correctly
 
     # file is already generated, don't re-generate it
-    await charges_file_factory(
+    generated_charges_file = await charges_file_factory(
         currency="EUR",
         owner=operations_account,
         status=ChargesFileStatus.GENERATED,
         document_date="2025-04-01",
-        azure_blob_name="dummy_operations_eur_blob_name",
     )
 
     # file is already processed, don't re-generate it
-    await charges_file_factory(
+    processed_charges_file = await charges_file_factory(
         currency="EUR",
         owner=affiliate_account,
         status=ChargesFileStatus.PROCESSED,
         document_date="2025-04-01",
-        azure_blob_name="dummy_affiliate_eur_blob_name",
     )
 
     # file is already processed but it's old, shouldn't affect the run
-    await charges_file_factory(
+    old_processed_charges_file = await charges_file_factory(
         currency="USD",
         owner=affiliate_account,
         status=ChargesFileStatus.PROCESSED,
         document_date="2025-03-01",
-        azure_blob_name="dummy_old_blob_name",
     )
 
     # deleted file, should be re-generated using the same db record
@@ -767,52 +760,50 @@ async def test_full_run(
         document_date="2025-04-01",
     )
 
+    time_before_run = datetime.now(UTC)
+    # travel forward in time to set the updated_at date to all records affected by the main function
+    # (both new records and updating existing ones), so that we can filter the affected records
+    # bellow
+    time_machine.travel("2025-04-10T11:00:00Z").start()
+
     with caplog.at_level(logging.INFO):
         await generate_monthly_charges_main(tmp_path, test_settings)
 
+    await db_session.refresh(generated_charges_file)
+    await db_session.refresh(processed_charges_file)
+    await db_session.refresh(old_processed_charges_file)
     await db_session.refresh(deleted_charges_file)
     await db_session.refresh(draft_charges_file)
 
-    charges_files = (
+    # Includes new charges files created by the script as well as the ones which were updated by it
+    updated_charges_files = (
         await db_session.scalars(
-            select(ChargesFile).where(~ChargesFile.azure_blob_name.startswith("dummy_"))
+            select(ChargesFile).where(ChargesFile.updated_at > time_before_run)
         )
     ).all()
 
+    assert generated_charges_file not in updated_charges_files
+    assert processed_charges_file not in updated_charges_files
+    assert old_processed_charges_file not in updated_charges_files
+    assert deleted_charges_file in updated_charges_files
+    assert draft_charges_file in updated_charges_files
+
     generated_file_names = sorted(file.name for file in tmp_path.glob("*"))
-    azure_blobs = sorted(
-        charge_file.azure_blob_name for charge_file in charges_files if charge_file.azure_blob_name
-    )
+    azure_blobs = sorted(charge_file.azure_blob_name for charge_file in updated_charges_files)
 
     assert generated_file_names == sorted(
-        [
-            f"charges_{operations_account.id}_GBP_2025_03.zip",
-            f"charges_{operations_account.id}_USD_2025_03.zip",
-            f"charges_{affiliate_account.id}_GBP_2025_03.zip",
-            f"charges_{affiliate_account.id}_USD_2025_03.zip",
-            f"charges_{another_affiliate_account.id}_EUR_2025_03.zip",
-        ]
+        [f"{charges_file.id}.zip" for charges_file in updated_charges_files]
     )
 
-    assert f"charges_{operations_account.id}_EUR_2025_03.zip" not in generated_file_names
-    assert f"charges_{affiliate_account.id}_EUR_2025_03.zip" not in generated_file_names
-
-    assert azure_blobs == sorted(
-        [
-            f"GBP/2025/04/charges_{operations_account.id}_GBP_2025_03.zip",
-            f"USD/2025/04/charges_{operations_account.id}_USD_2025_03.zip",
-            f"GBP/2025/04/charges_{affiliate_account.id}_GBP_2025_03.zip",
-            f"USD/2025/04/charges_{affiliate_account.id}_USD_2025_03.zip",
-            f"EUR/2025/04/charges_{another_affiliate_account.id}_EUR_2025_03.zip",
-        ]
+    assert all(
+        charges_file.status == ChargesFileStatus.GENERATED for charges_file in updated_charges_files
     )
-
-    assert f"EUR/2025/04/charges_{operations_account.id}_EUR_2025_03.zip" not in azure_blobs
-    assert f"EUR/2025/04/charges_{affiliate_account.id}_EUR_2025_03.zip" not in azure_blobs
-
-    assert all(charges_file.status == ChargesFileStatus.GENERATED for charges_file in charges_files)
     assert deleted_charges_file.status == ChargesFileStatus.GENERATED
     assert draft_charges_file.status == ChargesFileStatus.GENERATED
+
+    assert azure_blobs == sorted(
+        [charges_file.azure_blob_name for charges_file in updated_charges_files]
+    )
 
     # filtering "Found ..." logs, so that tests failures are easier to debug
     found_logs = [msg for msg in caplog.messages if msg.startswith("Found ")]

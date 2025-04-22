@@ -174,24 +174,19 @@ class ChargesFileGenerator:
 
         return df
 
-    def export_to_excel(self, df: pd.DataFrame) -> pathlib.Path:
-        last_month = datetime.now(UTC).date() - relativedelta(months=1)
-        filename = (
-            f"charges_{self.account.id}_{self.currency}_"
-            f"{last_month.year}_{last_month.month:02d}.xlsx"
-        )
+    def export_to_excel(self, df: pd.DataFrame, filename: str) -> pathlib.Path:
         filepath = self.exports_dir / filename
 
         df.to_excel(filepath, header=True, index=False)
 
         return filepath
 
-    def export_to_zip(self, df: pd.DataFrame) -> pathlib.Path:
-        excel_filepath = self.export_to_excel(df)
-        filepath = self.exports_dir / (excel_filepath.stem + ".zip")
+    def export_to_zip(self, df: pd.DataFrame, filename: str) -> pathlib.Path:
+        excel_filepath = self.export_to_excel(df, filename="charges.xlsx")
+        filepath = self.exports_dir / filename
 
         with zipfile.ZipFile(filepath, mode="w") as archive:
-            archive.write(self.export_to_excel(df), arcname=excel_filepath.name)
+            archive.write(excel_filepath, arcname=excel_filepath.name)
             archive.writestr(
                 f"exchange_rates_{self.currency_converter.base_currency}.json",
                 self.currency_converter.get_exchangerate_api_response_json(),
@@ -204,15 +199,17 @@ class ChargesFileGenerator:
     def get_total_amount(self, df: pd.DataFrame) -> Decimal:
         return df["Total Purchase Price"].sum()
 
-    async def upload_to_azure(self, filepath: pathlib.Path, month: int, year: int) -> str | None:
+    async def upload_to_azure(self, filepath: pathlib.Path, month: int, year: int) -> bool:
         try:
-            return await upload_charges_file(
+            await upload_charges_file(
                 file_path=str(filepath.resolve()),
                 currency=self.currency,
                 month=month,
                 year=year,
                 silence_exceptions=False,
             )
+
+            return True
         except (ResourceNotFoundError, AzureError, ClientAuthenticationError):
             logger.exception(
                 "Unable to upload any files to Azure Blob Storage, aborting the process"
@@ -226,7 +223,7 @@ class ChargesFileGenerator:
                 str(filepath.resolve()),
             )
 
-        return None
+        return False
 
 
 async def fetch_existing_charges_file(
@@ -431,15 +428,6 @@ async def main(exports_dir: pathlib.Path, settings: Settings) -> None:
                     )
                     continue
 
-                exported_filepath = charges_file_generator.export_to_zip(df)
-
-                logger.info(
-                    "Charges file generated for account %s and currency %s and saved to %s",
-                    account.id,
-                    currency,
-                    str(exported_filepath.resolve()),
-                )
-
                 if charges_file_db_record is None:
                     logger.info(
                         "Creating a database record for the charges file for "
@@ -465,13 +453,24 @@ async def main(exports_dir: pathlib.Path, settings: Settings) -> None:
                         charges_file_db_record.id,
                     )
 
+                exported_filepath = charges_file_generator.export_to_zip(
+                    df, filename=f"{charges_file_db_record.id}.zip"
+                )
+
+                logger.info(
+                    "Charges file generated for account %s and currency %s and saved to %s",
+                    account.id,
+                    currency,
+                    str(exported_filepath.resolve()),
+                )
+
                 logging.info("Uploading the charges file to Azure Blob Storage")
 
-                azure_blob_name = await charges_file_generator.upload_to_azure(
+                successful_upload = await charges_file_generator.upload_to_azure(
                     exported_filepath, today.month, today.year
                 )
 
-                if azure_blob_name is None:
+                if not successful_upload:
                     logger.error(
                         "Charges file %s was not uploaded to Azure Blob Storage",
                         charges_file_db_record.id,
@@ -481,7 +480,7 @@ async def main(exports_dir: pathlib.Path, settings: Settings) -> None:
                 logger.info(
                     "Charges file %s uploaded to Azure Blob Storage at %s",
                     charges_file_db_record.id,
-                    azure_blob_name,
+                    charges_file_db_record.azure_blob_name,
                 )
 
                 logger.info(
@@ -495,7 +494,6 @@ async def main(exports_dir: pathlib.Path, settings: Settings) -> None:
                         charges_file_db_record,
                         {
                             "status": ChargesFileStatus.GENERATED,
-                            "azure_blob_name": azure_blob_name,
                         },
                     )
 
