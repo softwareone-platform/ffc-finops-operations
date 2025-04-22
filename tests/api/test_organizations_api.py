@@ -705,7 +705,7 @@ async def test_update_organization_name(
         httpx_mock.add_response(
             method="PATCH",
             headers={"Authorization": operations_client.headers["Authorization"]},
-            url=f"https://api-modifier.ffc.com/organizations/{db_org.linked_organization_id}",
+            url=f"https://opt-api.ffc.com/organizations/{db_org.linked_organization_id}",
             status_code=api_modifier_status_code,
             json={
                 "id": db_org.linked_organization_id,
@@ -757,7 +757,7 @@ async def test_update_organization_both_fields(
     httpx_mock.add_response(
         method="PATCH",
         headers={"Authorization": operations_client.headers["Authorization"]},
-        url=f"https://api-modifier.ffc.com/organizations/{db_org.linked_organization_id}",
+        url=f"https://opt-api.ffc.com/organizations/{db_org.linked_organization_id}",
         status_code=api_modifier_status_code,
         json={
             "id": db_org.linked_organization_id,
