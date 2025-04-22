@@ -22,7 +22,7 @@ from app.commands.generate_monthly_charges import (
     ChargesFileGenerator,
     fetch_accounts,
     fetch_datasource_expenses,
-    fetch_existing_charges_file,
+    fetch_existing_generated_charges_file,
     fetch_unique_billing_currencies,
 )
 from app.commands.generate_monthly_charges import main as generate_monthly_charges_main
@@ -498,31 +498,36 @@ async def test_upload_to_azure(
 
 
 @pytest.mark.parametrize(
-    ("existing_file_date", "existing_file_currency", "should_match"),
+    ("existing_file_date", "existing_file_currency", "existing_file_status", "should_match"),
     [
-        ("2025-04-10", "USD", True),
-        ("2025-04-01", "USD", True),
-        ("2025-04-01", "EUR", False),
-        ("2025-03-31", "USD", False),
+        ("2025-04-10", "USD", ChargesFileStatus.GENERATED, True),
+        ("2025-03-31", "USD", ChargesFileStatus.GENERATED, False),
+        ("2025-04-01", "USD", ChargesFileStatus.PROCESSED, True),
+        ("2025-04-01", "EUR", ChargesFileStatus.PROCESSED, False),
+        ("2025-04-01", "USD", ChargesFileStatus.DELETED, False),
+        ("2025-04-10", "USD", ChargesFileStatus.DRAFT, False),
     ],
 )
 @time_machine.travel("2025-04-10T10:00:00Z", tick=False)
-async def test_fetch_existing_charges_file(
+async def test_fetch_existing_generated_charges_file(
     charges_file_factory: ModelFactory[ChargesFile],
     operations_account: Account,
     db_session: AsyncSession,
     existing_file_date: str,
     existing_file_currency: str,
+    existing_file_status: ChargesFileStatus,
     should_match: bool,
 ):
     charges_file = await charges_file_factory(
         currency=existing_file_currency,
         owner=operations_account,
-        status=ChargesFileStatus.DRAFT,
+        status=existing_file_status,
         document_date=existing_file_date,
     )
 
-    returned_charges_file = await fetch_existing_charges_file(db_session, operations_account, "USD")
+    returned_charges_file = await fetch_existing_generated_charges_file(
+        db_session, operations_account, "USD"
+    )
 
     if should_match:
         assert returned_charges_file is not None
@@ -744,7 +749,7 @@ async def test_full_run(
         document_date="2025-03-01",
     )
 
-    # deleted file, should be re-generated using the same db record
+    # file is deleted, should be re-generated with a new db record
     deleted_charges_file = await charges_file_factory(
         currency="USD",
         owner=operations_account,
@@ -785,7 +790,7 @@ async def test_full_run(
     assert generated_charges_file not in updated_charges_files
     assert processed_charges_file not in updated_charges_files
     assert old_processed_charges_file not in updated_charges_files
-    assert deleted_charges_file in updated_charges_files
+    assert deleted_charges_file not in updated_charges_files
     assert draft_charges_file in updated_charges_files
 
     generated_file_names = sorted(file.name for file in tmp_path.glob("*"))
@@ -802,7 +807,13 @@ async def test_full_run(
     assert all(
         charges_file.status == ChargesFileStatus.GENERATED for charges_file in updated_charges_files
     )
-    assert deleted_charges_file.status == ChargesFileStatus.GENERATED
+
+    # Confirm the statuses of the previously created charges files
+    assert generated_charges_file.status == ChargesFileStatus.GENERATED
+    assert processed_charges_file.status == ChargesFileStatus.PROCESSED
+    assert old_processed_charges_file.status == ChargesFileStatus.PROCESSED
+    assert deleted_charges_file.status == ChargesFileStatus.DELETED
+    # this one was re-used, so its status has changed
     assert draft_charges_file.status == ChargesFileStatus.GENERATED
 
     charge_file_amounts = sorted(
@@ -810,11 +821,11 @@ async def test_full_run(
     )
     assert charge_file_amounts == sorted(
         [
-            (operations_account.id, "GBP", Decimal("0.42")),
-            (operations_account.id, "USD", Decimal("1.10")),
-            (affiliate_account.id, "GBP", Decimal("0.33")),
-            (affiliate_account.id, "USD", Decimal("0.60")),
-            (another_affiliate_account.id, "EUR", Decimal("0.56")),
+            (operations_account.id, "GBP", Decimal("0.4200")),
+            (operations_account.id, "USD", Decimal("1.1000")),
+            (affiliate_account.id, "GBP", Decimal("0.3300")),
+            (affiliate_account.id, "USD", Decimal("0.6000")),
+            (another_affiliate_account.id, "EUR", Decimal("0.5600")),
         ]
     )
 
@@ -848,25 +859,30 @@ async def test_full_run(
     charges_file_logs = [msg for msg in caplog.messages if msg.startswith("Charges file ")]
 
     assert (
-        f"Charges file for account {operations_account.id} and currency GBP already exists "
-        "but it's in DRAFT status, using the existing one as it was not "
-        "uploaded to Azure blob storage"
+        f"Charges file database record for account {operations_account.id} and currency GBP "
+        f"already exists in DRAFT status: {draft_charges_file.id}, re-using it"
     ) in charges_file_logs
 
     assert (
-        f"Charges file for account {operations_account.id} and currency EUR is already generated "
-        "and uploaded to Azure blob storage, skipping the generation"
+        f"Charges file for account {operations_account.id} and currency EUR already exists "
+        f"({generated_charges_file.id}) and it's in generated status, skipping generating a new one"
     ) in charges_file_logs
 
     assert (
-        f"Charges file for account {affiliate_account.id} and currency EUR is already generated "
-        "and uploaded to Azure blob storage, skipping the generation"
+        f"Charges file for account {affiliate_account.id} and currency EUR already exists "
+        f"({processed_charges_file.id}) and it's in processed status, skipping generating a new one"
     ) in charges_file_logs
 
+    newly_created_charges_file = next(
+        cf
+        for cf in updated_charges_files
+        if cf.owner == deleted_charges_file.owner and cf.currency == deleted_charges_file.currency
+    )
     assert (
-        f"Charges file for account {operations_account.id} and currency USD is deleted, "
-        "proceeding to generate a new one if there are any charge entries"
+        f"Charges file database record created for account {operations_account.id} "
+        f"and currency USD in DRAFT status: {newly_created_charges_file.id}"
     ) in charges_file_logs
+    assert newly_created_charges_file.id != deleted_charges_file.id
 
 
 def test_cli_command(mocker: MockerFixture, test_settings: Settings, tmp_path: pathlib.Path):

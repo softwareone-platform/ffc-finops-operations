@@ -109,12 +109,18 @@ class ModelHandler[M: BaseModel]:
         return instance
 
     async def get_or_create(
-        self, *, defaults: dict[str, Any] | None = None, **filters: Any
+        self,
+        *,
+        defaults: dict[str, Any] | None = None,
+        extra_conditions: list[ColumnExpressionArgument] | None = None,
+        **filters: Any,
     ) -> tuple[M, bool]:
         defaults = defaults or {}
         query = select(self.model_cls).where(
             *(getattr(self.model_cls, key) == value for key, value in filters.items())
         )
+        if extra_conditions:
+            query = query.where(*extra_conditions)
         if self.default_options:
             query = query.options(*self.default_options)
         result = await self.session.execute(query)
