@@ -44,7 +44,7 @@ def optscale_azure_cnr_datasource_response_data(
         "details": {
             "cost": 0,
             "forecast": 1099.0,
-            "tracked": 0,
+            "resources": 0,
             "last_month_cost": 2909.1068521455545,
             "discovery_infos": [],
         },
@@ -84,7 +84,7 @@ def optscale_azure_tenant_datasource_response_data(
         "details": {
             "cost": 0,
             "forecast": 0.0,
-            "tracked": 0,
+            "resources": 0,
             "last_month_cost": 0,
             "discovery_infos": [],
         },
@@ -163,15 +163,17 @@ async def test_get_datasources_for_organization_success(
     azure_cnr = next(item for item in data if item["type"] == "azure_cnr")
     azure_tenant = next(item for item in data if item["type"] == "azure_tenant")
 
-    assert azure_cnr["organization_id"] == str(org.id)
+    assert azure_cnr["name"] == "CPA (Development and Test)"
     assert azure_cnr["type"] == DatasourceType.AZURE_CNR.value
-    assert azure_cnr["resources_changed_this_month"] == 0
+    assert azure_cnr["parent_id"] == "48108421-7334-4a2c-ac7b-0160476dc790"
+    assert azure_cnr["resources_charged_this_month"] == 0
     assert azure_cnr["expenses_so_far_this_month"] == 0.0
     assert azure_cnr["expenses_forecast_this_month"] == 1099.0
 
-    assert azure_tenant["organization_id"] == str(org.id)
+    assert azure_tenant["name"] == "Test"
     assert azure_tenant["type"] == DatasourceType.AZURE_TENANT.value
-    assert azure_tenant["resources_changed_this_month"] == 0
+    assert "parent_id" not in azure_tenant
+    assert azure_tenant["resources_charged_this_month"] == 0
     assert azure_tenant["expenses_so_far_this_month"] == 0.0
     assert azure_tenant["expenses_forecast_this_month"] == 0.0
 
@@ -287,9 +289,9 @@ async def test_get_datasource_by_id_success(
     assert response.status_code == 200
     assert response.json() == {
         "id": datasource_data["id"],
-        "organization_id": str(org.id),
+        "name": datasource_data["name"],
         "type": DatasourceType.AWS_CNR.value,
-        "resources_changed_this_month": 5,
+        "resources_charged_this_month": 5,
         "expenses_so_far_this_month": 99.88,
         "expenses_forecast_this_month": 1234.56,
     }
