@@ -5,6 +5,7 @@ from pytest_mock import MockerFixture
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.conf import Settings
 from app.db.models import Organization, System
 from app.enums import OrganizationStatus
 from tests.types import ModelFactory
@@ -828,3 +829,81 @@ async def test_try_update_name_for_organization_without_linked_organization_id(
 
     assert db_org.name == "initial_name"
     assert db_org.operations_external_id == "initial_external_id"
+
+
+# ====================
+# Create Organizations
+# ====================
+
+
+async def test_delete_organization(
+    test_settings: Settings,
+    organization_factory: ModelFactory[Organization],
+    operations_client: AsyncClient,
+    httpx_mock: HTTPXMock,
+    db_session: AsyncSession,
+):
+    db_org = await organization_factory(
+        name="Test organization",
+        linked_organization_id="UUID-1234-5678-9098-7654",
+    )
+    httpx_mock.add_response(
+        method="PATCH",
+        headers={"Authorization": operations_client.headers["Authorization"]},
+        url=f"{test_settings.optscale_rest_api_base_url}/organizations/{db_org.linked_organization_id}",
+        status_code=200,
+        json={
+            "id": db_org.linked_organization_id,
+            "disabled": True,
+        },
+    )
+
+    assert db_org.status == OrganizationStatus.ACTIVE
+    assert db_org.deleted_at is None
+
+    response = await operations_client.delete(f"/organizations/{db_org.id}")
+    assert response.status_code == 204
+    assert bool(httpx_mock.get_request())
+
+    await db_session.refresh(db_org)
+    assert db_org.status == OrganizationStatus.DELETED
+    assert db_org.deleted_at is not None
+
+    response = await operations_client.delete(f"/organizations/{db_org.id}")
+    assert response.status_code == 400
+    assert response.json()["detail"] == f"Organization {db_org.name} is already deleted."
+
+
+async def test_delete_organization_optscale_issue(
+    test_settings: Settings,
+    organization_factory: ModelFactory[Organization],
+    operations_client: AsyncClient,
+    httpx_mock: HTTPXMock,
+    db_session: AsyncSession,
+):
+    db_org = await organization_factory(
+        name="Test organization",
+        linked_organization_id="UUID-1234-5678-9098-7654",
+    )
+    httpx_mock.add_response(
+        method="PATCH",
+        headers={"Authorization": operations_client.headers["Authorization"]},
+        url=f"{test_settings.optscale_rest_api_base_url}/organizations/{db_org.linked_organization_id}",
+        status_code=500,
+        text="Internal Server Error",
+    )
+
+    assert db_org.status == OrganizationStatus.ACTIVE
+    assert db_org.deleted_at is None
+
+    response = await operations_client.delete(f"/organizations/{db_org.id}")
+
+    await db_session.refresh(db_org)
+
+    assert db_org.status == OrganizationStatus.ACTIVE
+    assert db_org.deleted_at is None
+
+    assert response.status_code == 502
+    assert (
+        f"Error deleting organization {db_org.linked_organization_id} in FinOps for Cloud."
+    ) in response.json()["detail"]

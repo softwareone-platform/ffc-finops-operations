@@ -104,6 +104,17 @@ class OptscaleClient(BaseAPIClient):
         response.raise_for_status()
         return response
 
+    async def suspend_organization(
+        self,
+        organization_id: str,
+    ) -> httpx.Response:
+        response = await self.httpx_client.patch(
+            f"/organizations/{organization_id}",
+            json={"disabled": True},
+        )
+        response.raise_for_status()
+        return response
+
 
 class OptscaleAuthClient(BaseAPIClient):
     @property
