@@ -460,7 +460,31 @@ def datasource_expense_factory(
 
 
 @pytest.fixture
-def exchange_rates_factory(db_session: AsyncSession) -> ModelFactory[ExchangeRates]:
+def exchange_rates_per_currency() -> dict[str, dict[str, float]]:
+    return {
+        "USD": {
+            "USD": 1.0,
+            "EUR": 0.9252,
+            "GBP": 0.7737,
+        },
+        "EUR": {
+            "USD": 1.0808,
+            "EUR": 1.0,
+            "GBP": 0.8555,
+        },
+        "GBP": {
+            "USD": 1.2925,
+            "EUR": 1.1689,
+            "GBP": 1.0,
+        },
+    }
+
+
+@pytest.fixture
+def exchange_rates_factory(
+    db_session: AsyncSession,
+    exchange_rates_per_currency: dict[str, dict[str, float]],
+) -> ModelFactory[ExchangeRates]:
     async def _exchange_rates(
         exchange_rates: dict[str, float] | None = None,
         base_currency: str = "USD",
@@ -468,11 +492,7 @@ def exchange_rates_factory(db_session: AsyncSession) -> ModelFactory[ExchangeRat
         next_update: datetime | None = None,
     ):
         if exchange_rates is None:
-            exchange_rates = {
-                "USD": 1.0,
-                "EUR": 0.9252,
-                "GBP": 0.7737,
-            }
+            exchange_rates = exchange_rates_per_currency[base_currency]
 
         if last_update is None:
             last_update = datetime.now(UTC)

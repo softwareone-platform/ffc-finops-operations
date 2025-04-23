@@ -133,6 +133,16 @@ def mock_optscale_client(test_settings: Settings, httpx_mock: HTTPXMock) -> Mock
 class MockExchangeRateAPIClient(BaseMockAPIClient[ExchangeRateAPIClient]):
     API_RESPONSE_DATETIME_FORMAT = "%a, %d %b %Y %H:%M:%S %z"
 
+    def __init__(
+        self,
+        test_settings: Settings,
+        httpx_mock: HTTPXMock,
+        default_exchange_rates: dict[str, dict[str, float]] | None = None,
+    ) -> None:
+        super().__init__(test_settings, httpx_mock)
+
+        self.default_exchange_rates = default_exchange_rates or {}
+
     def mock_get_latest_rates(
         self,
         exchange_rates: dict[str, float] | None = None,
@@ -141,6 +151,9 @@ class MockExchangeRateAPIClient(BaseMockAPIClient[ExchangeRateAPIClient]):
         next_update: datetime | None = None,
         error_code: ExchangeRateAPIErrorType | None = None,
     ) -> None:
+        if exchange_rates is None:
+            exchange_rates = self.default_exchange_rates.get(base_currency)
+
         if last_update is None:
             last_update = datetime.now(UTC)
 
@@ -173,5 +186,10 @@ class MockExchangeRateAPIClient(BaseMockAPIClient[ExchangeRateAPIClient]):
 def mock_exchange_rate_api_client(
     test_settings: Settings,
     httpx_mock: HTTPXMock,
+    exchange_rates_per_currency: dict[str, dict[str, float]],
 ) -> MockExchangeRateAPIClient:
-    return MockExchangeRateAPIClient(test_settings, httpx_mock)
+    return MockExchangeRateAPIClient(
+        test_settings,
+        httpx_mock,
+        default_exchange_rates=exchange_rates_per_currency,
+    )
