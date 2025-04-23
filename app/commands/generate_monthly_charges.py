@@ -145,9 +145,21 @@ class ChargesFileGenerator:
     def generate_charges_file_dataframe(
         self, datasource_expenses: Sequence[DatasourceExpense]
     ) -> pd.DataFrame | None:
+        logger.info(
+            "Generating charges file contents for account %s and currency %s",
+            self.account.id,
+            self.currency,
+        )
+
         charge_entries = self.get_charge_entries(datasource_expenses)
 
         if not charge_entries:
+            logger.warning(
+                "No charge entries found for account %s and currency %s, "
+                "skipping generating charges file as it would be empty",
+                self.account.id,
+                self.currency,
+            )
             return None
 
         df = pd.DataFrame(
@@ -172,18 +184,45 @@ class ChargesFileGenerator:
             ]
         )
 
+        logger.info(
+            "Charges file contents for account %s and currency %s generated successfully",
+            self.account.id,
+            self.currency,
+        )
+
         return df
 
     def export_to_excel(self, df: pd.DataFrame, filename: str) -> pathlib.Path:
+        logger.info(
+            "Exporting charge file contents for account %s and currency %s to excel format",
+            self.account.id,
+            self.currency,
+        )
         filepath = self.exports_dir / filename
 
         df.to_excel(filepath, header=True, index=False)
 
+        logger.info(
+            "Charge file contents for account %s and currency %s "
+            "exported to excel format and saved at %s",
+            self.account.id,
+            self.currency,
+            str(filepath.resolve()),
+        )
+
         return filepath
 
     def export_to_zip(self, df: pd.DataFrame, filename: str) -> pathlib.Path:
-        excel_filepath = self.export_to_excel(df, filename="charges.xlsx")
         filepath = self.exports_dir / filename
+
+        logger.info(
+            "Exporting charge file contents together with the currency conversion rates "
+            "for account %s and currency %s to zip format",
+            self.account.id,
+            self.currency,
+        )
+
+        excel_filepath = self.export_to_excel(df, filename="charges.xlsx")
 
         with zipfile.ZipFile(filepath, mode="w") as archive:
             archive.write(excel_filepath, arcname=excel_filepath.name)
@@ -193,6 +232,13 @@ class ChargesFileGenerator:
             )
 
         excel_filepath.unlink(missing_ok=True)
+
+        logger.info(
+            "Charges file ZIP generated for account %s and currency %s and saved to %s",
+            self.account.id,
+            self.currency,
+            str(filepath.resolve()),
+        )
 
         return filepath
 
@@ -464,12 +510,6 @@ async def main(exports_dir: pathlib.Path, settings: Settings) -> None:
                 if generated_charges_file is not None:
                     continue
 
-                logger.info(
-                    "Generating charges file for account %s and currency %s",
-                    account.id,
-                    currency,
-                )
-
                 async with session.begin():
                     datasource_expenses = await fetch_datasource_expenses(
                         session, account, currency
@@ -478,12 +518,6 @@ async def main(exports_dir: pathlib.Path, settings: Settings) -> None:
                 df = charges_file_generator.generate_charges_file_dataframe(datasource_expenses)
 
                 if df is None:
-                    logger.info(
-                        "No charge entries found for account %s and currency %s, "
-                        "skipping generating charges file",
-                        account.id,
-                        currency,
-                    )
                     continue
 
                 async with session.begin():
@@ -493,13 +527,6 @@ async def main(exports_dir: pathlib.Path, settings: Settings) -> None:
 
                 exported_filepath = charges_file_generator.export_to_zip(
                     df, filename=f"{charges_file_db_record.id}.zip"
-                )
-
-                logger.info(
-                    "Charges file generated for account %s and currency %s and saved to %s",
-                    account.id,
-                    currency,
-                    str(exported_filepath.resolve()),
                 )
 
                 successful_upload = await upload_charges_file_to_azure(
