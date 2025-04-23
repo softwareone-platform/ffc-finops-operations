@@ -24,6 +24,7 @@ from app.commands.generate_monthly_charges import (
     fetch_datasource_expenses,
     fetch_existing_generated_charges_file,
     fetch_unique_billing_currencies,
+    upload_charges_file_to_azure,
 )
 from app.commands.generate_monthly_charges import main as generate_monthly_charges_main
 from app.conf import Settings
@@ -466,8 +467,8 @@ async def test_get_total_amount(
         (ClientAuthenticationError("Invalid credentials"), True, True),
     ],
 )
-async def test_upload_to_azure(
-    currency_converter: CurrencyConverter,
+async def test_upload_charges_file_to_azure(
+    charges_file_factory: ModelFactory[ChargesFile],
     operations_account: Account,
     tmp_path: pathlib.Path,
     mocker: MockerFixture,
@@ -480,20 +481,24 @@ async def test_upload_to_azure(
         side_effect=side_effect,
         return_value=should_upload,
     )
-    charges_file_generator = ChargesFileGenerator(
-        operations_account, "USD", currency_converter, tmp_path
+
+    charges_file = await charges_file_factory(
+        currency="USD",
+        owner=operations_account,
+        status=ChargesFileStatus.DRAFT,
+        document_date="2025-04-10",
     )
 
-    dummy_file = tmp_path / "dummy_file.xlsx"
-    dummy_file.touch()
+    file_to_be_uploaded = tmp_path / "dummy_file.zip"
+    file_to_be_uploaded.touch()
 
     if should_raise:
         assert isinstance(side_effect, Exception)
 
         with pytest.raises(side_effect.__class__, match=str(side_effect)):
-            await charges_file_generator.upload_to_azure(dummy_file, month=4, year=2025)
+            await upload_charges_file_to_azure(charges_file, file_to_be_uploaded)
     else:
-        result = await charges_file_generator.upload_to_azure(dummy_file, month=4, year=2025)
+        result = await upload_charges_file_to_azure(charges_file, file_to_be_uploaded)
         assert result == should_upload
 
 

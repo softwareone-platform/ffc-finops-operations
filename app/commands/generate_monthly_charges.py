@@ -200,30 +200,41 @@ class ChargesFileGenerator:
     def get_total_amount(df: pd.DataFrame) -> Decimal:
         return df["Total Purchase Price"].sum()
 
-    async def upload_to_azure(self, filepath: pathlib.Path, month: int, year: int) -> bool:
-        try:
-            await upload_charges_file(
-                file_path=str(filepath.resolve()),
-                currency=self.currency,
-                month=month,
-                year=year,
-            )
 
-            return True
-        except (ResourceNotFoundError, AzureError, ClientAuthenticationError):
-            logger.exception(
-                "Unable to upload any files to Azure Blob Storage, aborting the process"
-            )
-            # raising the exception as we need to stop the process -- all the other uploads
-            # will fail too
-            raise
-        except Exception:
-            logger.exception(
-                "Unexpected error occurred while uploading %s to Azure, skipping this file",
-                str(filepath.resolve()),
-            )
+async def upload_charges_file_to_azure(charges_file: ChargesFile, filepath: pathlib.Path) -> bool:
+    logging.info(
+        "Uploading the charges file %s at %s to Azure Blob Storage",
+        charges_file.id,
+        filepath,
+    )
 
-        return False
+    try:
+        await upload_charges_file(
+            file_path=str(filepath.resolve()),
+            currency=charges_file.currency,
+            month=charges_file.document_date.month,
+            year=charges_file.document_date.year,
+        )
+
+        logger.info(
+            "Charges file %s successfully uploaded to Azure Blob Storage, blob name: %s",
+            charges_file.id,
+            charges_file.azure_blob_name,
+        )
+
+        return True
+    except (ResourceNotFoundError, AzureError, ClientAuthenticationError):
+        logger.exception("Unable to upload any files to Azure Blob Storage, aborting the process")
+        # raising the exception as we need to stop the process -- all the other uploads
+        # will fail too
+        raise
+    except Exception:
+        logger.exception(
+            "Unexpected error occurred while uploading %s to Azure, skipping this file",
+            str(filepath.resolve()),
+        )
+
+    return False
 
 
 async def fetch_existing_generated_charges_file(
@@ -491,24 +502,12 @@ async def main(exports_dir: pathlib.Path, settings: Settings) -> None:
                     str(exported_filepath.resolve()),
                 )
 
-                logging.info("Uploading the charges file to Azure Blob Storage")
-
-                successful_upload = await charges_file_generator.upload_to_azure(
-                    exported_filepath, today.month, today.year
+                successful_upload = await upload_charges_file_to_azure(
+                    charges_file_db_record, exported_filepath
                 )
 
                 if not successful_upload:  # pragma: no cover
-                    logger.error(
-                        "Charges file %s was not uploaded to Azure Blob Storage",
-                        charges_file_db_record.id,
-                    )
                     continue
-
-                logger.info(
-                    "Charges file %s uploaded to Azure Blob Storage at %s",
-                    charges_file_db_record.id,
-                    charges_file_db_record.azure_blob_name,
-                )
 
                 async with session.begin():
                     await update_charges_file_post_generation(
