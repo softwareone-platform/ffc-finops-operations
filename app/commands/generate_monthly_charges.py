@@ -357,9 +357,11 @@ async def fetch_accounts(session: AsyncSession) -> Sequence[Account]:
     return accounts
 
 
-async def get_or_create_charges_file(
-    charges_file_handler: ChargesFileHandler, account: Account, currency: str, document_date: date
+async def get_or_create_draft_charges_file(
+    session: AsyncSession, account: Account, currency: str, document_date: date
 ) -> ChargesFile:
+    charges_file_handler = ChargesFileHandler(session)
+
     logger.info(
         "Checking if a database record for the charges file for "
         "account %s and currency %s already exists in draft status",
@@ -367,7 +369,7 @@ async def get_or_create_charges_file(
         currency,
     )
 
-    charges_file_db_record, created = await charges_file_handler.get_or_create(
+    charges_file, created = await charges_file_handler.get_or_create(
         owner=account,
         currency=currency,
         status=ChargesFileStatus.DRAFT,
@@ -387,7 +389,7 @@ async def get_or_create_charges_file(
             "in DRAFT status: %s",
             account.id,
             currency,
-            charges_file_db_record.id,
+            charges_file.id,
         )
     else:
         logger.info(
@@ -395,25 +397,25 @@ async def get_or_create_charges_file(
             "already exists in DRAFT status: %s, re-using it",
             account.id,
             currency,
-            charges_file_db_record.id,
+            charges_file.id,
         )
 
-    return charges_file_db_record
+    return charges_file
 
 
-async def set_charges_file_status_to_generated(
-    charges_file_handler: ChargesFileHandler,
-    charges_file_db_record: ChargesFile,
-    amount: Decimal,
+async def update_charges_file_post_generation(
+    session: AsyncSession, charges_file: ChargesFile, amount: Decimal
 ) -> None:
+    charges_file_handler = ChargesFileHandler(session)
+
     logger.info(
         "Updating the charges file %s in the database to status %s",
-        charges_file_db_record.id,
+        charges_file.id,
         ChargesFileStatus.GENERATED,
     )
 
     await charges_file_handler.update(
-        charges_file_db_record,
+        charges_file,
         {
             "amount": amount,
             "status": ChargesFileStatus.GENERATED,
@@ -422,9 +424,9 @@ async def set_charges_file_status_to_generated(
 
     logger.info(
         "Charges file %s updated in the database to status %s with amount %s",
-        charges_file_db_record.id,
+        charges_file.id,
         ChargesFileStatus.GENERATED,
-        charges_file_db_record.amount,
+        charges_file.amount,
     )
 
 
@@ -436,8 +438,6 @@ async def main(exports_dir: pathlib.Path, settings: Settings) -> None:
             unique_billing_currencies = await fetch_unique_billing_currencies(session)
             currency_converter = await CurrencyConverter.from_db(session)
             accounts = await fetch_accounts(session)
-
-            charges_file_handler = ChargesFileHandler(session)
 
         for currency in unique_billing_currencies:
             for account in accounts:
@@ -476,8 +476,8 @@ async def main(exports_dir: pathlib.Path, settings: Settings) -> None:
                     continue
 
                 async with session.begin():
-                    charges_file_db_record = await get_or_create_charges_file(
-                        charges_file_handler, account, currency, today
+                    charges_file_db_record = await get_or_create_draft_charges_file(
+                        session, account, currency, today
                     )
 
                 exported_filepath = charges_file_generator.export_to_zip(
@@ -511,8 +511,8 @@ async def main(exports_dir: pathlib.Path, settings: Settings) -> None:
                 )
 
                 async with session.begin():
-                    await set_charges_file_status_to_generated(
-                        charges_file_handler,
+                    await update_charges_file_post_generation(
+                        session,
                         charges_file_db_record,
                         amount=charges_file_generator.get_total_amount(df),
                     )
