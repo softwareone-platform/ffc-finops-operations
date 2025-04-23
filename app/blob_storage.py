@@ -47,7 +47,7 @@ async def upload_charges_file(
     currency: str,
     year: int,
     month: int,
-) -> str | None:
+) -> str:
     """
     This function is responsible for uploading the given file to Azure Blob Storage.
 

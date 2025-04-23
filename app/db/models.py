@@ -416,3 +416,21 @@ class ChargesFile(Base, HumanReadablePKMixin, TimestampMixin):
         default=ChargesFileStatus.DRAFT,
         server_default=ChargesFileStatus.DRAFT.value,
     )
+
+    @hybrid_property
+    def azure_blob_name(self) -> str:
+        return (
+            f"{self.currency}/{self.document_date.year}/{self.document_date.month:02}/{self.id}.zip"
+        )
+
+    @azure_blob_name.inplace.expression
+    @classmethod
+    def _azure_blob_name_sql_expr(cls) -> sa.ColumnElement[str]:
+        return sa.func.concat(
+            cls.currency,
+            "/",
+            sa.func.to_char(cls.document_date, "YYYY/MM"),
+            "/",
+            cls.id,
+            ".zip",
+        )

@@ -1,14 +1,16 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 import pytest
+from pytest_capsqlalchemy import SQLAlchemyCapturer
 from pytest_mock import MockerFixture
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.human_readable_pk import HumanReadablePKMixin
-from app.db.models import Account, Actor, Entitlement, Organization, System
-from app.enums import ActorType, EntitlementStatus
+from app.db.models import Account, Actor, ChargesFile, Entitlement, Organization, System
+from app.enums import ActorType, ChargesFileStatus, EntitlementStatus
+from tests.types import ModelFactory
 
 
 async def test_actor_inheritance(db_session: AsyncSession):
@@ -165,3 +167,38 @@ async def test_system_encrypted_jwt_secret(db_session: AsyncSession):
 
     # Secret should be encrypted in DB but decrypted when accessed
     assert system_from_db.jwt_secret == secret
+
+
+async def test_charges_file_azure_blob_name(
+    db_session: AsyncSession,
+    operations_account: Account,
+    charges_file_factory: ModelFactory[ChargesFile],
+    capsqlalchemy: SQLAlchemyCapturer,
+):
+    charges_file = await charges_file_factory(
+        currency="USD",
+        owner=operations_account,
+        status=ChargesFileStatus.DRAFT,
+        document_date="2024-04-22",
+    )
+    assert charges_file.document_date == date(2024, 4, 22)
+
+    # assert the python implementation of the hybrid property
+    assert charges_file.azure_blob_name == f"USD/2024/04/{charges_file.id}.zip"
+
+    # assert the SQL implementation of the hybrid property
+    with capsqlalchemy:
+        azure_blob_name_from_sql = await db_session.scalar(
+            select(ChargesFile.azure_blob_name.label("azure_blob_name"))
+        )
+
+        capsqlalchemy.assert_captured_queries(
+            "SELECT concat(invoices.currency, '/', "
+            "to_char(invoices.document_date, 'YYYY/MM'), '/', "
+            "invoices.id, '.zip') AS azure_blob_name \n"
+            "FROM invoices",
+            include_tcl=False,
+            bind_params=True,
+        )
+
+    assert azure_blob_name_from_sql == f"USD/2024/04/{charges_file.id}.zip"

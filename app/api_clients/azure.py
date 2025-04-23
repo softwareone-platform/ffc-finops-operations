@@ -54,7 +54,7 @@ class AsyncAzureBlobServiceClient:
         self,
         blob_name: str,  # the blob name to create or use
         file_path: str,  # Path to the file to upload
-    ) -> str | None:
+    ) -> str:
         """
         Uploads a local file to an Azure Blob Storage container.
 
@@ -66,8 +66,15 @@ class AsyncAzureBlobServiceClient:
             file_path (str): The path to the local file to be uploaded.
 
         Returns:
-            str | None: The file path if upload succeeds; otherwise, None.
+            str: The file path if upload succeeds; otherwise, an exception will be raised.
 
+        Raises:
+            ValueError: If the format of month and/or year is invalid.
+            FileNotFoundError: If the file path does not exist.
+            ResourceNotFoundError: If the container does not exist.
+            AzureError: If a general error occurs on Azure.
+            ClientAuthenticationError: If the authentication error occurs.
+            Generic Exception: If the general error occurs.
         """
         blob_client = self.container_client.get_blob_client(blob_name)  # create the blob client
 
@@ -76,19 +83,24 @@ class AsyncAzureBlobServiceClient:
 
             async with aiofiles.open(file_path, "rb") as file:
                 await blob_client.upload_blob(data=file, overwrite=True)
+
             logger.info(f"File '{blob_name}' uploaded to container '{self.container_name}'.")
             return file_path
         except FileNotFoundError:
-            logger.error(f"The file {file_path} could not be found.")
+            logger.exception("The file %s could not be found.", file_path)
+            raise
         except ResourceNotFoundError:  # pragma: no branch
-            logger.error(f"Error: The container {self.container_name} does not exist.")
-        except AzureError as error:  # pragma: no branch
-            logger.error(f"Azure General Error occurred: {error}")
-        except ClientAuthenticationError as error:  # pragma: no branch
-            logger.error(f"Credentials or SAS token Error occurred: {error}")
-        except Exception as error:  # pragma: no branch
-            logger.error(f"Unexpected error occurred: {error}")
-        return None
+            logger.exception("Error: The container %s does not exist.", self.container_name)
+            raise
+        except AzureError:  # pragma: no branch
+            logger.exception("Azure General Error occurred")
+            raise
+        except ClientAuthenticationError:  # pragma: no branch
+            logger.exception("Credentials or SAS token Error occurred")
+            raise
+        except Exception:  # pragma: no branch
+            logger.exception("Unexpected error occurred")
+            raise
 
     async def get_azure_blob_download_url(self, blob_name: str) -> str | None:
         """

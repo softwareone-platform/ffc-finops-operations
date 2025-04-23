@@ -3,6 +3,7 @@ from app.commands import (
     check_expired_invitations,
     cleanup_obsolete_datasource_expenses,
     create_operations_account,
+    generate_monthly_charges,
     invite_user,
     openapi,
     redeem_entitlements,
@@ -13,6 +14,7 @@ from app.commands import (
 __all__ = [
     "check_expired_invitations",
     "create_operations_account",
+    "generate_monthly_charges",
     "invite_user",
     "openapi",
     "redeem_entitlements",

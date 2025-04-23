@@ -24,13 +24,8 @@ async def test_can_upload_file():
 
 
 async def test_cannot_upload_file():
-    response = await upload_charges_file(
-        file_path="not_found",
-        currency="eur",
-        year=2025,
-        month=3,
-    )
-    assert response is None
+    with pytest.raises(FileNotFoundError, match="not_found"):
+        await upload_charges_file(file_path="not_found", currency="eur", year=2025, month=3)
 
 
 @time_machine.travel("2025-03-20T10:00:00Z", tick=False)
