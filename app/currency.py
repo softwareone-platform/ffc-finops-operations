@@ -34,9 +34,9 @@ class CurrencyConverter:
         self.exchange_rates_db_record = exchange_rates_db_record
 
     @classmethod
-    async def from_db(cls, db_session: AsyncSession) -> Self:
+    async def from_db(cls, db_session: AsyncSession, base_currency: str) -> Self:
         exchange_rates_handler = ExchangeRatesHandler(db_session)
-        exchange_rates = await exchange_rates_handler.fetch_latest_valid()
+        exchange_rates = await exchange_rates_handler.fetch_latest_valid(base_currency)
 
         if exchange_rates is None:
             raise CurrencyConverterError("No active exchange rates found in the database")

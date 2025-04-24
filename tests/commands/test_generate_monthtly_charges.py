@@ -397,7 +397,7 @@ async def test_export_to_zip(
         },
     )
 
-    currency_converter = await CurrencyConverter.from_db(db_session)
+    currency_converter = await CurrencyConverter.from_db(db_session, "USD")
 
     charges_file_generator = ChargesFileGenerator(
         operations_account, "EUR", currency_converter, tmp_path
