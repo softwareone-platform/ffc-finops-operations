@@ -1799,15 +1799,15 @@ wheels = [
 
 [[package]]
 name = "requela"
-version = "0.1.16"
+version = "0.1.17"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "lark" },
     { name = "pytest-randomly" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1a/b5/c49e5dd8e27e4fdfc009de4358bc8fa30d304530295da40ec82e9a803fea/requela-0.1.16.tar.gz", hash = "sha256:54be7f2993f7a43a0d57d57da5e9e046ac8e6b0c1ef254939fc0f269e412e2a1", size = 158920 }
+sdist = { url = "https://files.pythonhosted.org/packages/b7/89/18c045ed396c014e12902dc40e3dbac636fa4f6f75f8cf37406a51c6e0a7/requela-0.1.17.tar.gz", hash = "sha256:740741a0e7b481d7362e371156d2bf11fcdc5e1a2678cbfeb3585f478f2ddbb1", size = 158945 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d2/f3/40682c3c585fc9156d6fc54da02b6b21daf543180a6ba61be91b4b5b4965/requela-0.1.16-py3-none-any.whl", hash = "sha256:05358c1e5e5c7cb8d7b230e5bee67f1c58052e66edacfc1adaa925d2151f1d75", size = 22570 },
+    { url = "https://files.pythonhosted.org/packages/54/44/7a5cf742de537e5797bc83556d3387cfce3dca3b47a1f2d48beb31047bec/requela-0.1.17-py3-none-any.whl", hash = "sha256:3d23df65e21fa10b0d94a1a608f4680951b57b21751a636f80e0dc744ea10d4e", size = 22603 },
 ]
 
 [[package]]
