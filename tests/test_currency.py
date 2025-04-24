@@ -35,7 +35,7 @@ async def test_currency_converter_from_db(
         },
     )
 
-    currency_converter = await CurrencyConverter.from_db(db_session)
+    currency_converter = await CurrencyConverter.from_db(db_session, "USD")
     assert currency_converter.base_currency == exchange_rates.base_currency
     assert currency_converter.exchange_rates == {
         ccy: Decimal(rate).quantize(Decimal("0.1") ** CurrencyConverter.DECIMAL_PRECISION)
@@ -49,7 +49,7 @@ async def test_currency_converter_from_db_no_db_records(db_session: AsyncSession
     with pytest.raises(
         CurrencyConverterError, match="No active exchange rates found in the database"
     ):
-        await CurrencyConverter.from_db(db_session)
+        await CurrencyConverter.from_db(db_session, "USD")
 
 
 @time_machine.travel("2025-03-28T10:00:00Z", tick=False)
@@ -65,7 +65,7 @@ async def test_currency_converter_from_db_only_old_records(
     with pytest.raises(
         CurrencyConverterError, match="No active exchange rates found in the database"
     ):
-        await CurrencyConverter.from_db(db_session)
+        await CurrencyConverter.from_db(db_session, "USD")
 
 
 @pytest.mark.parametrize(

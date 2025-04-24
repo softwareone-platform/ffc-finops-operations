@@ -493,7 +493,7 @@ async def main(exports_dir: pathlib.Path, settings: Settings) -> None:
     async with session_factory() as session:
         async with session.begin():
             unique_billing_currencies = await fetch_unique_billing_currencies(session)
-            currency_converter = await CurrencyConverter.from_db(session)
+            currency_converter = await CurrencyConverter.from_db(session, "USD")
             accounts = await fetch_accounts(session)
 
         for currency in unique_billing_currencies:

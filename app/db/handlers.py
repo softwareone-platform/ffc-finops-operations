@@ -512,9 +512,10 @@ class ChargesFileHandler(ModelHandler[ChargesFile]):
 
 
 class ExchangeRatesHandler(ModelHandler[ExchangeRates]):
-    async def fetch_latest_valid(self) -> ExchangeRates | None:
+    async def fetch_latest_valid(self, base_currency: str) -> ExchangeRates | None:
         scalars = await self.query_db(
             select(ExchangeRates)
+            .filter(ExchangeRates.base_currency == base_currency)
             .filter(ExchangeRates.next_update > datetime.now(UTC))
             .order_by(desc(ExchangeRates.last_update))
             .limit(1)
