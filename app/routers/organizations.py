@@ -12,7 +12,7 @@ from app.dependencies.api_clients import APIModifierClient, OptscaleAuthClient, 
 from app.dependencies.auth import check_operations_account
 from app.dependencies.db import OrganizationRepository
 from app.dependencies.path import OrganizationId
-from app.enums import DatasourceType
+from app.enums import DatasourceType, OrganizationStatus
 from app.pagination import LimitOffsetPage, paginate
 from app.rql import OrganizationRules, RQLQuery
 from app.schemas.core import convert_model_to_schema
@@ -295,6 +295,23 @@ async def update_organization(
     return convert_model_to_schema(OrganizationRead, db_organization)
 
 
-@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_organization_by_id(id: str):
-    pass
+@router.delete("/{organization_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_organization_by_id(
+    db_organization: Annotated[Organization, Depends(fetch_organization_or_404)],
+    organization_repo: OrganizationRepository,
+    optscale_client: OptscaleClient,
+):
+    if db_organization.status == OrganizationStatus.DELETED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Organization {db_organization.name} is already deleted.",
+        )
+
+    with wrap_http_error_in_502(
+        f"Error deleting organization {db_organization.linked_organization_id} in FinOps for Cloud."
+    ):
+        await optscale_client.suspend_organization(
+            organization_id=db_organization.linked_organization_id,
+        )
+
+    await organization_repo.delete(db_organization)
