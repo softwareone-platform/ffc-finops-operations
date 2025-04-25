@@ -7,6 +7,7 @@ from app.commands import (
     invite_user,
     openapi,
     redeem_entitlements,
+    shell,
     update_current_month_datasource_expenses,
     update_latest_exchange_rates,
 )
@@ -18,6 +19,7 @@ __all__ = [
     "invite_user",
     "openapi",
     "redeem_entitlements",
+    "shell",
     "calculate_accounts_stats",
     "update_current_month_datasource_expenses",
     "cleanup_obsolete_datasource_expenses",

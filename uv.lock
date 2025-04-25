@@ -766,7 +766,7 @@ wheels = [
 
 [[package]]
 name = "ipython"
-version = "8.35.0"
+version = "8.30.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "colorama", marker = "sys_platform == 'win32'" },
@@ -779,9 +779,9 @@ dependencies = [
     { name = "stack-data" },
     { name = "traitlets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0c/77/7d1501e8b539b179936e0d5969b578ed23887be0ab8c63e0120b825bda3e/ipython-8.35.0.tar.gz", hash = "sha256:d200b7d93c3f5883fc36ab9ce28a18249c7706e51347681f80a0aef9895f2520", size = 5605027 }
+sdist = { url = "https://files.pythonhosted.org/packages/d8/8b/710af065ab8ed05649afa5bd1e07401637c9ec9fb7cfda9eac7e91e9fbd4/ipython-8.30.0.tar.gz", hash = "sha256:cb0a405a306d2995a5cbb9901894d240784a9f341394c6ba3f4fe8c6eb89ff6e", size = 5592205 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/91/bf/17ffca8c8b011d0bac90adb5d4e720cb3ae1fe5ccfdfc14ca31f827ee320/ipython-8.35.0-py3-none-any.whl", hash = "sha256:e6b7470468ba6f1f0a7b116bb688a3ece2f13e2f94138e508201fad677a788ba", size = 830880 },
+    { url = "https://files.pythonhosted.org/packages/1d/f3/1332ba2f682b07b304ad34cad2f003adcfeb349486103f4b632335074a7c/ipython-8.30.0-py3-none-any.whl", hash = "sha256:85ec56a7e20f6c38fce7727dcca699ae4ffc85985aa7b23635a8008f918ae321", size = 820765 },
 ]
 
 [[package]]
@@ -926,16 +926,19 @@ dependencies = [
     { name = "fastapi-pagination" },
     { name = "gunicorn" },
     { name = "httpx" },
+    { name = "ipython" },
     { name = "jinja2" },
     { name = "pandas", extra = ["excel"] },
     { name = "pycountry" },
     { name = "pydantic-extra-types" },
     { name = "pydantic-settings" },
+    { name = "pyfiglet" },
     { name = "pyjwt" },
     { name = "python-dateutil" },
     { name = "python-dotenv" },
     { name = "pyyaml" },
     { name = "requela" },
+    { name = "rich" },
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "sqlalchemy-utils" },
     { name = "stamina" },
@@ -951,7 +954,6 @@ dev = [
     { name = "bandit" },
     { name = "faker" },
     { name = "ipdb" },
-    { name = "ipython" },
     { name = "mypy" },
     { name = "pdbr", extra = ["ipython"] },
     { name = "pre-commit" },
@@ -983,16 +985,19 @@ requires-dist = [
     { name = "fastapi-pagination", specifier = "==0.12.*" },
     { name = "gunicorn", specifier = "==23.0.*" },
     { name = "httpx", specifier = "==0.27.*" },
+    { name = "ipython", specifier = "==8.30.*" },
     { name = "jinja2", specifier = "==3.1.*" },
     { name = "pandas", extras = ["excel"], specifier = "==2.2.*" },
     { name = "pycountry", specifier = ">=24.6.1,<24.7" },
     { name = "pydantic-extra-types", specifier = "==2.10.*" },
     { name = "pydantic-settings", specifier = "==2.6.*" },
+    { name = "pyfiglet", specifier = "==1.0.*" },
     { name = "pyjwt", specifier = "==2.10.*" },
     { name = "python-dateutil", specifier = "==2.9.*" },
     { name = "python-dotenv", specifier = "==1.0.*" },
     { name = "pyyaml", specifier = "==6.0.*" },
     { name = "requela", specifier = "==0.1.*" },
+    { name = "rich", specifier = "==14.0.*" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = "==2.0.*" },
     { name = "sqlalchemy-utils", specifier = "==0.41.*" },
     { name = "stamina", specifier = "==25.1.*" },
@@ -1008,7 +1013,6 @@ dev = [
     { name = "bandit", specifier = ">=1.8.0,<2.0" },
     { name = "faker", specifier = ">=33.1.0,<34.0" },
     { name = "ipdb", specifier = ">=0.13.13,<1.0" },
-    { name = "ipython", specifier = ">=8.30.0,<9.0" },
     { name = "mypy", specifier = ">=1.14.0,<2.0" },
     { name = "pdbr", extras = ["ipython"], specifier = ">=0.9.0,<1.0" },
     { name = "pre-commit", specifier = ">=4.0.1,<5.0" },
@@ -1538,6 +1542,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/b5/d4/9dfbe238f45ad8b168f5c96ee49a3df0598ce18a0795a983b419949ce65b/pydantic_settings-2.6.1.tar.gz", hash = "sha256:e0f92546d8a9923cb8941689abf85d6601a8c19a23e97a34b2964a2e3f813ca0", size = 75646 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/5e/f9/ff95fd7d760af42f647ea87f9b8a383d891cdb5e5dbd4613edaeb094252a/pydantic_settings-2.6.1-py3-none-any.whl", hash = "sha256:7fb0637c786a558d3103436278a7c4f1cfd29ba8973238a50c5bb9a55387da87", size = 28595 },
+]
+
+[[package]]
+name = "pyfiglet"
+version = "1.0.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a0/f2/2649b2acace54f861eccd4ab163bfd914236fc93ddb1df02dad2a2552b14/pyfiglet-1.0.2.tar.gz", hash = "sha256:758788018ab8faaddc0984e1ea05ff330d3c64be663c513cc1f105f6a3066dab", size = 832345 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1a/03/bef6fff907e212d67a0003f8ea4819307bba91b2856074a0763dd483ccc4/pyfiglet-1.0.2-py3-none-any.whl", hash = "sha256:889b351d79c99e50a3f619c8f8e6ffdb27fd8c939fc43ecbd7559bd57d5f93ea", size = 1085824 },
 ]
 
 [[package]]

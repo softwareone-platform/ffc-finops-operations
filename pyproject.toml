@@ -40,13 +40,15 @@ dependencies = [
     "aiohttp==3.11.*",
     "jinja2==3.1.*",
     "pandas[excel]==2.2.*",
+    "ipython==8.30.*",
+    "rich==14.0.*",
+    "pyfiglet==1.0.*",
 ]
 
 [dependency-groups]
 dev = [
     "bandit>=1.8.0,<2.0",
     "faker>=33.1.0,<34.0",
-    "ipython>=8.30.0,<9.0",
     "mypy>=1.14.0,<2.0",
     "pre-commit>=4.0.1,<5.0",
     "pytest-httpx>=0.34.0,<1.0",
