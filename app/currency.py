@@ -80,7 +80,7 @@ class CurrencyConverter:
         return self._normalize(amount * exchange_rate)
 
     def get_exchangerate_api_response_json(self, base_currency: str) -> str:
-        if base_currency not in self.exchange_rates_per_currency is None:  # pragma: no branch
+        if base_currency not in self.exchange_rates_per_currency:  # pragma: no branch
             raise CurrencyConverterError(
                 f"No exchange rates found for {base_currency} in the database"
             )
