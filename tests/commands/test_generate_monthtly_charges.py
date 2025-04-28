@@ -49,14 +49,16 @@ from tests.conftest import ModelFactory
 
 
 @pytest.fixture
-def currency_converter() -> CurrencyConverter:
-    return CurrencyConverter(
-        base_currency="USD",
-        exchange_rates={
-            "EUR": Decimal("0.9252"),
-            "GBP": Decimal("0.7737"),
-        },
-    )
+@time_machine.travel("2025-04-10T10:00:00Z", tick=False)
+async def currency_converter(
+    db_session: AsyncSession,
+    exchange_rates_factory: ModelFactory[ExchangeRates],
+) -> CurrencyConverter:
+    await exchange_rates_factory(base_currency="USD")
+    await exchange_rates_factory(base_currency="GBP")
+    await exchange_rates_factory(base_currency="EUR")
+
+    return await CurrencyConverter.from_db(db_session)
 
 
 @pytest.fixture
@@ -385,20 +387,11 @@ async def test_export_to_zip(
     exchange_rates_factory: ModelFactory[ExchangeRates],
     operations_account: Account,
     usd_org_billed_in_eur_expenses: Organization,
+    currency_converter: CurrencyConverter,
     db_session: AsyncSession,
     snapshot: Snapshot,
     tmp_path: pathlib.Path,
 ):
-    await exchange_rates_factory(
-        base_currency="USD",
-        exchange_rates={
-            "EUR": 0.9252,
-            "GBP": 0.7737,
-        },
-    )
-
-    currency_converter = await CurrencyConverter.from_db(db_session, "USD")
-
     charges_file_generator = ChargesFileGenerator(
         operations_account, "EUR", currency_converter, tmp_path
     )
@@ -413,10 +406,10 @@ async def test_export_to_zip(
     assert filepath.parent == tmp_path
 
     with zipfile.ZipFile(filepath, "r") as archive:
-        assert sorted(archive.namelist()) == ["charges.xlsx", "exchange_rates_USD.json"]
+        assert sorted(archive.namelist()) == ["charges.xlsx", "exchange_rates_EUR.json"]
 
         snapshot.assert_match(archive.read("charges.xlsx"), "charges.xlsx")
-        snapshot.assert_match(archive.read("exchange_rates_USD.json"), "exchange_rates.json")
+        snapshot.assert_match(archive.read("exchange_rates_EUR.json"), "exchange_rates.json")
 
 
 @pytest.mark.parametrize(
@@ -424,7 +417,7 @@ async def test_export_to_zip(
     [
         ("USD", Decimal("1.10")),
         ("EUR", Decimal("0.00")),
-        ("GBP", Decimal("0.42")),
+        ("GBP", Decimal("0.43")),
     ],
 )
 @pytest.mark.fixed_random_seed
@@ -720,13 +713,9 @@ async def test_full_run(
     charges_file_handler = ChargesFileHandler(db_session)
     assert await charges_file_handler.count() == 0
 
-    await exchange_rates_factory(
-        base_currency="USD",
-        exchange_rates={
-            "EUR": 0.9252,
-            "GBP": 0.7737,
-        },
-    )
+    await exchange_rates_factory(base_currency="USD")
+    await exchange_rates_factory(base_currency="EUR")
+    await exchange_rates_factory(base_currency="GBP")
 
     # Add some existing charges files to the database to test that they are handled correctly
 
@@ -825,9 +814,9 @@ async def test_full_run(
     )
     assert charge_file_amounts == sorted(
         [
-            (operations_account.id, "GBP", Decimal("0.4200")),
+            (operations_account.id, "GBP", Decimal("0.4300")),
             (operations_account.id, "USD", Decimal("1.1000")),
-            (affiliate_account.id, "GBP", Decimal("0.3300")),
+            (affiliate_account.id, "GBP", Decimal("0.3400")),
             (affiliate_account.id, "USD", Decimal("0.6000")),
             (another_affiliate_account.id, "EUR", Decimal("0.5600")),
         ]

@@ -227,8 +227,8 @@ class ChargesFileGenerator:
         with zipfile.ZipFile(filepath, mode="w") as archive:
             archive.write(excel_filepath, arcname=excel_filepath.name)
             archive.writestr(
-                f"exchange_rates_{self.currency_converter.base_currency}.json",
-                self.currency_converter.get_exchangerate_api_response_json(),
+                f"exchange_rates_{self.currency}.json",
+                self.currency_converter.get_exchangerate_api_response_json(self.currency),
             )
 
         excel_filepath.unlink(missing_ok=True)
@@ -493,7 +493,7 @@ async def main(exports_dir: pathlib.Path, settings: Settings) -> None:
     async with session_factory() as session:
         async with session.begin():
             unique_billing_currencies = await fetch_unique_billing_currencies(session)
-            currency_converter = await CurrencyConverter.from_db(session, "USD")
+            currency_converter = await CurrencyConverter.from_db(session)
             accounts = await fetch_accounts(session)
 
         for currency in unique_billing_currencies:

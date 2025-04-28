@@ -35,10 +35,13 @@ async def get_currencies_to_update(session: AsyncSession) -> list[str]:
 
     currencies_to_update = []
 
-    for base_currency in all_currencies:
-        latest_exchange_rates = await exchange_rates_handler.fetch_latest_valid(base_currency)
+    latest_exchange_rates = {
+        exchange_rates.base_currency: exchange_rates
+        for exchange_rates in await exchange_rates_handler.fetch_latest_valid()
+    }
 
-        if latest_exchange_rates is not None:
+    for base_currency in all_currencies:
+        if base_currency in latest_exchange_rates:
             logger.info(
                 "Exchange rates for %s are already stored in the database and are still valid, "
                 "skipping feching them",
