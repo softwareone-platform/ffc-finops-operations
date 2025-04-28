@@ -2,14 +2,14 @@ import asyncio
 import logging
 import pathlib
 import zipfile
-from collections.abc import Sequence
+from collections.abc import AsyncGenerator, Sequence
 from copy import copy
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Annotated, Self
 
-import pandas as pd
+import openpyxl
 import typer
 from azure.core.exceptions import AzureError, ClientAuthenticationError, ResourceNotFoundError
 from dateutil.relativedelta import relativedelta  # type: ignore[import-untyped]
@@ -95,18 +95,43 @@ class ChargesFileGenerator:
     currency_converter: CurrencyConverter
     exports_dir: pathlib.Path
 
-    def get_charge_entries(
-        self, datasource_expenses: Sequence[DatasourceExpense]
-    ) -> list[ChargeEntry]:
-        return [
-            charge_entry
-            for ds_exp in datasource_expenses
-            for charge_entry in self.charge_entries_for_datasource_expense(ds_exp)
-        ]
+    def __post_init__(self) -> None:
+        self.workbook = openpyxl.Workbook(write_only=True)
+        self.worksheet = self.workbook.create_sheet()
+        self.running_total = Decimal(0)
+        self.total_rows = 0
 
-    def charge_entries_for_datasource_expense(
-        self, datasource_expense: DatasourceExpense
-    ) -> list[ChargeEntry]:
+    @property
+    def has_entries(self) -> bool:
+        return self.total_rows > 0
+
+    def append_row(self, charge_entry: ChargeEntry) -> None:
+        row = {
+            "Entry ID": self.total_rows if self.has_entries else 1,
+            "Subscription Search Criteria": "subscription.externalIds.vendor",
+            "Subscription Search Value": charge_entry.subscription_search_value,
+            "Item Search Criteria": "item.externalIds.vendor",
+            "Item Search Value": charge_entry.item_search_value,
+            "Usage Start Time": charge_entry.usage_start_time.strftime("%-d-%b-%Y"),
+            "Usage End Time": charge_entry.usage_end_time.strftime("%-d-%b-%Y"),
+            "Quantity": 1,
+            "Purchase Price": charge_entry.price.quantize(Decimal("0.01")),
+            "Total Purchase Price": charge_entry.price.quantize(Decimal("0.01")),
+            "External Reference": charge_entry.external_reference,
+            "Vendor Description 1": charge_entry.vendor_description_1,
+            "Vendor Description 2": charge_entry.vendor_description_2,
+            "Vendor Reference": "",
+        }
+
+        if not self.has_entries:
+            self.worksheet.append(list(row.keys()))
+
+        self.worksheet.append(list(row.values()))
+
+        self.total_rows += 2 if not self.has_entries else 1
+        self.running_total += charge_entry.price
+
+    def add_datasource_expense(self, datasource_expense: DatasourceExpense) -> None:
         entry = ChargeEntry.from_datasource_expense(datasource_expense, self.currency_converter)
 
         if self.account.type == AccountType.AFFILIATE:
@@ -117,94 +142,40 @@ class ChargesFileGenerator:
                 if entitlement.status != EntitlementStatus.ACTIVE:
                     continue
 
+                self.append_row(entry)
+
                 # If multiple entitlements match the same datasource expense, we need to
                 # return only the first one (the entitlements are already ordered by
                 # created_at)
-                return [entry]
-
-            return []
-
-        if self.account.type == AccountType.OPERATIONS:
-            charge_entries = [entry]
+                return
+        elif self.account.type == AccountType.OPERATIONS:
+            self.append_row(entry)
 
             for entitlement in datasource_expense.entitlements:
                 if entitlement.status != EntitlementStatus.ACTIVE:
                     continue
 
-                charge_entries.append(entry.contra_entry())
+                self.append_row(entry.contra_entry())
 
                 # If multiple entitlements match the same datasource expense, we need to
                 # add only the contra entry for the first one (the entitlements are
                 # already ordered by created_at)
-                break
+                return
+        else:  # pragma: no cover
+            raise ValueError(f"Unknown account type: {self.account.type}")
 
-            return charge_entries
-
-        raise ValueError(f"Unknown account type: {self.account.type}")  # pragma: no cover
-
-    def generate_charges_file_dataframe(
-        self, datasource_expenses: Sequence[DatasourceExpense]
-    ) -> pd.DataFrame | None:
+    def save(self, filename: str) -> pathlib.Path:
         logger.info(
-            "Generating charges file contents for account %s and currency %s",
-            self.account.id,
-            self.currency,
-        )
-
-        charge_entries = self.get_charge_entries(datasource_expenses)
-
-        if not charge_entries:
-            logger.warning(
-                "No charge entries found for account %s and currency %s, "
-                "skipping generating charges file as it would be empty",
-                self.account.id,
-                self.currency,
-            )
-            return None
-
-        df = pd.DataFrame(
-            [
-                {
-                    "Entry ID": row_num,
-                    "Subscription Search Criteria": "subscription.externalIds.vendor",
-                    "Subscription Search Value": entry.subscription_search_value,
-                    "Item Search Criteria": "item.externalIds.vendor",
-                    "Item Search Value": entry.item_search_value,
-                    "Usage Start Time": entry.usage_start_time.strftime("%-d-%b-%Y"),
-                    "Usage End Time": entry.usage_end_time.strftime("%-d-%b-%Y"),
-                    "Quantity": 1,
-                    "Purchase Price": entry.price.quantize(Decimal("0.01")),
-                    "Total Purchase Price": entry.price.quantize(Decimal("0.01")),
-                    "External Reference": entry.external_reference,
-                    "Vendor Description 1": entry.vendor_description_1,
-                    "Vendor Description 2": entry.vendor_description_2,
-                    "Vendor Reference": "",
-                }
-                for row_num, entry in enumerate(charge_entries, start=1)
-            ]
-        )
-
-        logger.info(
-            "Charges file contents for account %s and currency %s generated successfully",
-            self.account.id,
-            self.currency,
-        )
-
-        return df
-
-    def export_to_excel(self, df: pd.DataFrame, filename: str) -> pathlib.Path:
-        logger.info(
-            "Exporting charge file contents for account %s and currency %s to excel format",
+            "Exporting charge file contents for account %s and currency %s to Excel format",
             self.account.id,
             self.currency,
         )
         filepath = self.exports_dir / filename
 
-        df.to_excel(filepath, header=True, index=False)
+        self.workbook.save(filepath)
 
         logger.info(
-            "Charge file contents for account %s and currency %s "
-            "exported to excel format and saved at %s",
+            "Charges file generated for account %s and currency %s and saved to %s",
             self.account.id,
             self.currency,
             str(filepath.resolve()),
@@ -212,8 +183,9 @@ class ChargesFileGenerator:
 
         return filepath
 
-    def export_to_zip(self, df: pd.DataFrame, filename: str) -> pathlib.Path:
-        filepath = self.exports_dir / filename
+    def make_archive(self, filename: str) -> pathlib.Path:
+        if not self.has_entries:
+            raise ValueError("Cannot export to zip format: no records found in the charges file")
 
         logger.info(
             "Exporting charge file contents together with the currency conversion rates "
@@ -222,10 +194,11 @@ class ChargesFileGenerator:
             self.currency,
         )
 
-        excel_filepath = self.export_to_excel(df, filename="charges.xlsx")
+        excel_filepath = self.save("charges.xlsx")
+        filepath = self.exports_dir / filename
 
         with zipfile.ZipFile(filepath, mode="w") as archive:
-            archive.write(excel_filepath, arcname=excel_filepath.name)
+            archive.write(excel_filepath, arcname="charges.xlsx")
             archive.writestr(
                 f"exchange_rates_{self.currency}.json",
                 self.currency_converter.get_exchangerate_api_response_json(self.currency),
@@ -241,10 +214,6 @@ class ChargesFileGenerator:
         )
 
         return filepath
-
-    @staticmethod
-    def get_total_amount(df: pd.DataFrame) -> Decimal:
-        return df["Total Purchase Price"].sum()
 
 
 async def upload_charges_file_to_azure(charges_file: ChargesFile, filepath: pathlib.Path) -> bool:
@@ -333,25 +302,21 @@ async def fetch_existing_generated_charges_file(
 
 
 async def fetch_datasource_expenses(
-    session: AsyncSession, account: Account, currency: str
-) -> Sequence[DatasourceExpense]:
+    session: AsyncSession, currency: str
+) -> AsyncGenerator[DatasourceExpense]:
     today = datetime.now(UTC).date()
     last_month = today - relativedelta(months=1)
 
     organization_handler = OrganizationHandler(session)
     datasource_expense_handler = DatasourceExpenseHandler(session)
 
-    logger.info(
-        "Querying organizations to process for account %s with billing currency = %s",
-        account.id,
-        currency,
-    )
+    logger.info("Querying organizations to process with billing currency = %s", currency)
 
     organizations = await organization_handler.query_db(
         where_clauses=[Organization.billing_currency == currency]
     )
     logger.info(
-        "Found %d organizations to process for billing currency %s",
+        "Found %d organizations to process with billing currency %s",
         len(organizations),
         currency,
     )
@@ -363,24 +328,16 @@ async def fetch_datasource_expenses(
         last_month.month,
         last_month.year,
     )
-    all_orgs_expenses = await datasource_expense_handler.query_db(
-        where_clauses=[
+    all_orgs_expenses = datasource_expense_handler.stream_scalars(
+        extra_conditions=[
             DatasourceExpense.organization_id.in_(org.id for org in organizations),
             DatasourceExpense.month == last_month.month,
             DatasourceExpense.year == last_month.year,
         ],
-        unique=True,
-    )
-    logger.info(
-        "Found %d datasource expenses for all organizations "
-        "with %s billing currency for month = %s, year = %s",
-        len(all_orgs_expenses),
-        currency,
-        last_month.month,
-        last_month.year,
     )
 
-    return all_orgs_expenses
+    async for org_exp in all_orgs_expenses:
+        yield org_exp
 
 
 async def fetch_unique_billing_currencies(session: AsyncSession) -> Sequence[str]:
@@ -498,39 +455,31 @@ async def main(exports_dir: pathlib.Path, settings: Settings) -> None:
 
         for currency in unique_billing_currencies:
             for account in accounts:
-                charges_file_generator = ChargesFileGenerator(
-                    account, currency, currency_converter, exports_dir
-                )
-
                 async with session.begin():
                     generated_charges_file = await fetch_existing_generated_charges_file(
                         session, account, currency
                     )
 
-                if generated_charges_file is not None:
-                    continue
+                    if generated_charges_file is not None:
+                        continue
 
-                async with session.begin():
-                    datasource_expenses = await fetch_datasource_expenses(
-                        session, account, currency
+                    generator = ChargesFileGenerator(
+                        account, currency, currency_converter, exports_dir
                     )
+                    async for ds_exp in fetch_datasource_expenses(session, currency):
+                        generator.add_datasource_expense(ds_exp)
 
-                df = charges_file_generator.generate_charges_file_dataframe(datasource_expenses)
+                    if not generator.has_entries:
+                        continue
 
-                if df is None:
-                    continue
-
-                async with session.begin():
                     charges_file_db_record = await get_or_create_draft_charges_file(
                         session, account, currency, today
                     )
 
-                exported_filepath = charges_file_generator.export_to_zip(
-                    df, filename=f"{charges_file_db_record.id}.zip"
-                )
+                zip_file_path = generator.make_archive(f"{charges_file_db_record.id}.zip")
 
                 successful_upload = await upload_charges_file_to_azure(
-                    charges_file_db_record, exported_filepath
+                    charges_file_db_record, zip_file_path
                 )
 
                 if not successful_upload:  # pragma: no cover
@@ -540,7 +489,7 @@ async def main(exports_dir: pathlib.Path, settings: Settings) -> None:
                     await update_charges_file_post_generation(
                         session,
                         charges_file_db_record,
-                        amount=charges_file_generator.get_total_amount(df),
+                        amount=generator.running_total.quantize(Decimal("0.01")),
                     )
 
 

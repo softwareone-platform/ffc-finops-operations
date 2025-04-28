@@ -1,0 +1,5 @@
+Entry ID,Subscription Search Criteria,Subscription Search Value,Item Search Criteria,Item Search Value,Usage Start Time,Usage End Time,Quantity,Purchase Price,Total Purchase Price,External Reference,Vendor Description 1,Vendor Description 2,Vendor Reference
+1,subscription.externalIds.vendor,FORG-7330-1645-9608,item.externalIds.vendor,FIN-0001-P1M,1-Mar-2025,31-Mar-2025,1,0.56,0.56,06cb0fb3-9a1d-4644-815e-f6d13b8faa18,AWS Account,a65ed389-b74d-4fb1-b2e7-06298fadc1a6,
+2,subscription.externalIds.vendor,FORG-7330-1645-9608,item.externalIds.vendor,FIN-0001-P1M,1-Mar-2025,31-Mar-2025,1,-0.56,-0.56,06cb0fb3-9a1d-4644-815e-f6d13b8faa18,AWS Account,a65ed389-b74d-4fb1-b2e7-06298fadc1a6,
+3,subscription.externalIds.vendor,FORG-7330-1645-9608,item.externalIds.vendor,FIN-0001-P1M,1-Mar-2025,31-Mar-2025,1,0.65,0.65,06cb0fb3-9a1d-4644-815e-f6d13b8faa18,GCP Account,386ecbe0-6b65-46a4-8b81-48f6b38a088c,
+4,subscription.externalIds.vendor,FORG-7330-1645-9608,item.externalIds.vendor,FIN-0001-P1M,1-Mar-2025,31-Mar-2025,1,-0.65,-0.65,06cb0fb3-9a1d-4644-815e-f6d13b8faa18,GCP Account,386ecbe0-6b65-46a4-8b81-48f6b38a088c,

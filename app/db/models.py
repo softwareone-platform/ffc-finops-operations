@@ -310,7 +310,7 @@ class DatasourceExpense(Base, HumanReadablePKMixin, TimestampMixin):
         foreign_keys=lambda: [DatasourceExpense.datasource_id],
         viewonly=True,
         uselist=True,
-        lazy="joined",
+        lazy="selectin",
     )
 
     __table_args__ = (
