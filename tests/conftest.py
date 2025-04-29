@@ -667,17 +667,19 @@ def assert_equal_or_raises[T](
 
     Example Usage:
 
-        @pytest.mark.parametrize(
-            ("numerator", "denominator", "expected"),
-            [
-                (5, 2, 2.5),
-                (2, 2, 1.0),
-                (1, 0, ZeroDivisionError("division by zero")),
-                (1, "string", TypeError),
-            ],
-        )
-        def test_division(numerator, denominator, expected):
-            assert_equal_or_raises(lambda: numerator / denominator, expected)
+    ```python
+    @pytest.mark.parametrize(
+        ("numerator", "denominator", "expected"),
+        [
+            (5, 2, 2.5),
+            (2, 2, 1.0),
+            (1, 0, ZeroDivisionError("division by zero")),
+            (1, "string", TypeError),
+        ],
+    )
+    def test_division(numerator, denominator, expected):
+        assert_equal_or_raises(lambda: numerator / denominator, expected)
+    ```
     """
 
     if inspect.isclass(expected) and issubclass(expected, Exception):
