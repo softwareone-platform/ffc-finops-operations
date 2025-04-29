@@ -193,10 +193,10 @@ async def test_charges_file_azure_blob_name(
         )
 
         capsqlalchemy.assert_captured_queries(
-            "SELECT concat(invoices.currency, '/', "
-            "to_char(invoices.document_date, 'YYYY/MM'), '/', "
-            "invoices.id, '.zip') AS azure_blob_name \n"
-            "FROM invoices",
+            "SELECT concat(chargesfiles.currency, '/', "
+            "to_char(chargesfiles.document_date, 'YYYY/MM'), '/', "
+            "chargesfiles.id, '.zip') AS azure_blob_name \n"
+            "FROM chargesfiles",
             include_tcl=False,
             bind_params=True,
         )

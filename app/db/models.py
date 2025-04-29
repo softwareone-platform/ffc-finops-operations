@@ -400,7 +400,7 @@ class Entitlement(Base, HumanReadablePKMixin, AuditableMixin):
 
 
 class ChargesFile(Base, HumanReadablePKMixin, TimestampMixin):
-    __tablename__ = "invoices"
+    __tablename__ = "chargesfiles"
 
     PK_PREFIX = "FCHG"
     PK_NUM_LENGTH = 12
