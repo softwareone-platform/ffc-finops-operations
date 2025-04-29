@@ -14,13 +14,18 @@ class CurrencyConverterError(Exception):
     pass
 
 
+class BaseCurrencyNotSupportedError(CurrencyConverterError):
+    def __init__(self, base_currency: str) -> None:
+        self.base_currency = base_currency
+        super().__init__(f"Missing exchange rates for base currency {base_currency}")
+
+
 class MissingExchangeRateError(CurrencyConverterError):
-    def __init__(self, from_currency: str, to_currency: str) -> None:
-        self.from_currency = from_currency
+    def __init__(self, base_currency: str, to_currency: str) -> None:
+        self.base_currency = base_currency
         self.to_currency = to_currency
         super().__init__(
-            f"Missing exchange rate for {from_currency} -> {to_currency} "
-            f"or {to_currency} -> {from_currency}"
+            f"Exchange rates for base currency {base_currency} don't include {to_currency}"
         )
 
 
@@ -53,22 +58,17 @@ class CurrencyConverter:
         if from_currency == to_currency:
             return self._normalize(1)
 
-        # If we have exchange rates for the from_currency as the base currency, use that
-        if (exchange_rates := self.exchange_rates_per_currency.get(from_currency)) is not None:
-            conversion_rate = exchange_rates.api_response["conversion_rates"].get(to_currency)
+        exchange_rates = self.exchange_rates_per_currency.get(from_currency)
 
-            if conversion_rate is not None:
-                return self._normalize(conversion_rate)
+        if exchange_rates is None:
+            raise BaseCurrencyNotSupportedError(base_currency=from_currency)
 
-        # Otherwise, check if we have exchange rates in the oposite direction,
-        # i.e. to_currency as the base currency
-        if (exchange_rates := self.exchange_rates_per_currency.get(to_currency)) is not None:
-            conversion_rate = exchange_rates.api_response["conversion_rates"].get(from_currency)
+        conversion_rate = exchange_rates.api_response["conversion_rates"].get(to_currency)
 
-            if conversion_rate is not None:
-                return self._normalize(1 / conversion_rate)
+        if conversion_rate is None:
+            raise MissingExchangeRateError(from_currency, to_currency)
 
-        raise MissingExchangeRateError(from_currency, to_currency)
+        return self._normalize(conversion_rate)
 
     def convert_currency(self, amount: Number, from_currency: str, to_currency: str) -> Decimal:
         amount = self._normalize(amount)
@@ -81,8 +81,6 @@ class CurrencyConverter:
 
     def get_exchangerate_api_response_json(self, base_currency: str) -> str:
         if base_currency not in self.exchange_rates_per_currency:  # pragma: no branch
-            raise CurrencyConverterError(
-                f"No exchange rates found for {base_currency} in the database"
-            )
+            raise BaseCurrencyNotSupportedError(base_currency)
 
         return json.dumps(self.exchange_rates_per_currency[base_currency].api_response, indent=4)

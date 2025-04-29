@@ -1,3 +1,4 @@
+import inspect
 import secrets
 import uuid
 from collections.abc import AsyncGenerator, Callable
@@ -654,6 +655,39 @@ def stamina_testing_mode():
 #     )
 #     with patch("app.api_clients.azure.AZURE_SA_CREDENTIALS", test_key):
 #         yield
+
+
+def assert_equal_or_raises[T](
+    func: Callable[[], T],
+    expected: T | type[Exception] | Exception,
+) -> None:
+    """Assert that an expression either returns a specific value or raises an exception.
+
+    Especially useful when used with `pytest.mark.parametrize` to check different scenarios.
+
+    Example Usage:
+
+        @pytest.mark.parametrize(
+            ("numerator", "denominator", "expected"),
+            [
+                (5, 2, 2.5),
+                (2, 2, 1.0),
+                (1, 0, ZeroDivisionError("division by zero")),
+                (1, "string", TypeError),
+            ],
+        )
+        def test_division(numerator, denominator, expected):
+            assert_equal_or_raises(lambda: numerator / denominator, expected)
+    """
+
+    if inspect.isclass(expected) and issubclass(expected, Exception):
+        with pytest.raises(expected):
+            func()
+    elif isinstance(expected, Exception):
+        with pytest.raises(expected.__class__, match=str(expected)):
+            func()
+    else:
+        assert func() == expected
 
 
 FIXED_SEED: Final[int] = 42

@@ -6,8 +6,14 @@ import time_machine
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.currency import CurrencyConverter, CurrencyConverterError, MissingExchangeRateError
+from app.currency import (
+    BaseCurrencyNotSupportedError,
+    CurrencyConverter,
+    CurrencyConverterError,
+    MissingExchangeRateError,
+)
 from app.db.models import ExchangeRates
+from tests.conftest import assert_equal_or_raises
 from tests.types import ModelFactory
 
 
@@ -78,36 +84,22 @@ async def test_currency_converter_from_db_only_old_records(
         (1, "ZZZ", "ZZZ", Decimal("1.00")),
         (0, "ZZZ", "USD", Decimal("0.00")),
         (0, "USD", "ZZZ", Decimal("0.00")),
+        (1, "USD", "ZZZ", MissingExchangeRateError("USD", "ZZZ")),
+        (1, "ZZZ", "USD", BaseCurrencyNotSupportedError("ZZZ")),
     ],
     ids=lambda x: str(x),
 )
-def test_convert_currency_success(
+def test_convert_currency(
     currency_converter: CurrencyConverter,
     amount: int | float | Decimal,
     from_currency: str,
     to_currency: str,
     expected: Decimal,
 ):
-    assert currency_converter.convert_currency(amount, from_currency, to_currency) == expected
-
-
-@pytest.mark.parametrize(
-    ("amount", "from_currency", "to_currency", "exception_cls", "exception_msg_match"),
-    [
-        (1, "USD", "ZZZ", MissingExchangeRateError, "ZZZ"),
-        (1, "ZZZ", "USD", MissingExchangeRateError, "ZZZ"),
-    ],
-)
-def test_convert_currency_errors(
-    currency_converter: CurrencyConverter,
-    amount: int | float | Decimal,
-    from_currency: str,
-    to_currency: str,
-    exception_cls: type[CurrencyConverterError],
-    exception_msg_match: str,
-):
-    with pytest.raises(exception_cls, match=exception_msg_match):
-        currency_converter.convert_currency(amount, from_currency, to_currency)
+    assert_equal_or_raises(
+        lambda: currency_converter.convert_currency(amount, from_currency, to_currency),
+        expected,
+    )
 
 
 @pytest.mark.parametrize(
@@ -120,7 +112,7 @@ def test_convert_currency_errors(
         ("USD", "EUR", Decimal("0.9252")),
         ("EUR", "USD", Decimal("1.0808")),
         ("ZZZ", "ZZZ", Decimal("1.00")),
-        ("ZZZ", "USD", MissingExchangeRateError("ZZZ", "USD")),
+        ("ZZZ", "USD", BaseCurrencyNotSupportedError("ZZZ")),
     ],
 )
 def test_get_exchange_rate(
@@ -129,8 +121,7 @@ def test_get_exchange_rate(
     to_currency: str,
     expected: Decimal | Exception,
 ):
-    if isinstance(expected, Exception):
-        with pytest.raises(expected.__class__, match=str(expected)):
-            currency_converter.get_exchange_rate(from_currency, to_currency)
-    else:
-        assert currency_converter.get_exchange_rate(from_currency, to_currency) == expected
+    assert_equal_or_raises(
+        lambda: currency_converter.get_exchange_rate(from_currency, to_currency),
+        expected,
+    )
