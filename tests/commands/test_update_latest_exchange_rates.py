@@ -44,6 +44,11 @@ async def test_successful_fetch_exchange_rates_when_missing_multiple_currencies(
     with caplog.at_level(logging.INFO, logger="app.commands.update_latest_exchange_rates"):
         await update_latest_exchange_rates.main(test_settings)
 
+    latest_exchange_rates = {
+        exchange_rates.base_currency: exchange_rates
+        for exchange_rates in await exchange_rates_handler.fetch_latest_valid()
+    }
+
     for base_currency, currency_rates in exchange_rates_per_currency.items():
         assert (
             f"Exchange rates for {base_currency} are not stored in the database or "
@@ -55,8 +60,7 @@ async def test_successful_fetch_exchange_rates_when_missing_multiple_currencies(
             in caplog.messages
         )
 
-        exchange_rates = await exchange_rates_handler.fetch_latest_valid(base_currency)
-
+        exchange_rates = latest_exchange_rates[base_currency]
         assert exchange_rates is not None
         assert exchange_rates.api_response["base_code"] == base_currency
         assert exchange_rates.api_response["conversion_rates"] == currency_rates
@@ -132,10 +136,10 @@ async def test_fetch_exchange_rates_when_outdated_are_present_in_db(
     new_exchange_rates = await exchange_rates_handler.query_db()
     assert len(new_exchange_rates) == 2
 
-    latest_exchange_rates = await exchange_rates_handler.fetch_latest_valid("USD")
+    latest_exchange_rates = await exchange_rates_handler.fetch_latest_valid()
 
-    assert latest_exchange_rates is not None
-    assert latest_exchange_rates.api_response["conversion_rates"] == {
+    assert len(latest_exchange_rates) == 1
+    assert latest_exchange_rates[0].api_response["conversion_rates"] == {
         "USD": 1.0,
         "EUR": 0.200,
         "GBP": 0.100,
@@ -194,11 +198,12 @@ async def test_exchange_rate_api_timeouts_then_succeeds(
     with caplog.at_level(logging.INFO, logger="app.commands.update_latest_exchange_rates"):
         await update_latest_exchange_rates.main(test_settings)
 
-    latest_exchange_rates = await exchange_rates_handler.fetch_latest_valid("USD")
+    latest_exchange_rates = await exchange_rates_handler.fetch_latest_valid()
+    assert len(latest_exchange_rates) == 1
 
-    assert latest_exchange_rates is not None
     assert (
-        latest_exchange_rates.api_response["conversion_rates"] == exchange_rates_per_currency["USD"]
+        latest_exchange_rates[0].api_response["conversion_rates"]
+        == exchange_rates_per_currency["USD"]
     )
 
     assert "Fetching latest exchange rates for USD" in caplog.messages

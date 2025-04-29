@@ -14,38 +14,36 @@ class CurrencyConverterError(Exception):
     pass
 
 
+class BaseCurrencyNotSupportedError(CurrencyConverterError):
+    def __init__(self, base_currency: str) -> None:
+        self.base_currency = base_currency
+        super().__init__(f"Missing exchange rates for base currency {base_currency}")
+
+
 class MissingExchangeRateError(CurrencyConverterError):
-    def __init__(self, currency: str) -> None:
-        self.currency = currency
-        super().__init__(f"Missing exchange rate for currency {currency}")
+    def __init__(self, base_currency: str, to_currency: str) -> None:
+        self.base_currency = base_currency
+        self.to_currency = to_currency
+        super().__init__(
+            f"Exchange rates for base currency {base_currency} don't include {to_currency}"
+        )
 
 
 class CurrencyConverter:
     DECIMAL_PRECISION: Final[int] = 4
 
-    def __init__(
-        self,
-        base_currency: str,
-        exchange_rates: dict[str, Decimal],
-        exchange_rates_db_record: ExchangeRates | None = None,
-    ) -> None:
-        self.base_currency = base_currency
-        self.exchange_rates = exchange_rates
-        self.exchange_rates_db_record = exchange_rates_db_record
+    def __init__(self, exchange_rates_per_currency: dict[str, ExchangeRates]) -> None:
+        self.exchange_rates_per_currency = exchange_rates_per_currency
 
     @classmethod
-    async def from_db(cls, db_session: AsyncSession, base_currency: str) -> Self:
+    async def from_db(cls, db_session: AsyncSession) -> Self:
         exchange_rates_handler = ExchangeRatesHandler(db_session)
-        exchange_rates = await exchange_rates_handler.fetch_latest_valid(base_currency)
+        exchange_rates = await exchange_rates_handler.fetch_latest_valid()
 
-        if exchange_rates is None:
+        if not exchange_rates:
             raise CurrencyConverterError("No active exchange rates found in the database")
 
-        conversion_rate: dict[str, Decimal] = {
-            currency: cls._normalize(rate)
-            for currency, rate in exchange_rates.api_response["conversion_rates"].items()
-        }
-        return cls(exchange_rates.base_currency, conversion_rate, exchange_rates)
+        return cls({er.base_currency: er for er in exchange_rates})
 
     @classmethod
     def _normalize(cls, amount: Number) -> Decimal:
@@ -56,14 +54,21 @@ class CurrencyConverter:
 
         return amount.quantize(q)
 
-    def _get_exchange_rate_against_base(self, currency: str) -> Decimal:
-        if currency == self.base_currency:
+    def get_exchange_rate(self, from_currency: str, to_currency: str) -> Decimal:
+        if from_currency == to_currency:
             return self._normalize(1)
 
-        try:
-            return self.exchange_rates[currency]
-        except KeyError:
-            raise MissingExchangeRateError(currency)
+        exchange_rates = self.exchange_rates_per_currency.get(from_currency)
+
+        if exchange_rates is None:
+            raise BaseCurrencyNotSupportedError(base_currency=from_currency)
+
+        conversion_rate = exchange_rates.api_response["conversion_rates"].get(to_currency)
+
+        if conversion_rate is None:
+            raise MissingExchangeRateError(from_currency, to_currency)
+
+        return self._normalize(conversion_rate)
 
     def convert_currency(self, amount: Number, from_currency: str, to_currency: str) -> Decimal:
         amount = self._normalize(amount)
@@ -71,15 +76,11 @@ class CurrencyConverter:
         if amount == 0 or from_currency == to_currency:
             return amount
 
-        to_currency_rate = self._get_exchange_rate_against_base(to_currency)
-        from_currency_rate = self._get_exchange_rate_against_base(from_currency)
+        exchange_rate = self.get_exchange_rate(from_currency, to_currency)
+        return self._normalize(amount * exchange_rate)
 
-        return self._normalize(amount * to_currency_rate / from_currency_rate)
+    def get_exchangerate_api_response_json(self, base_currency: str) -> str:
+        if base_currency not in self.exchange_rates_per_currency:  # pragma: no branch
+            raise BaseCurrencyNotSupportedError(base_currency)
 
-    def get_exchangerate_api_response_json(self) -> str:
-        if self.exchange_rates_db_record is None:  # pragma: no cover
-            raise CurrencyConverterError(
-                "Currency converter not initialized from a database record"
-            )
-
-        return json.dumps(self.exchange_rates_db_record.api_response, indent=4)
+        return json.dumps(self.exchange_rates_per_currency[base_currency].api_response, indent=4)
