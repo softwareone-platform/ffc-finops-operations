@@ -88,14 +88,18 @@ class ChargeEntry:
         return contra_entry
 
 
-@dataclass
 class ChargesFileGenerator:
-    account: Account
-    currency: str
-    currency_converter: CurrencyConverter
-    exports_dir: pathlib.Path
-
-    def __post_init__(self) -> None:
+    def __init__(
+        self,
+        account: Account,
+        currency: str,
+        currency_converter: CurrencyConverter,
+        exports_dir: pathlib.Path,
+    ) -> None:
+        self.account = account
+        self.currency = currency
+        self.currency_converter = currency_converter
+        self.exports_dir = exports_dir
         self.workbook = openpyxl.Workbook(write_only=True)
         self.worksheet = self.workbook.create_sheet()
         self.running_total = Decimal(0)
@@ -124,11 +128,12 @@ class ChargesFileGenerator:
         }
 
         if not self.has_entries:
+            # Add the header row
             self.worksheet.append(list(row.keys()))
+            self.total_rows += 1
 
         self.worksheet.append(list(row.values()))
-
-        self.total_rows += 2 if not self.has_entries else 1
+        self.total_rows += 1
         self.running_total += charge_entry.price
 
     def add_datasource_expense(self, datasource_expense: DatasourceExpense) -> None:
