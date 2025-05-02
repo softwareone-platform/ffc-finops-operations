@@ -74,7 +74,7 @@ async def test_redeeem_entitlements(
 
 async def test_redeeem_entitlements_error_fetching_datasources(
     mocker: MockerFixture,
-    capsys: pytest.CaptureFixture,
+    caplog: pytest.LogCaptureFixture,
     test_settings: Settings,
     apple_inc_organization: Organization,
     entitlement_aws: Entitlement,
@@ -84,9 +84,11 @@ async def test_redeeem_entitlements_error_fetching_datasources(
         "app.commands.redeem_entitlements.fetch_datasources_for_organization",
         side_effect=ReadTimeout("timed out"),
     )
-    await redeem_entitlements(test_settings)
-    captured = capsys.readouterr()
-    assert "Failed to fetch datasources: timed out" in captured.out
+    with caplog.at_level("ERROR"):
+        await redeem_entitlements(test_settings)
+
+    assert "Failed to fetch datasources" in caplog.text
+    assert "timed out" in caplog.text
     await db_session.refresh(entitlement_aws)
     assert entitlement_aws.status == EntitlementStatus.NEW
     assert entitlement_aws.redeemed_by is None

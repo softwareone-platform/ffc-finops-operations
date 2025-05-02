@@ -47,13 +47,4 @@ RUN chmod +x /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 
 # Running gunicorn with Uvicorn workers
-CMD [ \
-    "gunicorn", \
-    "-b", ":8000", \
-    "--capture-output", \
-    "--error-logfile", "-", \
-    "--access-logfile", "-", \
-    "--workers", "4", \
-    "--worker-class", "uvicorn_worker.UvicornWorker", \
-    "app.main:app" \
-]
+CMD [ "ffcops", "serve", "--host", "0.0.0.0", "--port", "8975", "--workers", "4"]

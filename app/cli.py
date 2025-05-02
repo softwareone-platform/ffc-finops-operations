@@ -1,15 +1,14 @@
 import inspect
-import logging
 
 import typer
 from pyfiglet import Figlet
 from rich.console import Console
-from rich.logging import RichHandler
 from rich.text import Text
 
 from app import commands
 from app.conf import get_settings
 from app.db.base import configure_db_engine
+from app.logging import setup_logging
 
 
 def gradient(start_hex, end_hex, num_samples=10):  # pragma: no cover
@@ -67,17 +66,12 @@ for name, module in inspect.getmembers(commands):
 
 
 @app.callback()
-def main(ctx: typer.Context):
+def main(
+    ctx: typer.Context,
+):
     show_banner()
     settings = get_settings()
-
-    if settings.cli_rich_logging:
-        logging.basicConfig(
-            level=logging.INFO,
-            format="%(message)s",
-            datefmt="%X",
-            handlers=[RichHandler()],
-        )
-
-    configure_db_engine(settings)
     ctx.obj = settings
+    if ctx.invoked_subcommand != "serve":
+        setup_logging(settings)
+        configure_db_engine(settings)
