@@ -2,7 +2,7 @@ import io
 import logging
 import pathlib
 import zipfile
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 import pandas as pd
@@ -203,6 +203,130 @@ async def eur_org_billed_in_gbp_expenses(
 
 
 @pytest.fixture
+async def gbp_org_billed_in_eur_expenses(
+    organization_factory: ModelFactory[Organization],
+    datasource_expense_factory: ModelFactory[DatasourceExpense],
+    entitlement_factory: ModelFactory[Entitlement],
+    affiliate_account: Account,
+    db_session: AsyncSession,
+    faker: Faker,
+):
+    org = await organization_factory(
+        operations_external_id="ORG-22222",
+        name=faker.company(),
+        currency="GBP",
+        billing_currency="EUR",
+        status=OrganizationStatus.ACTIVE,
+        linked_organization_id=faker.uuid4(str),
+    )
+
+    aws_acc_mar_expenses = await datasource_expense_factory(  # noqa: F841
+        datasource_id=faker.uuid4(str),
+        datasource_name="AWS Account",
+        organization=org,
+        month=3,
+        year=2025,
+        month_expenses=Decimal("50.00"),
+        created_at=datetime(2025, 3, 1, 10, 0, 0, tzinfo=UTC),
+        updated_at=datetime(2025, 3, 31, 10, 0, 0, tzinfo=UTC),
+    )
+
+    azure_acc_mar_expenses = await datasource_expense_factory(  # noqa: F841
+        datasource_id=faker.uuid4(str),
+        datasource_name="Azure Account",
+        organization=org,
+        month=3,
+        year=2025,
+        month_expenses=Decimal("40.00"),
+        created_at=datetime(2025, 3, 1, 10, 0, 0, tzinfo=UTC),
+        updated_at=datetime(2025, 3, 31, 10, 0, 0, tzinfo=UTC),
+    )
+
+    await entitlement_factory(
+        name="Free AWS account",
+        affiliate_external_id="ACC-111111",
+        datasource_id=aws_acc_mar_expenses.datasource_id,
+        status=EntitlementStatus.TERMINATED,  # should be ignored
+        owner=affiliate_account,
+    )
+
+    await entitlement_factory(
+        name="Free Azure account",
+        affiliate_external_id="ACC-888888",
+        datasource_id=azure_acc_mar_expenses.datasource_id,
+        status=EntitlementStatus.ACTIVE,
+        owner=affiliate_account,
+    )
+
+    await db_session.refresh(aws_acc_mar_expenses)
+    await db_session.refresh(azure_acc_mar_expenses)
+
+    return org
+
+
+@pytest.fixture
+async def eur_org_billed_in_eur_expenses(
+    organization_factory: ModelFactory[Organization],
+    datasource_expense_factory: ModelFactory[DatasourceExpense],
+    entitlement_factory: ModelFactory[Entitlement],
+    affiliate_account: Account,
+    db_session: AsyncSession,
+    faker: Faker,
+):
+    org = await organization_factory(
+        operations_external_id="ORG-77777",
+        name=faker.company(),
+        currency="EUR",
+        billing_currency="EUR",
+        status=OrganizationStatus.ACTIVE,
+        linked_organization_id=faker.uuid4(str),
+    )
+
+    aws_acc_mar_expenses = await datasource_expense_factory(  # noqa: F841
+        datasource_id=faker.uuid4(str),
+        datasource_name="AWS Account",
+        organization=org,
+        month=3,
+        year=2025,
+        month_expenses=Decimal("50.00"),
+        created_at=datetime(2025, 3, 1, 10, 0, 0, tzinfo=UTC),
+        updated_at=datetime(2025, 3, 31, 10, 0, 0, tzinfo=UTC),
+    )
+
+    azure_acc_mar_expenses = await datasource_expense_factory(  # noqa: F841
+        datasource_id=faker.uuid4(str),
+        datasource_name="Azure Account",
+        organization=org,
+        month=3,
+        year=2025,
+        month_expenses=Decimal("40.00"),
+        created_at=datetime(2025, 3, 1, 10, 0, 0, tzinfo=UTC),
+        updated_at=datetime(2025, 3, 31, 10, 0, 0, tzinfo=UTC),
+    )
+
+    await entitlement_factory(
+        name="Free AWS account",
+        affiliate_external_id="ACC-99999",
+        datasource_id=aws_acc_mar_expenses.datasource_id,
+        status=EntitlementStatus.TERMINATED,  # should be ignored
+        owner=affiliate_account,
+    )
+
+    await entitlement_factory(
+        name="Free Azure account",
+        affiliate_external_id="ACC-88888",
+        datasource_id=azure_acc_mar_expenses.datasource_id,
+        status=EntitlementStatus.ACTIVE,
+        owner=affiliate_account,
+    )
+
+    await db_session.refresh(aws_acc_mar_expenses)
+    await db_session.refresh(azure_acc_mar_expenses)
+
+    return org
+
+
+@pytest.fixture
 async def usd_org_billed_in_usd_expenses(
     organization_factory: ModelFactory[Organization],
     datasource_expense_factory: ModelFactory[DatasourceExpense],
@@ -268,17 +392,118 @@ async def usd_org_billed_in_usd_expenses(
     )
 
 
-def assert_df_matches_snapshot(df: pd.DataFrame, snapshot: Snapshot) -> None:
-    # We're exporting the dataframe to CSV format, so that we can save it in a snapshot file.
+def assert_generated_file_matches_snapshot(
+    excel_file_path: pathlib.Path,
+    snapshot: Snapshot,
+) -> None:
+    # We're exporting the data to CSV format, so that we can save it in a snapshot file.
     # We're intentionally using CSV instead of Excel format, as .xlsx is a binary format and
     # should the test fail, the diff would be unreadable and won't be obvious what's wrong.
-    # There is a seperate test specifically for the excel exporting
+    # Since we're still parsing the file from xlsx that is enough to guarantee that the file
+    # is a valid xlsx file
 
-    file = io.StringIO()
-    df.to_csv(file, index=False, header=True)
+    csv_file = io.StringIO()
+    df = pd.read_excel(excel_file_path)
+    df.to_csv(csv_file, index=False, header=True, float_format="%.2f")
 
-    file.seek(0)
-    snapshot.assert_match(file.read(), "charges.csv")
+    csv_file.seek(0)
+    snapshot.assert_match(csv_file.read(), "charges.csv")
+
+
+@time_machine.travel("2025-04-10T10:00:00Z", tick=False)
+def test_charges_file_generator_append_row(
+    currency_converter: CurrencyConverter,
+    operations_account: Account,
+    test_settings: Settings,
+    tmp_path: pathlib.Path,
+):
+    generator = ChargesFileGenerator(operations_account, "USD", currency_converter, tmp_path)
+
+    assert not generator.has_entries
+    assert generator.total_rows == 0
+    assert generator.running_total == Decimal("0.00")
+
+    generator.append_row(
+        ChargeEntry(
+            subscription_search_criteria="subscription.externalIds.vendor",
+            subscription_search_value=operations_account.id,
+            item_search_criteria="item.externalIds.vendor",
+            item_search_value=test_settings.ffc_external_product_id,
+            usage_start_time=(datetime.now(UTC) - timedelta(days=28)).date(),
+            usage_end_time=datetime.now(UTC).date(),
+            price=Decimal("1.00"),
+            external_reference="ORG-1234-5678",
+            vendor_description_1="AWS Account",
+            vendor_description_2="123456789",
+            vendor_reference="",
+        )
+    )
+
+    assert generator.has_entries
+    assert generator.total_rows == 2  # with the header
+    assert generator.running_total == Decimal("1.00")
+
+    generator.append_row(
+        ChargeEntry(
+            subscription_search_criteria="subscription.externalIds.vendor",
+            subscription_search_value=operations_account.id,
+            item_search_criteria="item.externalIds.vendor",
+            item_search_value=test_settings.ffc_external_product_id,
+            usage_start_time=(datetime.now(UTC) - timedelta(days=28)).date(),
+            usage_end_time=datetime.now(UTC).date(),
+            price=Decimal("2.00"),
+            external_reference="ORG-1234-5678",
+            vendor_description_1="GCP Account",
+            vendor_description_2="987654321",
+            vendor_reference="",
+        )
+    )
+
+    assert generator.has_entries
+    assert generator.total_rows == 3  # with the header
+    assert generator.running_total == Decimal("3.00")
+
+
+@pytest.mark.parametrize(
+    ("account_fixture", "currency", "expected_total_rows", "expected_running_total"),
+    [
+        ("operations_account", "EUR", 5, Decimal("0.00")),
+        ("affiliate_account", "EUR", 2, Decimal("0.65")),
+        ("another_affiliate_account", "EUR", 2, Decimal("0.56")),
+        ("operations_account", "GBP", 4, Decimal("0.43")),
+        ("affiliate_account", "GBP", 2, Decimal("0.34")),
+        ("another_affiliate_account", "GBP", 0, Decimal("0.00")),
+        ("operations_account", "USD", 5, Decimal("1.10")),
+        ("affiliate_account", "USD", 2, Decimal("0.60")),
+        ("another_affiliate_account", "USD", 0, Decimal("0.00")),
+    ],
+)
+@time_machine.travel("2025-04-10T10:00:00Z", tick=False)
+async def test_charges_file_generator_add_datasource_expense(
+    currency_converter: CurrencyConverter,
+    usd_org_billed_in_usd_expenses: Organization,
+    usd_org_billed_in_eur_expenses: Organization,
+    eur_org_billed_in_gbp_expenses: Organization,
+    test_settings: Settings,
+    db_session: AsyncSession,
+    request: pytest.FixtureRequest,
+    tmp_path: pathlib.Path,
+    account_fixture: str,
+    currency: str,
+    expected_total_rows: int,
+    expected_running_total: Decimal,
+):
+    account = request.getfixturevalue(account_fixture)
+
+    generator = ChargesFileGenerator(account, currency, currency_converter, tmp_path)
+
+    async for ds_exp in fetch_datasource_expenses(db_session, currency):
+        generator.add_datasource_expense(ds_exp)
+
+    generator.save("charges.xlsx")
+    assert generator.has_entries == (generator.total_rows > 0)
+    assert generator.total_rows == expected_total_rows  # with the header
+    assert generator.running_total.quantize(Decimal("0.00")) == expected_running_total
 
 
 @pytest.mark.fixed_random_seed
@@ -291,12 +516,12 @@ async def test_generate_charges_file_dataframe_operations_same_currency(
     db_session: AsyncSession,
     tmp_path: pathlib.Path,
 ):
-    charges_file_generator = ChargesFileGenerator(
-        operations_account, "USD", currency_converter, tmp_path
-    )
-    datasource_expenses = await fetch_datasource_expenses(db_session, operations_account, "USD")
-    df = charges_file_generator.generate_charges_file_dataframe(datasource_expenses)
-    assert_df_matches_snapshot(df, snapshot)
+    generator = ChargesFileGenerator(operations_account, "USD", currency_converter, tmp_path)
+
+    async for ds_exp in fetch_datasource_expenses(db_session, "USD"):
+        generator.add_datasource_expense(ds_exp)
+
+    assert_generated_file_matches_snapshot(generator.save("charges.xlsx"), snapshot)
 
 
 @pytest.mark.fixed_random_seed
@@ -309,12 +534,12 @@ async def test_generate_charges_file_dataframe_affiliate_same_currency(
     snapshot: Snapshot,
     tmp_path: pathlib.Path,
 ):
-    charges_file_generator = ChargesFileGenerator(
-        affiliate_account, "USD", currency_converter, tmp_path
-    )
-    datasource_expenses = await fetch_datasource_expenses(db_session, affiliate_account, "USD")
-    df = charges_file_generator.generate_charges_file_dataframe(datasource_expenses)
-    assert_df_matches_snapshot(df, snapshot)
+    generator = ChargesFileGenerator(affiliate_account, "USD", currency_converter, tmp_path)
+
+    async for ds_exp in fetch_datasource_expenses(db_session, "USD"):
+        generator.add_datasource_expense(ds_exp)
+
+    assert_generated_file_matches_snapshot(generator.save("charges.xlsx"), snapshot)
 
 
 async def test_generate_charges_file_dataframe_empty_file(
@@ -324,12 +549,12 @@ async def test_generate_charges_file_dataframe_empty_file(
     db_session: AsyncSession,
     tmp_path: pathlib.Path,
 ):
-    charges_file_generator = ChargesFileGenerator(
-        affiliate_account, "EUR", currency_converter, tmp_path
-    )
-    datasource_expenses = await fetch_datasource_expenses(db_session, affiliate_account, "EUR")
-    df = charges_file_generator.generate_charges_file_dataframe(datasource_expenses)
-    assert df is None
+    generator = ChargesFileGenerator(affiliate_account, "EUR", currency_converter, tmp_path)
+
+    async for ds_exp in fetch_datasource_expenses(db_session, "EUR"):
+        generator.add_datasource_expense(ds_exp)
+
+    assert not generator.has_entries
 
 
 @pytest.mark.parametrize(
@@ -349,36 +574,12 @@ async def test_generate_charges_file_dataframe_affiliate_multiple_organizations_
     tmp_path: pathlib.Path,
     currency: str,
 ):
-    charges_file_generator = ChargesFileGenerator(
-        affiliate_account, currency, currency_converter, tmp_path
-    )
-    datasource_expenses = await fetch_datasource_expenses(db_session, affiliate_account, currency)
-    df = charges_file_generator.generate_charges_file_dataframe(datasource_expenses)
-    assert_df_matches_snapshot(df, snapshot)
+    generator = ChargesFileGenerator(affiliate_account, currency, currency_converter, tmp_path)
 
+    async for ds_exp in fetch_datasource_expenses(db_session, currency):
+        generator.add_datasource_expense(ds_exp)
 
-@pytest.mark.fixed_random_seed
-@time_machine.travel("2025-04-10T10:00:00Z", tick=False)
-async def test_export_to_excel(
-    currency_converter: CurrencyConverter,
-    operations_account: Account,
-    usd_org_billed_in_usd_expenses: Organization,
-    db_session: AsyncSession,
-    snapshot: Snapshot,
-    tmp_path: pathlib.Path,
-):
-    charges_file_generator = ChargesFileGenerator(
-        operations_account, "USD", currency_converter, tmp_path
-    )
-    datasource_expenses = await fetch_datasource_expenses(db_session, operations_account, "USD")
-    df = charges_file_generator.generate_charges_file_dataframe(datasource_expenses)
-    assert df is not None
-
-    filepath = charges_file_generator.export_to_excel(df, "charges.xlsx")
-
-    assert filepath.name == "charges.xlsx"
-    assert filepath.parent == tmp_path
-    snapshot.assert_match(filepath.read_bytes(), "charges.xlsx")
+    assert_generated_file_matches_snapshot(generator.save("charges.xlsx"), snapshot)
 
 
 @pytest.mark.fixed_random_seed
@@ -392,24 +593,50 @@ async def test_export_to_zip(
     snapshot: Snapshot,
     tmp_path: pathlib.Path,
 ):
-    charges_file_generator = ChargesFileGenerator(
-        operations_account, "EUR", currency_converter, tmp_path
-    )
+    generator = ChargesFileGenerator(operations_account, "EUR", currency_converter, tmp_path)
 
-    datasource_expenses = await fetch_datasource_expenses(db_session, operations_account, "EUR")
-    df = charges_file_generator.generate_charges_file_dataframe(datasource_expenses)
-    assert df is not None
+    async for ds_exp in fetch_datasource_expenses(db_session, "EUR"):
+        generator.add_datasource_expense(ds_exp)
 
-    filepath = charges_file_generator.export_to_zip(df, filename="charges.zip")
+    assert generator.has_entries
 
-    assert filepath.name == "charges.zip"
-    assert filepath.parent == tmp_path
+    zip_file_path = generator.make_archive("charges.zip")
 
-    with zipfile.ZipFile(filepath, "r") as archive:
-        assert sorted(archive.namelist()) == ["charges.xlsx", "exchange_rates_EUR.json"]
+    with zipfile.ZipFile(zip_file_path, "r") as archive:
+        assert sorted(archive.namelist()) == ["charges.xlsx", "exchange_rates_USD.json"]
 
-        snapshot.assert_match(archive.read("charges.xlsx"), "charges.xlsx")
-        snapshot.assert_match(archive.read("exchange_rates_EUR.json"), "exchange_rates.json")
+        excel_file_path = pathlib.Path(archive.extract("charges.xlsx", tmp_path))
+        assert_generated_file_matches_snapshot(excel_file_path, snapshot)
+        snapshot.assert_match(archive.read("exchange_rates_USD.json"), "exchange_rates.json")
+
+
+@time_machine.travel("2025-04-10T10:00:00Z", tick=False)
+async def test_export_to_zip_includes_multiple_exchange_rates(
+    exchange_rates_factory: ModelFactory[ExchangeRates],
+    operations_account: Account,
+    usd_org_billed_in_eur_expenses: Organization,
+    eur_org_billed_in_eur_expenses: Organization,
+    gbp_org_billed_in_eur_expenses: Organization,
+    currency_converter: CurrencyConverter,
+    db_session: AsyncSession,
+    snapshot: Snapshot,
+    tmp_path: pathlib.Path,
+):
+    generator = ChargesFileGenerator(operations_account, "EUR", currency_converter, tmp_path)
+
+    async for ds_exp in fetch_datasource_expenses(db_session, "EUR"):
+        generator.add_datasource_expense(ds_exp)
+
+    assert generator.has_entries
+
+    zip_file_path = generator.make_archive("charges.zip")
+
+    with zipfile.ZipFile(zip_file_path, "r") as archive:
+        assert sorted(archive.namelist()) == [
+            "charges.xlsx",
+            "exchange_rates_GBP.json",
+            "exchange_rates_USD.json",
+        ]
 
 
 @pytest.mark.parametrize(
@@ -428,25 +655,24 @@ async def test_get_total_amount(
     usd_org_billed_in_usd_expenses: Organization,
     usd_org_billed_in_eur_expenses: Organization,
     eur_org_billed_in_gbp_expenses: Organization,
-    snapshot: Snapshot,
     tmp_path: pathlib.Path,
+    snapshot: Snapshot,
     db_session: AsyncSession,
     currency: str,
     expected_total_amount: Decimal,
 ):
-    charges_file_generator = ChargesFileGenerator(
-        operations_account, currency, currency_converter, tmp_path
-    )
-    datasource_expenses = await fetch_datasource_expenses(db_session, operations_account, currency)
-    df = charges_file_generator.generate_charges_file_dataframe(datasource_expenses)
+    generator = ChargesFileGenerator(operations_account, currency, currency_converter, tmp_path)
+    async for ds_exp in fetch_datasource_expenses(db_session, currency):
+        generator.add_datasource_expense(ds_exp)
 
-    assert df is not None
+    assert generator.has_entries
 
-    total_amount = charges_file_generator.get_total_amount(df)
+    df = pd.read_excel(generator.save("charges.xlsx"))
 
+    total_amount = generator.running_total.quantize(Decimal("0.00"))
     assert total_amount == expected_total_amount
-    assert total_amount == df["Purchase Price"].sum()  # type: ignore[index]
-    assert total_amount == df["Total Purchase Price"].sum()  # type: ignore[index]
+    assert total_amount == Decimal(df["Purchase Price"].sum()).quantize(Decimal("0.00"))
+    assert total_amount == Decimal(df["Total Purchase Price"].sum()).quantize(Decimal("0.00"))
 
 
 @pytest.mark.parametrize(
@@ -765,7 +991,7 @@ async def test_full_run(
     # (both new records and updating existing ones), so that we can filter the affected records
     # bellow
     with caplog.at_level(logging.INFO), time_machine.travel("2025-04-10T11:00:00Z", tick=False):
-        await generate_monthly_charges_main(tmp_path, test_settings)
+        await generate_monthly_charges_main(exports_dir=tmp_path, settings=test_settings)
 
     await db_session.refresh(generated_charges_file)
     await db_session.refresh(processed_charges_file)
@@ -831,22 +1057,9 @@ async def test_full_run(
     )
     assert "Found 4 accounts in the database" in found_logs
 
-    assert "Found 1 organizations to process for billing currency EUR" in found_logs
-    assert "Found 1 organizations to process for billing currency GBP" in found_logs
-    assert "Found 1 organizations to process for billing currency USD" in found_logs
-
-    assert (
-        "Found 2 datasource expenses for all organizations "
-        "with EUR billing currency for month = 3, year = 2025"
-    ) in found_logs
-    assert (
-        "Found 2 datasource expenses for all organizations "
-        "with GBP billing currency for month = 3, year = 2025"
-    ) in found_logs
-    assert (
-        "Found 3 datasource expenses for all organizations "
-        "with USD billing currency for month = 3, year = 2025"
-    ) in found_logs
+    assert "Found 1 organizations to process with billing currency EUR" in found_logs
+    assert "Found 1 organizations to process with billing currency GBP" in found_logs
+    assert "Found 1 organizations to process with billing currency USD" in found_logs
 
     # filtering "Charges file ..." logs, so that tests failures are easier to debug
     charges_file_logs = [msg for msg in caplog.messages if msg.startswith("Charges file ")]
