@@ -37,7 +37,7 @@ def test_serve_with_options(mocker: MockerFixture):
         "app.commands.serve.get_logging_config",
         return_value={"logging": "config"},
     )
-    mocker.patch("app.commands.serve.number_of_workers", return_value=4)
+    mocker.patch("app.commands.serve.get_default_number_of_workers", return_value=4)
     mocked_standalone_app = mocker.patch("app.commands.serve.StandaloneApplication")
     runner = CliRunner()
     result = runner.invoke(
