@@ -229,8 +229,8 @@ async def test_organization_with_recent_updates_to_datasource_expences(
     [
         (
             status.HTTP_404_NOT_FOUND,
-            logging.WARNING,
-            "Organization %s not found on Optscale. Skipping...",
+            logging.ERROR,
+            "Organization %s not found on Optscale.",
         ),
         (
             status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -241,10 +241,11 @@ async def test_organization_with_recent_updates_to_datasource_expences(
 )
 @time_machine.travel("2025-03-20T10:00:00Z", tick=False)
 async def test_optscale_api_returns_exception(
+    mocker: MockerFixture,
+    caplog: pytest.LogCaptureFixture,
     test_settings: Settings,
     db_session: AsyncSession,
     organization_factory: ModelFactory[Organization],
-    caplog: pytest.LogCaptureFixture,
     mock_optscale_client: MockOptscaleClient,
     status_code: int,
     expected_log_level: int,
@@ -257,7 +258,11 @@ async def test_optscale_api_returns_exception(
         organization, status_code=status_code
     )
 
-    with caplog.at_level(logging.WARNING):
+    mocked_send_exception = mocker.patch(
+        "app.commands.update_current_month_datasource_expenses.send_exception",
+    )
+
+    with caplog.at_level(logging.ERROR):
         await update_current_month_datasource_expenses.main(test_settings)
 
     assert (
@@ -268,17 +273,24 @@ async def test_optscale_api_returns_exception(
 
     new_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
     assert len(new_datasource_expenses) == 0
+    mocked_send_exception.assert_awaited_once()
+    assert mocked_send_exception.mock_calls[0].args[0] == "Datasource Expenses Update Error"
+    assert expected_log_format % organization.id in mocked_send_exception.mock_calls[0].args[1]
 
 
 @time_machine.travel("2025-03-20T10:00:00Z", tick=False)
 async def test_multiple_datasources_are_handled_correctly(
+    mocker: MockerFixture,
+    caplog: pytest.LogCaptureFixture,
     test_settings: Settings,
     db_session: AsyncSession,
     mock_optscale_client: MockOptscaleClient,
     organization_factory: ModelFactory[Organization],
     datasource_expense_factory: ModelFactory[DatasourceExpense],
-    caplog: pytest.LogCaptureFixture,
 ):
+    mocker.patch(
+        "app.commands.update_current_month_datasource_expenses.send_exception",
+    )
     datasource_expense_handler = DatasourceExpenseHandler(db_session)
     organization1 = await organization_factory(
         linked_organization_id=str(uuid.uuid4()), operations_external_id="org_1_external_id"
@@ -369,7 +381,7 @@ async def test_multiple_datasources_are_handled_correctly(
             f"Skipping child datasource {org_1_datasource_id3} of type azure_tenant" in caplog.text
         )
         assert f"Skipping child datasource {org_1_datasource_id4} of type gcp_tenant" in caplog.text
-        assert f"Organization {organization4.id} not found on Optscale. Skipping..." in caplog.text
+        assert f"Organization {organization4.id} not found on Optscale." in caplog.text
 
     new_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
 

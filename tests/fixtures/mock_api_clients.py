@@ -52,14 +52,14 @@ class BaseMockAPIClient(Protocol[C]):
 
         return api_client_cls
 
-    def commnon_matchers(self) -> dict[str, Any]:
+    def common_matchers(self) -> dict[str, Any]:
         return {}
 
     def add_mock_response(self, method: str, url: str, **kwargs: Any) -> None:
         self.httpx_mock.add_response(
             method=method,
             url=f"{self.real_client.base_url}/{url.removeprefix('/')}",
-            **self.commnon_matchers(),
+            **self.common_matchers(),
             **kwargs,
         )
 

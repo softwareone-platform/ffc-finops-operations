@@ -12,6 +12,7 @@ from app.db.base import session_factory
 from app.db.handlers import EntitlementHandler, OrganizationHandler
 from app.db.models import Entitlement, Organization
 from app.enums import EntitlementStatus, OrganizationStatus
+from app.notifications import send_exception, send_info
 
 logger = logging.getLogger(__name__)
 
@@ -71,22 +72,26 @@ async def process_datasource(
                     "linked_datasource_name": datasource["name"],
                 },
             )
-            logger.info(
+            msg = (
                 f"The entitlement {instance.id} - {instance.name} "
-                f"owner by {instance.owner.id} - {instance.owner.name} "
+                f"owned by {instance.owner.id} - {instance.owner.name} "
                 f"has been redeemed by {organization.id} - {organization.name} "
                 f"for datasource {datasource_id} - {datasource_name}."
             )
+            logger.info(msg)
+            await send_info("Redeem Entitlements Success", msg)
         else:
             logger.info(
                 f"Entitlement not found for datasource {datasource_id} - {datasource_name}."
             )
 
     except DatabaseError as e:  # pragma: no cover
-        logger.error(
+        msg = (
             f"An error occurred while updating the entitlement for "
             f"{datasource_id} - {datasource_name}: {e}"
         )
+        logger.error(msg)
+        await send_exception("Redeem Entitlements Error", msg)
 
 
 async def redeem_entitlements(settings: Settings):
@@ -111,7 +116,9 @@ async def redeem_entitlements(settings: Settings):
                     organization.linked_organization_id,  # type: ignore
                 )
             except httpx.HTTPError as e:
-                logger.error(f"Failed to fetch datasources for organization {organization.id}: {e}")
+                message = f"Failed to fetch datasources for organization {organization.id}: {e}"
+                logger.error(message)
+                await send_exception("Redeem Entitlements Error", message)
                 continue
             for datasource in datasources:
                 await process_datasource(

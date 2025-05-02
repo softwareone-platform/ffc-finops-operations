@@ -68,12 +68,16 @@ async def test_command_only_new_datasource_expenses(
 
 @time_machine.travel("2025-04-01T10:00:00Z", tick=False)
 async def test_command_delete_only_old_datasource_expenses(
+    mocker: MockerFixture,
+    caplog: pytest.LogCaptureFixture,
     db_session: AsyncSession,
     test_settings: Settings,
-    caplog: pytest.LogCaptureFixture,
     organization_factory: ModelFactory[Organization],
     datasource_expense_factory: ModelFactory[DatasourceExpense],
 ):
+    mocked_send_info = mocker.patch(
+        "app.commands.cleanup_obsolete_datasource_expenses.send_info",
+    )
     org1 = await organization_factory(operations_external_id="org1")
     await datasource_expense_factory(
         organization=org1,
@@ -116,8 +120,12 @@ async def test_command_delete_only_old_datasource_expenses(
         "Fetching obsolete datasource expenses from the database",
         "Found 3 obsolete datasource expenses to delete",
         "Deleting 3 obsolete datasource expenses from the database",
-        "Deleted 3 obsolete datasource expenses from the database",
+        "3 obsolete datasource expenses have been deleted.",
     ]
+    mocked_send_info.assert_awaited_once_with(
+        "Cleanup Obsolete Datasource Expenses Success",
+        "3 obsolete datasource expenses have been deleted.",
+    )
 
     num_ds_expenses_in_db = await db_session.scalar(select(func.count(DatasourceExpense.id)))
     assert num_ds_expenses_in_db == 4

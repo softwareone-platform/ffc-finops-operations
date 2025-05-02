@@ -9,6 +9,7 @@ from sqlalchemy import delete, func, select
 from app.conf import Settings
 from app.db.base import session_factory
 from app.db.models import DatasourceExpense
+from app.notifications import send_info
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +19,7 @@ async def main(settings: Settings) -> None:
         logger.info("Fetching obsolete datasource expenses from the database")
 
         threshold_date = datetime.now(UTC) - relativedelta(
-            months=settings.datasources_obsolete_after_months
+            months=settings.datasources_expenses_obsolete_after_months
         )
         where_cond = DatasourceExpense.created_at < threshold_date
 
@@ -38,7 +39,10 @@ async def main(settings: Settings) -> None:
 
         result = await session.execute(delete(DatasourceExpense).where(where_cond))
 
-        logger.info("Deleted %s obsolete datasource expenses from the database", result.rowcount)
+        message = f"{result.rowcount} obsolete datasource expenses have been deleted."
+
+        logger.info(message)
+        await send_info("Cleanup Obsolete Datasource Expenses Success", message)
 
 
 def command(ctx: typer.Context) -> None:

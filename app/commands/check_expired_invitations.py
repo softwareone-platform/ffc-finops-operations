@@ -9,6 +9,7 @@ from app.conf import Settings
 from app.db.base import session_factory
 from app.db.models import AccountUser
 from app.enums import AccountUserStatus
+from app.notifications import send_info
 
 logger = logging.getLogger(__name__)
 
@@ -26,10 +27,13 @@ async def check_expired_invitations(settings: Settings):
 
         result = await session.execute(stmt)
 
-        logger.info(
+        message = (
             f"{result.rowcount} invitations have been "
-            "successfully transitioned to `invitation-expired`.",
+            "successfully transitioned to `invitation-expired`."
         )
+
+        logger.info(message)
+        await send_info("Expire Invitations Success", message)
 
 
 def command(ctx: typer.Context):

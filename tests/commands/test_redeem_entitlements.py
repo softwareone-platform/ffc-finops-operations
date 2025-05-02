@@ -59,6 +59,9 @@ async def test_redeeem_entitlements(
             },
         ],
     )
+    mocked_send_info = mocker.patch(
+        "app.commands.redeem_entitlements.send_info",
+    )
 
     await redeem_entitlements(test_settings)
 
@@ -70,6 +73,16 @@ async def test_redeeem_entitlements(
     assert entitlement_aws.redeemed_by == apple_inc_organization
     assert entitlement_aws.redeemed_at is not None
     assert entitlement_aws.redeemed_at == datetime.now(UTC)
+    msg = (
+        f"The entitlement {entitlement_aws.id} - {entitlement_aws.name} "
+        f"owned by {entitlement_aws.owner.id} - {entitlement_aws.owner.name} "
+        f"has been redeemed by {apple_inc_organization.id} - {apple_inc_organization.name} "
+        f"for datasource {entitlement_aws.datasource_id} - aws ds."
+    )
+    mocked_send_info.assert_awaited_once_with(
+        "Redeem Entitlements Success",
+        msg,
+    )
 
 
 async def test_redeeem_entitlements_error_fetching_datasources(
@@ -84,6 +97,9 @@ async def test_redeeem_entitlements_error_fetching_datasources(
         "app.commands.redeem_entitlements.fetch_datasources_for_organization",
         side_effect=ReadTimeout("timed out"),
     )
+    mocker_send_exception = mocker.patch(
+        "app.commands.redeem_entitlements.send_exception",
+    )
     with caplog.at_level("ERROR"):
         await redeem_entitlements(test_settings)
 
@@ -92,6 +108,10 @@ async def test_redeeem_entitlements_error_fetching_datasources(
     await db_session.refresh(entitlement_aws)
     assert entitlement_aws.status == EntitlementStatus.NEW
     assert entitlement_aws.redeemed_by is None
+    mocker_send_exception.assert_awaited_once_with(
+        "Redeem Entitlements Error",
+        (f"Failed to fetch datasources for organization {apple_inc_organization.id}: timed out"),
+    )
 
 
 async def test_fetch_datasources_for_organization(

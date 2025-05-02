@@ -19,14 +19,17 @@ from tests.types import ModelFactory
 
 @time_machine.travel("2025-03-26T10:00:00Z", tick=False)
 async def test_successful_fetch_exchange_rates_when_missing_multiple_currencies(
+    mocker: MockerFixture,
+    caplog: pytest.LogCaptureFixture,
     organization_factory: ModelFactory[Organization],
     exchange_rates_per_currency: dict[str, dict[str, float]],
     test_settings: Settings,
     db_session: AsyncSession,
     mock_exchange_rate_api_client: MockExchangeRateAPIClient,
-    time_machine: time_machine.TimeMachineFixture,
-    caplog: pytest.LogCaptureFixture,
 ):
+    mocked_send_info = mocker.patch(
+        "app.commands.update_latest_exchange_rates.send_info",
+    )
     await organization_factory(currency="USD", operations_external_id="ORG-123")
     # intentional duplicate to test that we only fetch USD exchange rates once
     await organization_factory(currency="USD", operations_external_id="ORG-456")
@@ -71,6 +74,10 @@ async def test_successful_fetch_exchange_rates_when_missing_multiple_currencies(
         assert exchange_rates.next_update == datetime.fromtimestamp(
             exchange_rates.api_response["time_next_update_unix"], UTC
         )
+        mocked_send_info.assert_awaited_once_with(
+            "Exchange Rates Update Success",
+            f"Exchange rates for {', '.join(sorted(exchange_rates_per_currency.keys()))} stored.",
+        )
 
 
 @time_machine.travel("2025-03-26T10:00:00Z", tick=False)
@@ -98,13 +105,17 @@ async def test_dont_fetch_exchange_rates_when_recent_are_present_in_db(
 
 @time_machine.travel("2025-03-26T10:00:00Z", tick=False)
 async def test_fetch_exchange_rates_when_outdated_are_present_in_db(
+    mocker: MockerFixture,
+    caplog: pytest.LogCaptureFixture,
     organization_factory: ModelFactory[Organization],
     test_settings: Settings,
     db_session: AsyncSession,
     mock_exchange_rate_api_client: MockExchangeRateAPIClient,
     exchange_rates_factory: ModelFactory[ExchangeRates],
-    caplog: pytest.LogCaptureFixture,
 ):
+    mocker.patch(
+        "app.commands.update_latest_exchange_rates.send_info",
+    )
     await organization_factory(currency="USD")
 
     exchange_rates_handler = ExchangeRatesHandler(db_session)
@@ -131,7 +142,7 @@ async def test_fetch_exchange_rates_when_outdated_are_present_in_db(
         "adding the currency to the list to be fetched"
     ) in caplog.messages
     assert "Fetching latest exchange rates for USD" in caplog.messages
-    assert "Completed storing exchange rates for USD" in caplog.messages
+    assert "Exchange rates for USD stored." in caplog.messages
 
     new_exchange_rates = await exchange_rates_handler.query_db()
     assert len(new_exchange_rates) == 2
@@ -148,12 +159,16 @@ async def test_fetch_exchange_rates_when_outdated_are_present_in_db(
 
 @time_machine.travel("2025-03-26T10:00:00Z", tick=False)
 async def test_exchange_rate_api_rerturns_unrecoverable_error(
+    mocker: MockerFixture,
+    caplog: pytest.LogCaptureFixture,
     organization_factory: ModelFactory[Organization],
     test_settings: Settings,
     db_session: AsyncSession,
     mock_exchange_rate_api_client: MockExchangeRateAPIClient,
-    caplog: pytest.LogCaptureFixture,
 ):
+    mocked_send_exception = mocker.patch(
+        "app.commands.update_latest_exchange_rates.send_exception",
+    )
     await organization_factory(currency="USD")
     exchange_rates_handler = ExchangeRatesHandler(db_session)
 
@@ -178,17 +193,27 @@ async def test_exchange_rate_api_rerturns_unrecoverable_error(
     assert traceback is not None
 
     assert not await exchange_rates_handler.query_db()
+    mocked_send_exception.assert_awaited_once_with(
+        "Exchange Rates Update Error",
+        "Failed to fetch exchange rates for USD due to an exception: "
+        "exchange_rate API client error: response result is error, "
+        "code: ExchangeRateAPIErrorType.INACTIVE_ACCOUNT",
+    )
 
 
 @time_machine.travel("2025-03-26T10:00:00Z", tick=False)
 async def test_exchange_rate_api_timeouts_then_succeeds(
+    mocker: MockerFixture,
+    caplog: pytest.LogCaptureFixture,
     organization_factory: ModelFactory[Organization],
     exchange_rates_per_currency: dict[str, dict[str, float]],
     test_settings: Settings,
     db_session: AsyncSession,
     mock_exchange_rate_api_client: MockExchangeRateAPIClient,
-    caplog: pytest.LogCaptureFixture,
 ):
+    mocked_send_info = mocker.patch(
+        "app.commands.update_latest_exchange_rates.send_info",
+    )
     await organization_factory(currency="USD")
     exchange_rates_handler = ExchangeRatesHandler(db_session)
 
@@ -209,6 +234,10 @@ async def test_exchange_rate_api_timeouts_then_succeeds(
     assert "Fetching latest exchange rates for USD" in caplog.messages
     assert "stamina.retry_scheduled" in caplog.messages
     assert "Successfully fetched exchange rates for USD" in caplog.messages
+    mocked_send_info.assert_awaited_once_with(
+        "Exchange Rates Update Success",
+        "Exchange rates for USD stored.",
+    )
 
     stamina_log = next(
         record for record in caplog.records if "stamina.retry_scheduled" in record.message

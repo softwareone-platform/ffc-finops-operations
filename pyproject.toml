@@ -43,6 +43,7 @@ dependencies = [
     "ipython==8.30.*",
     "rich==14.0.*",
     "pyfiglet==1.0.*",
+    "adaptive-cards-py==0.3.*",
 ]
 
 [dependency-groups]
