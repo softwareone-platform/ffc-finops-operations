@@ -1,9 +1,9 @@
 import asyncio
+import logging
 from datetime import UTC, datetime
 
 import httpx
 import typer
-from rich.console import Console
 from sqlalchemy.exc import DatabaseError
 
 from app.api_clients.optscale import OptscaleClient
@@ -13,16 +13,80 @@ from app.db.handlers import EntitlementHandler, OrganizationHandler
 from app.db.models import Entitlement, Organization
 from app.enums import EntitlementStatus, OrganizationStatus
 
+logger = logging.getLogger(__name__)
+
 BATCH_SIZE = 100
-
-
-console = Console(highlighter=None)
 
 
 async def fetch_datasources_for_organization(settings: Settings, organization_id: str) -> dict:
     client = OptscaleClient(settings)
     response = await client.fetch_datasources_for_organization(organization_id)
     return response.json()["cloud_accounts"]
+
+
+async def process_datasource(
+    datasource: dict,
+    organization: Organization,
+    entitlement_handler: EntitlementHandler,
+):
+    datasource_id = datasource["account_id"]
+    datasource_type = datasource["type"]
+    datasource_name = datasource["name"]
+    type_name = datasource_type.split("_")[0].capitalize()
+
+    match datasource_type:
+        case "azure_tenant" | "gcp_tenant":
+            logger.debug(
+                f"Found {datasource_id} {datasource_name} of type {datasource_type}, "
+                "skip containers!"
+            )
+            return
+        case "azure_cnr" | "aws_cnr" | "gcp_cnr":
+            type_name = datasource["type"].split("_")[0].capitalize()
+            logger.info(
+                f"Found {type_name} datasource: {datasource['account_id']} {datasource['name']}"
+            )
+        case _:
+            logger.warning(
+                f"Found {datasource_id} {datasource_name} of type {datasource_type}, "
+                "unsupported type!"
+            )
+            return
+    try:
+        instance = await entitlement_handler.first(
+            where_clauses=[
+                Entitlement.datasource_id == datasource_id,
+                Entitlement.status == EntitlementStatus.NEW,
+            ]
+        )
+        if instance:
+            await entitlement_handler.update(
+                instance,
+                data={
+                    "status": EntitlementStatus.ACTIVE,
+                    "redeemed_at": datetime.now(UTC),
+                    "redeemed_by": organization,
+                    "linked_datasource_id": datasource["id"],
+                    "linked_datasource_type": datasource["type"],
+                    "linked_datasource_name": datasource["name"],
+                },
+            )
+            logger.info(
+                f"The entitlement {instance.id} - {instance.name} "
+                f"owner by {instance.owner.id} - {instance.owner.name} "
+                f"has been redeemed by {organization.id} - {organization.name} "
+                f"for datasource {datasource_id} - {datasource_name}."
+            )
+        else:
+            logger.info(
+                f"Entitlement not found for datasource {datasource_id} - {datasource_name}."
+            )
+
+    except DatabaseError as e:  # pragma: no cover
+        logger.error(
+            f"An error occurred while updating the entitlement for "
+            f"{datasource_id} - {datasource_name}: {e}"
+        )
 
 
 async def redeem_entitlements(settings: Settings):
@@ -37,9 +101,8 @@ async def redeem_entitlements(settings: Settings):
             order_by=[Organization.created_at],
             batch_size=BATCH_SIZE,
         ):
-            console.print(
-                "[blue]Fetching datasources for organization: "
-                f"[bold]{organization.id} - {organization.name}[/bold][/blue]",
+            logger.info(
+                f"Fetching datasources for organization: {organization.id} - {organization.name}..."
             )
             datasources = None
             try:
@@ -48,66 +111,14 @@ async def redeem_entitlements(settings: Settings):
                     organization.linked_organization_id,  # type: ignore
                 )
             except httpx.HTTPError as e:
-                console.print(f"[red]Failed to fetch datasources: {e}[/red]")
+                logger.error(f"Failed to fetch datasources for organization {organization.id}: {e}")
                 continue
             for datasource in datasources:
-                datasource_id = datasource["account_id"]
-                match datasource["type"]:
-                    case "azure_tenant" | "gcp_tenant":
-                        console.print(
-                            f"\tFound {datasource['type']} {datasource['account_id']}, skip it"
-                        )
-                        continue
-                    case "azure_cnr":
-                        console.print(
-                            f"\t[khaki3]Found Azure CNR {datasource['account_id']}[/khaki3]"
-                        )
-                    case "aws_cnr":
-                        console.print(
-                            f"\t[khaki3]Found AWS CNR {datasource['account_id']}[/khaki3]"
-                        )
-                    case "gcp_cnr":
-                        console.print(
-                            f"\t[khaki3]Found GCP CNR {datasource['account_id']}[/khaki3]"
-                        )
-                    case _:
-                        console.print(
-                            "\t[orange3]Unsupported datasource type "
-                            f"{datasource['type']}, skip it[/orange3]"
-                        )
-                        continue
-                try:
-                    instance = await entitlement_handler.first(
-                        where_clauses=[
-                            Entitlement.datasource_id == datasource_id,
-                            Entitlement.status == EntitlementStatus.NEW,
-                        ]
-                    )
-                    if instance:
-                        await entitlement_handler.update(
-                            instance,
-                            data={
-                                "status": EntitlementStatus.ACTIVE,
-                                "redeemed_at": datetime.now(UTC),
-                                "redeemed_by": organization,
-                                "linked_datasource_id": datasource["id"],
-                                "linked_datasource_type": datasource["type"],
-                                "linked_datasource_name": datasource["name"],
-                            },
-                        )
-                        console.print(
-                            f"\t\t[green]Entitlement {instance.id} for datasource {datasource_id} "
-                            "has been redeemed successfully![/green]"
-                        )
-                    else:
-                        console.print(
-                            "\t\t[magenta]No Entitlement in NEW status has been found for "
-                            f"datasource {datasource_id}[/magenta]"
-                        )
-
-                except DatabaseError as e:  # pragma: no cover
-                    console.print(f"[red]An error with the database occurred: {e}[/red]")
-                    continue
+                await process_datasource(
+                    datasource,
+                    organization,
+                    entitlement_handler,
+                )
 
 
 def command(ctx: typer.Context):

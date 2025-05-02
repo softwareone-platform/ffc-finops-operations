@@ -26,17 +26,10 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # TODO: Move the database setup to a svcs service and
-    #       use the function bellow its healthcheck
     settings = get_settings()
     app.debug = settings.debug
-
     configure_db_engine(settings)
     await verify_db_connection(settings)
-    # for client_name, client_cls in BaseAPIClient.get_clients_by_name().items():
-    #     logging.info("Registering %s API client as a service", client_name)
-    #     registry.register_factory(svc_type=client_cls, factory=client_cls)
-
     yield
 
 

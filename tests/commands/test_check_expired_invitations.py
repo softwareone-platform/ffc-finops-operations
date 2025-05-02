@@ -19,7 +19,7 @@ async def test_check_expired_invitation(
     operations_account: Account,
     user_factory: ModelFactory[User],
     accountuser_factory: ModelFactory[AccountUser],
-    capsys: pytest.CaptureFixture,
+    caplog: pytest.LogCaptureFixture,
 ):
     user = await user_factory(
         name="Peter Parker",
@@ -57,10 +57,10 @@ async def test_check_expired_invitation(
         invitation_token_expires_at=datetime.now(UTC) - timedelta(days=1),
     )
 
-    await check_expired_invitations(test_settings)
+    with caplog.at_level("INFO"):
+        await check_expired_invitations(test_settings)
 
-    captured = capsys.readouterr()
-    assert "2 invitations" in captured.out
+    assert "2 invitations" in caplog.text
 
     await db_session.refresh(active)
     assert active.status == AccountUserStatus.ACTIVE

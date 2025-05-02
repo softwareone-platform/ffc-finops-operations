@@ -1,14 +1,16 @@
 import asyncio
+import logging
 from datetime import UTC, datetime
 
 import typer
-from rich import print
 from sqlalchemy import update
 
 from app.conf import Settings
 from app.db.base import session_factory
 from app.db.models import AccountUser
 from app.enums import AccountUserStatus
+
+logger = logging.getLogger(__name__)
 
 
 async def check_expired_invitations(settings: Settings):
@@ -24,9 +26,9 @@ async def check_expired_invitations(settings: Settings):
 
         result = await session.execute(stmt)
 
-        print(
-            f"[green][bold]{result.rowcount}[/bold] "
-            "invitations have been successfully transitioned to `invitation-expired`.[/]",
+        logger.info(
+            f"{result.rowcount} invitations have been "
+            "successfully transitioned to `invitation-expired`.",
         )
 
 

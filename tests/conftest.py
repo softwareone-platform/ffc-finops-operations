@@ -53,6 +53,14 @@ pytest_plugins = [
 ]
 
 
+@pytest.fixture(scope="session", autouse=True)
+def skip_logging_setup() -> None:
+    from unittest.mock import patch
+
+    with patch("app.cli.setup_logging"):
+        yield
+
+
 def pytest_collection_modifyitems(items):
     pytest_asyncio_tests = (item for item in items if is_async_test(item))
     session_scope_marker = pytest.mark.asyncio(loop_scope="session")

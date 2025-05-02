@@ -1,7 +1,7 @@
 import asyncio
+import logging
 
 import typer
-from rich.console import Console
 
 from app.conf import Settings
 from app.db.base import session_factory
@@ -12,7 +12,7 @@ from app.enums import AccountStatus, EntitlementStatus
 BATCH_SIZE = 100
 
 
-console = Console(highlighter=None)
+logger = logging.getLogger(__name__)
 
 
 async def calculate_accounts_stats(settings: Settings):
@@ -31,9 +31,6 @@ async def calculate_accounts_stats(settings: Settings):
         )
         for account in accounts:
             stats = await entitlment_handler.get_stats_by_account(account.id)
-            console.print(
-                f"[blue]Fetching accounts: [bold]{account.id} - {account.name}[/bold][/blue]",
-            )
             await account_handler.update(
                 account,
                 data={
@@ -42,10 +39,11 @@ async def calculate_accounts_stats(settings: Settings):
                     "terminated_entitlements_count": stats.get(EntitlementStatus.TERMINATED, 0),
                 },
             )
-            console.print(
-                f"[blue]Account [bold]{account.id} - {account.name}[/bold][/blue] updated: "
-                f"new = {account.new_entitlements_count} active = {account.active_entitlements_count} "  # noqa: E501
-                f"terminated = {account.terminated_entitlements_count}"
+            logger.info(
+                f"Account {account.id} - {account.name} updated with "
+                f"{stats.get(EntitlementStatus.NEW, 0)} new, "
+                f"{stats.get(EntitlementStatus.ACTIVE, 0)} active and "
+                f"{stats.get(EntitlementStatus.TERMINATED, 0)} terminated entitlements."
             )
 
 
