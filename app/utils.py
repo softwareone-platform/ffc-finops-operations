@@ -1,6 +1,5 @@
 import contextlib
 import logging
-import multiprocessing
 import os
 import smtplib
 from datetime import datetime
@@ -93,7 +92,3 @@ def generate_invitation_email(id: str, name: str, token: str, expires: datetime)
         token=token,
         expires=expires,
     )
-
-
-def get_default_number_of_workers():
-    return (multiprocessing.cpu_count() * 2) + 1
