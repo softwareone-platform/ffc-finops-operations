@@ -1,4 +1,3 @@
-import multiprocessing
 from collections.abc import Callable
 from typing import Annotated, Any
 
@@ -7,10 +6,7 @@ from gunicorn.app.base import BaseApplication
 
 from app.logging import get_logging_config
 from app.main import app
-
-
-def number_of_workers():
-    return (multiprocessing.cpu_count() * 2) + 1
+from app.utils import get_default_number_of_workers
 
 
 class StandaloneApplication(BaseApplication):  # pragma: no cover
@@ -32,7 +28,7 @@ class StandaloneApplication(BaseApplication):  # pragma: no cover
         return self.application
 
 
-default_workers = number_of_workers()
+default_workers = get_default_number_of_workers()
 
 
 def command(

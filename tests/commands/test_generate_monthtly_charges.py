@@ -45,6 +45,7 @@ from app.enums import (
     EntitlementStatus,
     OrganizationStatus,
 )
+from app.utils import get_default_number_of_workers
 from tests.conftest import ModelFactory
 
 
@@ -838,7 +839,9 @@ async def test_full_run(
     # (both new records and updating existing ones), so that we can filter the affected records
     # bellow
     with caplog.at_level(logging.INFO), time_machine.travel("2025-04-10T11:00:00Z", tick=False):
-        await generate_monthly_charges_main(tmp_path, test_settings)
+        await generate_monthly_charges_main(
+            exports_dir=tmp_path, max_workers=2, settings=test_settings
+        )
 
     await db_session.refresh(generated_charges_file)
     await db_session.refresh(processed_charges_file)
@@ -950,4 +953,4 @@ def test_cli_command(mocker: MockerFixture, test_settings: Settings, tmp_path: p
     result = runner.invoke(app, ["generate-monthly-charges", "--exports-dir", str(tmp_path)])
     assert result.exit_code == 0
     mock_run.assert_called_once_with(mock_command_coro)
-    mock_command.assert_called_once_with(tmp_path, test_settings)
+    mock_command.assert_called_once_with(tmp_path, get_default_number_of_workers(), test_settings)

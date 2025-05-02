@@ -3,6 +3,7 @@ import logging
 import pathlib
 import zipfile
 from collections.abc import AsyncGenerator, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from copy import copy
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
@@ -28,6 +29,7 @@ from app.db.handlers import (
 )
 from app.db.models import Account, ChargesFile, DatasourceExpense, Organization
 from app.enums import AccountType, ChargesFileStatus, EntitlementStatus
+from app.utils import get_default_number_of_workers
 
 logger = logging.getLogger(__name__)
 
@@ -449,8 +451,9 @@ async def update_charges_file_post_generation(
     )
 
 
-async def main(exports_dir: pathlib.Path, settings: Settings) -> None:
+async def main(exports_dir: pathlib.Path, max_workers: int, settings: Settings) -> None:
     today = datetime.now(UTC).date()
+    loop = asyncio.get_event_loop()
 
     async with session_factory() as session:
         async with session.begin():
@@ -458,50 +461,63 @@ async def main(exports_dir: pathlib.Path, settings: Settings) -> None:
             currency_converter = await CurrencyConverter.from_db(session)
             accounts = await fetch_accounts(session)
 
-        for currency in unique_billing_currencies:
-            for account in accounts:
-                async with session.begin():
-                    generated_charges_file = await fetch_existing_generated_charges_file(
-                        session, account, currency
+        with ThreadPoolExecutor(max_workers) as thread_pool:
+            for currency in unique_billing_currencies:
+                for account in accounts:
+                    async with session.begin():
+                        generated_charges_file = await fetch_existing_generated_charges_file(
+                            session, account, currency
+                        )
+
+                        if generated_charges_file is not None:
+                            continue
+
+                        generator = ChargesFileGenerator(
+                            account, currency, currency_converter, exports_dir
+                        )
+                        async for ds_exp in fetch_datasource_expenses(session, currency):
+                            await loop.run_in_executor(
+                                thread_pool, generator.add_datasource_expense, ds_exp
+                            )
+
+                        if not generator.has_entries:
+                            continue
+
+                        charges_file_db_record = await get_or_create_draft_charges_file(
+                            session, account, currency, today
+                        )
+
+                    zip_file_path = await loop.run_in_executor(
+                        thread_pool, generator.save, f"{charges_file_db_record.id}.zip"
                     )
 
-                    if generated_charges_file is not None:
+                    successful_upload = await upload_charges_file_to_azure(
+                        charges_file_db_record, zip_file_path
+                    )
+
+                    if not successful_upload:  # pragma: no cover
                         continue
 
-                    generator = ChargesFileGenerator(
-                        account, currency, currency_converter, exports_dir
-                    )
-                    async for ds_exp in fetch_datasource_expenses(session, currency):
-                        generator.add_datasource_expense(ds_exp)
-
-                    if not generator.has_entries:
-                        continue
-
-                    charges_file_db_record = await get_or_create_draft_charges_file(
-                        session, account, currency, today
-                    )
-
-                zip_file_path = generator.make_archive(f"{charges_file_db_record.id}.zip")
-
-                successful_upload = await upload_charges_file_to_azure(
-                    charges_file_db_record, zip_file_path
-                )
-
-                if not successful_upload:  # pragma: no cover
-                    continue
-
-                async with session.begin():
-                    await update_charges_file_post_generation(
-                        session,
-                        charges_file_db_record,
-                        amount=generator.running_total.quantize(Decimal("0.01")),
-                    )
+                    async with session.begin():
+                        await update_charges_file_post_generation(
+                            session,
+                            charges_file_db_record,
+                            amount=generator.running_total.quantize(Decimal("0.01")),
+                        )
 
 
 def command(
     ctx: typer.Context,
     exports_dir: Annotated[
         pathlib.Path, typer.Option("--exports-dir", help="Directory to export the charge files to")
+    ],
+    max_workers: Annotated[
+        int,
+        typer.Option(
+            "--max-workers",
+            help="Maximum number of thread workers to use for I/O blocking operations",
+            default_factory=get_default_number_of_workers,
+        ),
     ],
 ) -> None:
     """
@@ -516,6 +532,6 @@ def command(
         logger.info("Exports directory %s does not exist, creating it", str(exports_dir.resolve()))
         exports_dir.mkdir(parents=True)
 
-    asyncio.run(main(exports_dir, ctx.obj))
+    asyncio.run(main(exports_dir, max_workers, ctx.obj))
 
     logger.info("Completed command function")
