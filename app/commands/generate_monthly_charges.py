@@ -145,10 +145,10 @@ class ChargesFileGenerator:
 
         if self.account.type == AccountType.AFFILIATE:
             for entitlement in datasource_expense.entitlements:
-                if entitlement.owner != self.account:
-                    continue
-
-                if entitlement.status != EntitlementStatus.ACTIVE:
+                if (
+                    entitlement.owner != self.account
+                    or entitlement.status != EntitlementStatus.ACTIVE
+                ):
                     continue
 
                 self.append_row(entry)
@@ -157,7 +157,10 @@ class ChargesFileGenerator:
                 # return only the first one (the entitlements are already ordered by
                 # created_at)
                 return
-        elif self.account.type == AccountType.OPERATIONS:
+
+            return
+
+        if self.account.type == AccountType.OPERATIONS:
             self.append_row(entry)
 
             for entitlement in datasource_expense.entitlements:
@@ -170,8 +173,10 @@ class ChargesFileGenerator:
                 # add only the contra entry for the first one (the entitlements are
                 # already ordered by created_at)
                 return
-        else:  # pragma: no cover
-            raise ValueError(f"Unknown account type: {self.account.type}")
+
+            return
+
+        raise ValueError(f"Unknown account type: {self.account.type}")  # pragma: no cover
 
     def save(self, filename: str) -> pathlib.Path:
         logger.info(
