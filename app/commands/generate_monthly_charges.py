@@ -106,6 +106,7 @@ class ChargesFileGenerator:
         self.worksheet = self.workbook.create_sheet()
         self.running_total = Decimal(0)
         self.total_rows = 0
+        self.source_currencies: set[str] = set()
 
     @property
     def has_entries(self) -> bool:
@@ -139,6 +140,7 @@ class ChargesFileGenerator:
         self.running_total += charge_entry.price
 
     def add_datasource_expense(self, datasource_expense: DatasourceExpense) -> None:
+        self.source_currencies.add(datasource_expense.organization.currency)
         entry = ChargeEntry.from_datasource_expense(datasource_expense, self.currency_converter)
 
         if self.account.type == AccountType.AFFILIATE:
@@ -206,10 +208,15 @@ class ChargesFileGenerator:
 
         with zipfile.ZipFile(filepath, mode="w") as archive:
             archive.write(excel_filepath, arcname="charges.xlsx")
-            archive.writestr(
-                f"exchange_rates_{self.currency}.json",
-                self.currency_converter.get_exchangerate_api_response_json(self.currency),
-            )
+
+            for source_currency in self.source_currencies:
+                if source_currency == self.currency:
+                    continue
+
+                archive.writestr(
+                    f"exchange_rates_{source_currency}.json",
+                    self.currency_converter.get_exchangerate_api_response_json(source_currency),
+                )
 
         excel_filepath.unlink(missing_ok=True)
 

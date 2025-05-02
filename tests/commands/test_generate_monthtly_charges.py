@@ -204,6 +204,130 @@ async def eur_org_billed_in_gbp_expenses(
 
 
 @pytest.fixture
+async def gbp_org_billed_in_eur_expenses(
+    organization_factory: ModelFactory[Organization],
+    datasource_expense_factory: ModelFactory[DatasourceExpense],
+    entitlement_factory: ModelFactory[Entitlement],
+    affiliate_account: Account,
+    db_session: AsyncSession,
+    faker: Faker,
+):
+    org = await organization_factory(
+        operations_external_id="ORG-22222",
+        name=faker.company(),
+        currency="GBP",
+        billing_currency="EUR",
+        status=OrganizationStatus.ACTIVE,
+        linked_organization_id=faker.uuid4(str),
+    )
+
+    aws_acc_mar_expenses = await datasource_expense_factory(  # noqa: F841
+        datasource_id=faker.uuid4(str),
+        datasource_name="AWS Account",
+        organization=org,
+        month=3,
+        year=2025,
+        month_expenses=Decimal("50.00"),
+        created_at=datetime(2025, 3, 1, 10, 0, 0, tzinfo=UTC),
+        updated_at=datetime(2025, 3, 31, 10, 0, 0, tzinfo=UTC),
+    )
+
+    azure_acc_mar_expenses = await datasource_expense_factory(  # noqa: F841
+        datasource_id=faker.uuid4(str),
+        datasource_name="Azure Account",
+        organization=org,
+        month=3,
+        year=2025,
+        month_expenses=Decimal("40.00"),
+        created_at=datetime(2025, 3, 1, 10, 0, 0, tzinfo=UTC),
+        updated_at=datetime(2025, 3, 31, 10, 0, 0, tzinfo=UTC),
+    )
+
+    await entitlement_factory(
+        name="Free AWS account",
+        affiliate_external_id="ACC-111111",
+        datasource_id=aws_acc_mar_expenses.datasource_id,
+        status=EntitlementStatus.TERMINATED,  # should be ignored
+        owner=affiliate_account,
+    )
+
+    await entitlement_factory(
+        name="Free Azure account",
+        affiliate_external_id="ACC-888888",
+        datasource_id=azure_acc_mar_expenses.datasource_id,
+        status=EntitlementStatus.ACTIVE,
+        owner=affiliate_account,
+    )
+
+    await db_session.refresh(aws_acc_mar_expenses)
+    await db_session.refresh(azure_acc_mar_expenses)
+
+    return org
+
+
+@pytest.fixture
+async def eur_org_billed_in_eur_expenses(
+    organization_factory: ModelFactory[Organization],
+    datasource_expense_factory: ModelFactory[DatasourceExpense],
+    entitlement_factory: ModelFactory[Entitlement],
+    affiliate_account: Account,
+    db_session: AsyncSession,
+    faker: Faker,
+):
+    org = await organization_factory(
+        operations_external_id="ORG-77777",
+        name=faker.company(),
+        currency="EUR",
+        billing_currency="EUR",
+        status=OrganizationStatus.ACTIVE,
+        linked_organization_id=faker.uuid4(str),
+    )
+
+    aws_acc_mar_expenses = await datasource_expense_factory(  # noqa: F841
+        datasource_id=faker.uuid4(str),
+        datasource_name="AWS Account",
+        organization=org,
+        month=3,
+        year=2025,
+        month_expenses=Decimal("50.00"),
+        created_at=datetime(2025, 3, 1, 10, 0, 0, tzinfo=UTC),
+        updated_at=datetime(2025, 3, 31, 10, 0, 0, tzinfo=UTC),
+    )
+
+    azure_acc_mar_expenses = await datasource_expense_factory(  # noqa: F841
+        datasource_id=faker.uuid4(str),
+        datasource_name="Azure Account",
+        organization=org,
+        month=3,
+        year=2025,
+        month_expenses=Decimal("40.00"),
+        created_at=datetime(2025, 3, 1, 10, 0, 0, tzinfo=UTC),
+        updated_at=datetime(2025, 3, 31, 10, 0, 0, tzinfo=UTC),
+    )
+
+    await entitlement_factory(
+        name="Free AWS account",
+        affiliate_external_id="ACC-99999",
+        datasource_id=aws_acc_mar_expenses.datasource_id,
+        status=EntitlementStatus.TERMINATED,  # should be ignored
+        owner=affiliate_account,
+    )
+
+    await entitlement_factory(
+        name="Free Azure account",
+        affiliate_external_id="ACC-88888",
+        datasource_id=azure_acc_mar_expenses.datasource_id,
+        status=EntitlementStatus.ACTIVE,
+        owner=affiliate_account,
+    )
+
+    await db_session.refresh(aws_acc_mar_expenses)
+    await db_session.refresh(azure_acc_mar_expenses)
+
+    return org
+
+
+@pytest.fixture
 async def usd_org_billed_in_usd_expenses(
     organization_factory: ModelFactory[Organization],
     datasource_expense_factory: ModelFactory[DatasourceExpense],
@@ -480,11 +604,40 @@ async def test_export_to_zip(
     zip_file_path = generator.make_archive("charges.zip")
 
     with zipfile.ZipFile(zip_file_path, "r") as archive:
-        assert sorted(archive.namelist()) == ["charges.xlsx", "exchange_rates_EUR.json"]
+        assert sorted(archive.namelist()) == ["charges.xlsx", "exchange_rates_USD.json"]
 
         excel_file_path = pathlib.Path(archive.extract("charges.xlsx", tmp_path))
         assert_generated_file_matches_snapshot(excel_file_path, snapshot)
-        snapshot.assert_match(archive.read("exchange_rates_EUR.json"), "exchange_rates.json")
+        snapshot.assert_match(archive.read("exchange_rates_USD.json"), "exchange_rates.json")
+
+
+@time_machine.travel("2025-04-10T10:00:00Z", tick=False)
+async def test_export_to_zip_includes_multiple_exchange_rates(
+    exchange_rates_factory: ModelFactory[ExchangeRates],
+    operations_account: Account,
+    usd_org_billed_in_eur_expenses: Organization,
+    eur_org_billed_in_eur_expenses: Organization,
+    gbp_org_billed_in_eur_expenses: Organization,
+    currency_converter: CurrencyConverter,
+    db_session: AsyncSession,
+    snapshot: Snapshot,
+    tmp_path: pathlib.Path,
+):
+    generator = ChargesFileGenerator(operations_account, "EUR", currency_converter, tmp_path)
+
+    async for ds_exp in fetch_datasource_expenses(db_session, "EUR"):
+        generator.add_datasource_expense(ds_exp)
+
+    assert generator.has_entries
+
+    zip_file_path = generator.make_archive("charges.zip")
+
+    with zipfile.ZipFile(zip_file_path, "r") as archive:
+        assert sorted(archive.namelist()) == [
+            "charges.xlsx",
+            "exchange_rates_GBP.json",
+            "exchange_rates_USD.json",
+        ]
 
 
 @pytest.mark.parametrize(
