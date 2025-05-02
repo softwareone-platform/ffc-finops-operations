@@ -463,10 +463,54 @@ async def update_charges_file_post_generation(
     )
 
 
-async def main(exports_dir: pathlib.Path, max_workers: int, settings: Settings) -> None:
+async def genenerate_monthly_charges(
+    session: AsyncSession,
+    currency: str,
+    account: Account,
+    currency_converter: CurrencyConverter,
+    exports_dir: pathlib.Path,
+    thread_pool: ThreadPoolExecutor,
+) -> None:
     today = datetime.now(UTC).date()
     loop = asyncio.get_event_loop()
 
+    async with session.begin():
+        generated_charges_file = await fetch_existing_generated_charges_file(
+            session, account, currency
+        )
+
+        if generated_charges_file is not None:
+            return
+
+        generator = ChargesFileGenerator(account, currency, currency_converter, exports_dir)
+        async for ds_exp in fetch_datasource_expenses(session, currency):
+            await loop.run_in_executor(thread_pool, generator.add_datasource_expense, ds_exp)
+
+        if not generator.has_entries:
+            return
+
+        charges_file_db_record = await get_or_create_draft_charges_file(
+            session, account, currency, today
+        )
+
+    zip_file_path = await loop.run_in_executor(
+        thread_pool, generator.save, f"{charges_file_db_record.id}.zip"
+    )
+
+    successful_upload = await upload_charges_file_to_azure(charges_file_db_record, zip_file_path)
+
+    if not successful_upload:  # pragma: no cover
+        return
+
+    async with session.begin():
+        await update_charges_file_post_generation(
+            session,
+            charges_file_db_record,
+            amount=generator.running_total.quantize(Decimal("0.01")),
+        )
+
+
+async def main(exports_dir: pathlib.Path, max_workers: int, settings: Settings) -> None:
     async with session_factory() as session:
         async with session.begin():
             unique_billing_currencies = await fetch_unique_billing_currencies(session)
@@ -476,46 +520,9 @@ async def main(exports_dir: pathlib.Path, max_workers: int, settings: Settings) 
         with ThreadPoolExecutor(max_workers) as thread_pool:
             for currency in unique_billing_currencies:
                 for account in accounts:
-                    async with session.begin():
-                        generated_charges_file = await fetch_existing_generated_charges_file(
-                            session, account, currency
-                        )
-
-                        if generated_charges_file is not None:
-                            continue
-
-                        generator = ChargesFileGenerator(
-                            account, currency, currency_converter, exports_dir
-                        )
-                        async for ds_exp in fetch_datasource_expenses(session, currency):
-                            await loop.run_in_executor(
-                                thread_pool, generator.add_datasource_expense, ds_exp
-                            )
-
-                        if not generator.has_entries:
-                            continue
-
-                        charges_file_db_record = await get_or_create_draft_charges_file(
-                            session, account, currency, today
-                        )
-
-                    zip_file_path = await loop.run_in_executor(
-                        thread_pool, generator.save, f"{charges_file_db_record.id}.zip"
+                    await genenerate_monthly_charges(
+                        session, currency, account, currency_converter, exports_dir, thread_pool
                     )
-
-                    successful_upload = await upload_charges_file_to_azure(
-                        charges_file_db_record, zip_file_path
-                    )
-
-                    if not successful_upload:  # pragma: no cover
-                        continue
-
-                    async with session.begin():
-                        await update_charges_file_post_generation(
-                            session,
-                            charges_file_db_record,
-                            amount=generator.running_total.quantize(Decimal("0.01")),
-                        )
 
 
 def command(
