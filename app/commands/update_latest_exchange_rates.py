@@ -12,6 +12,7 @@ from app.conf import Settings
 from app.db.base import session_factory
 from app.db.handlers import ExchangeRatesHandler
 from app.db.models import ExchangeRates, Organization
+from app.notifications import send_exception, send_info
 
 logger = logging.getLogger(__name__)
 
@@ -83,10 +84,10 @@ async def main(settings: Settings) -> None:
 
                 try:
                     response = await exchange_rate_client.get_latest_rates(base_currency)
-                except Exception:
-                    logger.exception(
-                        f"Failed to fetch exchange rates for {base_currency} due to an exception"
-                    )
+                except Exception as e:
+                    msg = f"Failed to fetch exchange rates for {base_currency} due to an exception"
+                    logger.exception(msg)
+                    await send_exception("Exchange Rates Update Error", f"{msg}: {e}")
                     continue
 
                 logger.info("Successfully fetched exchange rates for %s", base_currency)
@@ -100,9 +101,12 @@ async def main(settings: Settings) -> None:
                 session.add(exchange_rates_model)
 
         if exchange_rates_per_currency:
-            logger.info(
-                "Completed storing exchange rates for %s", ", ".join(exchange_rates_per_currency)
+            msg = (
+                f"Exchange rates for {', '.join(sorted(exchange_rates_per_currency.keys()))}"
+                " stored."
             )
+            logger.info(msg)
+            await send_info("Exchange Rates Update Success", msg)
 
 
 def command(ctx: typer.Context) -> None:

@@ -12,6 +12,7 @@ from app.conf import Settings
 from app.db.base import session_factory
 from app.db.handlers import DatasourceExpenseHandler, OrganizationHandler
 from app.db.models import DatasourceExpense, Organization
+from app.notifications import send_exception
 
 logger = logging.getLogger(__name__)
 
@@ -56,14 +57,16 @@ async def fetch_datasources_for_organizations(
             response = exc.response
 
             if exc.response.status_code == status.HTTP_404_NOT_FOUND:
-                logger.warning(
-                    "Organization %s not found on Optscale. Skipping...", organization.id
-                )
+                msg = f"Organization {organization.id} not found on Optscale."
+                logger.error(msg)
             else:
-                logger.exception(
-                    "Unexpected error occurred fetching datasources for organization %s",
-                    organization.id,
+                msg = (
+                    "Unexpected error occurred fetching "
+                    f"datasources for organization {organization.id}"
                 )
+                logger.exception(msg)
+
+            await send_exception("Datasource Expenses Update Error", f"{msg}: {exc}")
 
             continue
 

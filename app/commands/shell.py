@@ -4,6 +4,7 @@ from rich import box
 from rich.console import Console
 from rich.table import Table
 
+from app.conf import get_settings
 from app.db.base import session_factory
 from app.db import handlers
 
@@ -14,6 +15,7 @@ def command():
     """
     session = session_factory()
     namespace = {
+        "settings": get_settings(),
         "session": session,
         "user_handler": handlers.UserHandler(session),
         "account_handler": handlers.AccountHandler(session),

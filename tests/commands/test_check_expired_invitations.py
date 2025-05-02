@@ -14,12 +14,13 @@ from tests.types import ModelFactory
 
 
 async def test_check_expired_invitation(
+    mocker: MockerFixture,
+    caplog: pytest.LogCaptureFixture,
     test_settings: Settings,
     db_session: AsyncSession,
     operations_account: Account,
     user_factory: ModelFactory[User],
     accountuser_factory: ModelFactory[AccountUser],
-    caplog: pytest.LogCaptureFixture,
 ):
     user = await user_factory(
         name="Peter Parker",
@@ -57,6 +58,10 @@ async def test_check_expired_invitation(
         invitation_token_expires_at=datetime.now(UTC) - timedelta(days=1),
     )
 
+    mocked_send_info = mocker.patch(
+        "app.commands.check_expired_invitations.send_info",
+    )
+
     with caplog.at_level("INFO"):
         await check_expired_invitations(test_settings)
 
@@ -76,6 +81,10 @@ async def test_check_expired_invitation(
 
     await db_session.refresh(expired_invited_2)
     assert expired_invited_2.status == AccountUserStatus.INVITATION_EXPIRED
+    mocked_send_info.assert_awaited_once_with(
+        "Expire Invitations Success",
+        "2 invitations have been successfully transitioned to `invitation-expired`.",
+    )
 
 
 def test_invite_user_command(

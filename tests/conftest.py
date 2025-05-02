@@ -1,7 +1,7 @@
 import inspect
 import secrets
 import uuid
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator, Callable, Generator
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Final
@@ -54,7 +54,7 @@ pytest_plugins = [
 
 
 @pytest.fixture(scope="session", autouse=True)
-def skip_logging_setup() -> None:
+def skip_logging_setup() -> Generator:
     from unittest.mock import patch
 
     with patch("app.cli.setup_logging"):
@@ -95,6 +95,7 @@ def test_settings() -> Settings:
     settings.smtp_user = "user"
     settings.smtp_password = "password"
     settings.cli_rich_logging = False
+    settings.msteams_notifications_webhook_url = "https://example.com/webhook"
     return settings
 
 
@@ -704,7 +705,7 @@ FIXED_SEED: Final[int] = 42
 
 
 @pytest.hookimpl(hookwrapper=True)
-def _set_fixed_random_seed(item: pytest.Item) -> None:
+def _set_fixed_random_seed(item: pytest.Item) -> Generator:
     """Set the randomly_seed to a fixed value for tests with the `fixed_random_seed` marker."""
 
     marker = item.get_closest_marker("fixed_random_seed")

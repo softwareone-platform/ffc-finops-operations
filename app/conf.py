@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     pwd_reset_token_length_expires_minutes: int = 15
 
     system_jwt_token_max_lifespan_minutes: int = 5
-    datasources_obsolete_after_months: int = 6
+    datasources_expenses_obsolete_after_months: int = 6
     billing_percentage: float = 1.0
     ffc_external_product_id: str = "FIN-0001-P1M"
 
@@ -64,6 +64,8 @@ class Settings(BaseSettings):
 
     cli_rich_logging: bool = True
     debug: bool = False
+
+    msteams_notifications_webhook_url: str | None = None
 
     @computed_field
     def azure_sa_connection_string(self) -> str:
