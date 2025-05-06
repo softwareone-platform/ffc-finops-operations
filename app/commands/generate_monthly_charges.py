@@ -507,12 +507,37 @@ async def genenerate_monthly_charges(
         )
 
 
-async def main(exports_dir: pathlib.Path, settings: Settings) -> None:
+async def main(
+    exports_dir: pathlib.Path,
+    settings: Settings,
+    currency: str | None = None,
+    account_id: str | None = None,
+) -> None:
     async with session_factory() as session:
         async with session.begin():
             unique_billing_currencies = await fetch_unique_billing_currencies(session)
             currency_converter = await CurrencyConverter.from_db(session)
             accounts = await fetch_accounts(session)
+
+        if currency is not None:
+            logger.info("--currency is set, generating charge files only for currency %s", currency)
+
+            if currency not in unique_billing_currencies:
+                raise ValueError(
+                    f"Currency {currency} is not used as a billing currency "
+                    "for any organization in the database"
+                )
+
+            unique_billing_currencies = [currency]
+
+        if account_id is not None:
+            logger.info(
+                "--account-id is set, generating charge files only for account %s", account_id
+            )
+            accounts = [account for account in accounts if account.id == account_id]
+
+            if not accounts:
+                raise ValueError(f"Account {account_id} not found in the database")
 
         for currency in unique_billing_currencies:
             for account in accounts:
@@ -526,9 +551,28 @@ def command(
     exports_dir: Annotated[
         pathlib.Path, typer.Option("--exports-dir", help="Directory to export the charge files to")
     ],
+    currency: Annotated[
+        str | None,
+        typer.Option(
+            "--currency",
+            help="If set, only generate charge files for this currency",
+            show_default=False,
+        ),
+    ] = None,
+    account_id: Annotated[
+        str | None,
+        typer.Option(
+            "--account-id",
+            help="If set, only generate charge files for the account with this ID",
+            show_default=False,
+        ),
+    ] = None,
 ) -> None:
     """
-    Generate monthly charges for all accounts and currencies.
+    Generate monthly charge files for the previous month and upload them to Azure Blob Storage.
+
+    By default, the charge files are generated for all accounts and all billing currencies unless
+    specified otherwise.
     """
     logger.info("Starting command function")
 
@@ -539,6 +583,8 @@ def command(
         logger.info("Exports directory %s does not exist, creating it", str(exports_dir.resolve()))
         exports_dir.mkdir(parents=True)
 
-    asyncio.run(main(exports_dir, ctx.obj))
+    asyncio.run(
+        main(exports_dir=exports_dir, currency=currency, account_id=account_id, settings=ctx.obj)
+    )
 
     logger.info("Completed command function")

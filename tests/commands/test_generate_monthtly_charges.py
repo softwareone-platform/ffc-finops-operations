@@ -2,6 +2,7 @@ import io
 import logging
 import pathlib
 import zipfile
+from contextlib import nullcontext
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
@@ -1091,6 +1092,117 @@ async def test_full_run(
     assert newly_created_charges_file.id != deleted_charges_file.id
 
 
+@time_machine.travel("2025-04-10T10:00:00Z", tick=False)
+@pytest.mark.parametrize(
+    ("currency", "account_fixture_or_id", "expected_call_args", "exception"),
+    [
+        (
+            None,
+            None,
+            [
+                ("EUR", "operations_account"),
+                ("EUR", "affiliate_account"),
+                ("EUR", "another_affiliate_account"),
+                ("GBP", "operations_account"),
+                ("GBP", "affiliate_account"),
+                ("GBP", "another_affiliate_account"),
+                ("USD", "operations_account"),
+                ("USD", "affiliate_account"),
+                ("USD", "another_affiliate_account"),
+            ],
+            None,
+        ),
+        (
+            "GBP",
+            None,
+            [
+                ("GBP", "operations_account"),
+                ("GBP", "affiliate_account"),
+                ("GBP", "another_affiliate_account"),
+            ],
+            None,
+        ),
+        (
+            None,
+            "operations_account",
+            [
+                ("EUR", "operations_account"),
+                ("GBP", "operations_account"),
+                ("USD", "operations_account"),
+            ],
+            None,
+        ),
+        ("GBP", "operations_account", [("GBP", "operations_account")], None),
+        (
+            "CAD",
+            None,
+            [],
+            ValueError(
+                "Currency CAD is not used as a billing currency "
+                "for any organization in the database"
+            ),
+        ),
+        (
+            None,
+            "FACC-INVALID-ID",
+            [],
+            ValueError("Account FACC-INVALID-ID not found in the database"),
+        ),
+    ],
+)
+async def test_command_filters(
+    exchange_rates_factory: ModelFactory[ExchangeRates],
+    usd_org_billed_in_usd_expenses: Organization,
+    usd_org_billed_in_eur_expenses: Organization,
+    eur_org_billed_in_gbp_expenses: Organization,
+    affiliate_account: Account,
+    another_affiliate_account: Account,
+    operations_account: Account,
+    test_settings: Settings,
+    db_session: AsyncSession,
+    caplog: pytest.LogCaptureFixture,
+    tmp_path: pathlib.Path,
+    mocker: MockerFixture,
+    request: pytest.FixtureRequest,
+    currency: str | None,
+    account_fixture_or_id: str | None,
+    expected_call_args: list[tuple[str, str]],
+    exception: Exception | None,
+):
+    mock_genenerate_monthly_charges = mocker.patch(
+        "app.commands.generate_monthly_charges.genenerate_monthly_charges"
+    )
+
+    await exchange_rates_factory(base_currency="USD")
+    await exchange_rates_factory(base_currency="EUR")
+    await exchange_rates_factory(base_currency="GBP")
+
+    if account_fixture_or_id is None:
+        account_id = None
+    elif account_fixture_or_id.startswith("FACC-"):
+        account_id = account_fixture_or_id
+    else:
+        account_id = request.getfixturevalue(account_fixture_or_id).id
+
+    with pytest.raises(exception.__class__, match=str(exception)) if exception else nullcontext():
+        await generate_monthly_charges_main(
+            exports_dir=tmp_path,
+            settings=test_settings,
+            account_id=account_id,
+            currency=currency,
+        )
+
+    expected_calls_args = [
+        (currency, request.getfixturevalue(account_fixture).id)
+        for currency, account_fixture in expected_call_args
+    ]
+
+    actual_calls_args = [
+        (call.args[1], call.args[2].id) for call in mock_genenerate_monthly_charges.call_args_list
+    ]
+    assert sorted(actual_calls_args) == sorted(expected_calls_args)
+
+
 def test_cli_command(mocker: MockerFixture, test_settings: Settings, tmp_path: pathlib.Path):
     mocker.patch("app.cli.get_settings", return_value=test_settings)
     mock_command_coro = mocker.MagicMock()
@@ -1103,4 +1215,9 @@ def test_cli_command(mocker: MockerFixture, test_settings: Settings, tmp_path: p
     result = runner.invoke(app, ["generate-monthly-charges", "--exports-dir", str(tmp_path)])
     assert result.exit_code == 0
     mock_run.assert_called_once_with(mock_command_coro)
-    mock_command.assert_called_once_with(tmp_path, test_settings)
+    mock_command.assert_called_once_with(
+        exports_dir=tmp_path,
+        currency=None,
+        account_id=None,
+        settings=test_settings,
+    )
