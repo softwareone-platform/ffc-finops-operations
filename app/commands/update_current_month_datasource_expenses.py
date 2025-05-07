@@ -96,13 +96,14 @@ async def store_datasource_expenses(
         ds_count += len(datasources)
         for datasource in datasources:
             existing_datasource_expense, created = await datasource_expense_handler.get_or_create(
-                datasource_id=datasource["id"],
+                linked_datasource_id=datasource["id"],
                 organization_id=organization_id,
                 year=year,
                 month=month,
                 defaults={
                     "month_expenses": datasource["details"]["cost"],
                     "datasource_name": datasource["name"],
+                    "datasource_id": datasource["account_id"],
                 },
             )
             if not created:
