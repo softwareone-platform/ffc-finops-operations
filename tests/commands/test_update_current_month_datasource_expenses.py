@@ -49,8 +49,18 @@ async def test_create_new_datasource_expenses_single_organization(
     mock_optscale_client.mock_fetch_datasources_for_organization(
         organization,
         [
-            {"id": datasource_id1, "name": "First cloud account", "details": {"cost": 123.45}},
-            {"id": datasource_id2, "name": "Second cloud account", "details": {"cost": 567.89}},
+            {
+                "id": datasource_id1,
+                "name": "First cloud account",
+                "details": {"cost": 123.45},
+                "account_id": "123456",
+            },
+            {
+                "id": datasource_id2,
+                "name": "Second cloud account",
+                "details": {"cost": 567.89},
+                "account_id": "654321",
+            },
         ],
     )
 
@@ -63,10 +73,14 @@ async def test_create_new_datasource_expenses_single_organization(
     assert len(new_datasource_expenses) == 2
 
     ds_exp1 = next(
-        ds_exp for ds_exp in new_datasource_expenses if ds_exp.datasource_id == datasource_id1
+        ds_exp
+        for ds_exp in new_datasource_expenses
+        if ds_exp.linked_datasource_id == datasource_id1
     )
     ds_exp2 = next(
-        ds_exp for ds_exp in new_datasource_expenses if ds_exp.datasource_id == datasource_id2
+        ds_exp
+        for ds_exp in new_datasource_expenses
+        if ds_exp.linked_datasource_id == datasource_id2
     )
 
     assert ds_exp1.organization_id == organization.id
@@ -74,12 +88,14 @@ async def test_create_new_datasource_expenses_single_organization(
     assert ds_exp1.month == 3
     assert ds_exp1.month_expenses == Decimal("123.45")
     assert ds_exp1.datasource_name == "First cloud account"
+    assert ds_exp1.datasource_id == "123456"
 
     assert ds_exp2.organization_id == organization.id
     assert ds_exp2.year == 2025
     assert ds_exp2.month == 3
     assert ds_exp2.month_expenses == Decimal("567.89")
     assert ds_exp2.datasource_name == "Second cloud account"
+    assert ds_exp2.datasource_id == "654321"
 
 
 @time_machine.travel("2025-03-20T10:00:00Z", tick=False)
@@ -98,7 +114,7 @@ async def test_datasource_expenses_are_updated_for_current_month(
 
     existing_datasource_expense1 = await datasource_expense_factory(
         organization=organization,
-        datasource_id=datasource_id1,
+        linked_datasource_id=datasource_id1,
         datasource_name="First cloud account",
         year=2025,
         month=3,  # NOTE: This is for the current month, so it should be updated
@@ -107,7 +123,7 @@ async def test_datasource_expenses_are_updated_for_current_month(
 
     existing_datasource_expense2 = await datasource_expense_factory(
         organization=organization,
-        datasource_id=datasource_id2,
+        linked_datasource_id=datasource_id2,
         datasource_name="Second cloud account",
         year=2025,
         month=2,  # NOTE: this is for the previous month, so it should NOT be updated
@@ -131,18 +147,20 @@ async def test_datasource_expenses_are_updated_for_current_month(
     assert len(new_datasource_expenses) == 3
 
     ds_exp1 = next(
-        ds_exp for ds_exp in new_datasource_expenses if ds_exp.datasource_id == datasource_id1
+        ds_exp
+        for ds_exp in new_datasource_expenses
+        if ds_exp.linked_datasource_id == datasource_id1
     )
     ds_exp2_current_month = next(
         ds_exp
         for ds_exp in new_datasource_expenses
-        if (ds_exp.datasource_id == datasource_id2 and ds_exp.month == 2)
+        if (ds_exp.linked_datasource_id == datasource_id2 and ds_exp.month == 2)
     )
 
     ds_exp2_this_month = next(
         ds_exp
         for ds_exp in new_datasource_expenses
-        if (ds_exp.datasource_id == datasource_id2 and ds_exp.month == 3)
+        if (ds_exp.linked_datasource_id == datasource_id2 and ds_exp.month == 3)
     )
 
     await db_session.refresh(existing_datasource_expense1)
@@ -317,7 +335,7 @@ async def test_multiple_datasources_are_handled_correctly(
 
     await datasource_expense_factory(
         organization=organization1,
-        datasource_id=org_1_datasource_id1,
+        linked_datasource_id=org_1_datasource_id1,
         year=2025,
         month=2,
         month_expenses=Decimal("123.45"),
@@ -325,7 +343,7 @@ async def test_multiple_datasources_are_handled_correctly(
 
     await datasource_expense_factory(
         organization=organization1,
-        datasource_id=org_1_datasource_id1,
+        linked_datasource_id=org_1_datasource_id1,
         year=2025,
         month=3,
         month_expenses=Decimal("234.56"),
@@ -333,7 +351,7 @@ async def test_multiple_datasources_are_handled_correctly(
 
     await datasource_expense_factory(
         organization=organization1,
-        datasource_id=org_1_datasource_id2,
+        linked_datasource_id=org_1_datasource_id2,
         year=2025,
         month=3,
         month_expenses=Decimal("567.89"),
@@ -341,7 +359,7 @@ async def test_multiple_datasources_are_handled_correctly(
 
     await datasource_expense_factory(
         organization=organization2,
-        datasource_id=org_2_datasource_id1,
+        linked_datasource_id=org_2_datasource_id1,
         year=2025,
         month=3,
         month_expenses=Decimal("999.88"),
@@ -388,7 +406,7 @@ async def test_multiple_datasources_are_handled_correctly(
     expenses_data = {
         (
             ds_exp.organization_id,
-            ds_exp.datasource_id,
+            ds_exp.linked_datasource_id,
             ds_exp.year,
             ds_exp.month,
             ds_exp.month_expenses,
