@@ -22,13 +22,14 @@ async def test_redeeem_entitlements(
     db_session: AsyncSession,
     apple_inc_organization: Organization,
     entitlement_aws: Entitlement,
+    entitlement_gcp: Entitlement,
 ):
     mocker.patch(
         "app.commands.redeem_entitlements.fetch_datasources_for_organization",
         return_value=[
             {
-                "id": "ds1",
-                "name": "aws ds",
+                "id": "aws",
+                "name": "AWS Datasource",
                 "type": "aws_cnr",
                 "account_id": entitlement_aws.datasource_id,
             },
@@ -57,6 +58,12 @@ async def test_redeeem_entitlements(
                 "type": "gcp_tenant",
                 "account_id": "gcp-tentant-id",
             },
+            {
+                "id": "gcp",
+                "name": "GCP Datasource",
+                "type": "gcp_cnr",
+                "account_id": entitlement_gcp.datasource_id,
+            },
         ],
     )
     mocked_send_info = mocker.patch(
@@ -66,23 +73,36 @@ async def test_redeeem_entitlements(
     await redeem_entitlements(test_settings)
 
     await db_session.refresh(entitlement_aws)
-    assert entitlement_aws.linked_datasource_id == "ds1"
-    assert entitlement_aws.linked_datasource_name == "aws ds"
+    assert entitlement_aws.linked_datasource_id == "aws"
+    assert entitlement_aws.linked_datasource_name == "AWS Datasource"
     assert entitlement_aws.linked_datasource_type == DatasourceType.AWS_CNR
     assert entitlement_aws.status == EntitlementStatus.ACTIVE
     assert entitlement_aws.redeemed_by == apple_inc_organization
     assert entitlement_aws.redeemed_at is not None
     assert entitlement_aws.redeemed_at == datetime.now(UTC)
-    msg = (
-        f"The entitlement {entitlement_aws.id} - {entitlement_aws.name} "
-        f"owned by {entitlement_aws.owner.id} - {entitlement_aws.owner.name} "
-        f"has been redeemed by {apple_inc_organization.id} - {apple_inc_organization.name} "
-        f"for datasource {entitlement_aws.datasource_id} - aws ds."
-    )
-    mocked_send_info.assert_awaited_once_with(
+
+    await db_session.refresh(entitlement_gcp)
+    assert entitlement_gcp.linked_datasource_id == "gcp"
+    assert entitlement_gcp.linked_datasource_name == "GCP Datasource"
+    assert entitlement_gcp.linked_datasource_type == DatasourceType.GCP_CNR
+    assert entitlement_gcp.status == EntitlementStatus.ACTIVE
+    assert entitlement_gcp.redeemed_by == apple_inc_organization
+    assert entitlement_gcp.redeemed_at is not None
+    assert entitlement_gcp.redeemed_at == datetime.now(UTC)
+
+    assert mocked_send_info.await_count == 1
+    assert mocked_send_info.await_args is not None
+    assert mocked_send_info.await_args.args == (
         "Redeem Entitlements Success",
-        msg,
+        "2 Entitlements have been successfully redeemed.",
     )
+    assert mocked_send_info.await_args.kwargs["details"].header == (
+        "Entitlement",
+        "Owner",
+        "Organization",
+        "Datasource",
+    )
+    assert len(mocked_send_info.await_args.kwargs["details"].rows) == 2
 
 
 async def test_redeeem_entitlements_error_fetching_datasources(

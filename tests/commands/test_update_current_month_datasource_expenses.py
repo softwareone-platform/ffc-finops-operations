@@ -31,12 +31,14 @@ from tests.types import ModelFactory
     ],
 )
 async def test_create_new_datasource_expenses_single_organization(
+    mocker: MockerFixture,
     test_settings: Settings,
     db_session: AsyncSession,
     mock_optscale_client: MockOptscaleClient,
     organization_factory: ModelFactory[Organization],
     organization_status: OrganizationStatus,
 ):
+    mocker.patch("app.commands.update_current_month_datasource_expenses.send_info")
     datasource_expense_handler = DatasourceExpenseHandler(db_session)
     organization = await organization_factory(
         linked_organization_id=str(uuid.uuid4()),
@@ -84,12 +86,16 @@ async def test_create_new_datasource_expenses_single_organization(
 
 @time_machine.travel("2025-03-20T10:00:00Z", tick=False)
 async def test_datasource_expenses_are_updated_for_current_month(
+    mocker: MockerFixture,
     test_settings: Settings,
     db_session: AsyncSession,
     mock_optscale_client: MockOptscaleClient,
     organization_factory: ModelFactory[Organization],
     datasource_expense_factory: ModelFactory[DatasourceExpense],
 ):
+    mocker.patch(
+        "app.commands.update_current_month_datasource_expenses.send_info",
+    )
     datasource_expense_handler = DatasourceExpenseHandler(db_session)
     organization = await organization_factory(linked_organization_id=str(uuid.uuid4()))
 
@@ -174,12 +180,16 @@ async def test_datasource_expenses_are_updated_for_current_month(
 
 @time_machine.travel("2025-03-20T10:00:00Z", tick=False)
 async def test_organization_with_no_linked_organization_id(
+    mocker: MockerFixture,
     test_settings: Settings,
     db_session: AsyncSession,
     organization_factory: ModelFactory[Organization],
     caplog: pytest.LogCaptureFixture,
     httpx_mock: HTTPXMock,
 ):
+    mocker.patch(
+        "app.commands.update_current_month_datasource_expenses.send_info",
+    )
     datasource_expense_handler = DatasourceExpenseHandler(db_session)
     organization = await organization_factory(linked_organization_id=None)
 
@@ -229,7 +239,7 @@ async def test_organization_with_recent_updates_to_datasource_expences(
     [
         (
             status.HTTP_404_NOT_FOUND,
-            logging.ERROR,
+            logging.WARNING,
             "Organization %s not found on Optscale.",
         ),
         (
@@ -258,11 +268,13 @@ async def test_optscale_api_returns_exception(
         organization, status_code=status_code
     )
 
-    mocked_send_exception = mocker.patch(
+    mocker.patch(
         "app.commands.update_current_month_datasource_expenses.send_exception",
     )
-
-    with caplog.at_level(logging.ERROR):
+    mocker.patch(
+        "app.commands.update_current_month_datasource_expenses.send_info",
+    )
+    with caplog.at_level(logging.WARNING):
         await update_current_month_datasource_expenses.main(test_settings)
 
     assert (
@@ -273,9 +285,6 @@ async def test_optscale_api_returns_exception(
 
     new_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
     assert len(new_datasource_expenses) == 0
-    mocked_send_exception.assert_awaited_once()
-    assert mocked_send_exception.mock_calls[0].args[0] == "Datasource Expenses Update Error"
-    assert expected_log_format % organization.id in mocked_send_exception.mock_calls[0].args[1]
 
 
 @time_machine.travel("2025-03-20T10:00:00Z", tick=False)
@@ -290,6 +299,9 @@ async def test_multiple_datasources_are_handled_correctly(
 ):
     mocker.patch(
         "app.commands.update_current_month_datasource_expenses.send_exception",
+    )
+    mocker.patch(
+        "app.commands.update_current_month_datasource_expenses.send_info",
     )
     datasource_expense_handler = DatasourceExpenseHandler(db_session)
     organization1 = await organization_factory(

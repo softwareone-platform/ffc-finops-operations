@@ -39,10 +39,14 @@ async def main(settings: Settings) -> None:
 
         result = await session.execute(delete(DatasourceExpense).where(where_cond))
 
-        message = f"{result.rowcount} obsolete datasource expenses have been deleted."
+        message = (
+            f"{result.rowcount} obsolete (older than "
+            f"{threshold_date.isoformat()}) datasource expenses have been deleted."
+        )
 
         logger.info(message)
-        await send_info("Cleanup Obsolete Datasource Expenses Success", message)
+        if result.rowcount > 0:
+            await send_info("Cleanup Obsolete Datasource Expenses Success", message)
 
 
 def command(ctx: typer.Context) -> None:
