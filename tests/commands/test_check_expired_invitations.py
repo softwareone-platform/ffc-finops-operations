@@ -19,6 +19,7 @@ async def test_check_expired_invitation(
     test_settings: Settings,
     db_session: AsyncSession,
     operations_account: Account,
+    affiliate_account: Account,
     user_factory: ModelFactory[User],
     accountuser_factory: ModelFactory[AccountUser],
 ):
@@ -52,7 +53,7 @@ async def test_check_expired_invitation(
         invitation_token_expires_at=datetime.now(UTC) - timedelta(days=1),
     )
     expired_invited_2 = await accountuser_factory(
-        account_id=operations_account.id,
+        account_id=affiliate_account.id,
         user_id=user.id,
         status=AccountUserStatus.INVITED,
         invitation_token_expires_at=datetime.now(UTC) - timedelta(days=1),
@@ -65,7 +66,7 @@ async def test_check_expired_invitation(
     with caplog.at_level("INFO"):
         await check_expired_invitations(test_settings)
 
-    assert "2 invitations" in caplog.text
+    assert "2 Invitations" in caplog.text
 
     await db_session.refresh(active)
     assert active.status == AccountUserStatus.ACTIVE
@@ -81,10 +82,24 @@ async def test_check_expired_invitation(
 
     await db_session.refresh(expired_invited_2)
     assert expired_invited_2.status == AccountUserStatus.INVITATION_EXPIRED
-    mocked_send_info.assert_awaited_once_with(
+
+    assert mocked_send_info.await_count == 1
+    assert mocked_send_info.await_args is not None
+    assert mocked_send_info.await_args.args == (
         "Expire Invitations Success",
-        "2 invitations have been successfully transitioned to `invitation-expired`.",
+        "2 Invitations have been successfully transitioned to `invitation-expired`.",
     )
+    assert mocked_send_info.await_args.kwargs["details"].header == (
+        "User ID",
+        "Name",
+        "Email",
+        "Account ID",
+        "Account Name",
+    )
+    assert mocked_send_info.await_args.kwargs["details"].rows == [
+        (user.id, user.name, user.email, affiliate_account.id, affiliate_account.name),
+        (user.id, user.name, user.email, operations_account.id, operations_account.name),
+    ]
 
 
 def test_invite_user_command(

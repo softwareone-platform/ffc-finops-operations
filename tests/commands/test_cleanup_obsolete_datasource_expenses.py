@@ -120,11 +120,11 @@ async def test_command_delete_only_old_datasource_expenses(
         "Fetching obsolete datasource expenses from the database",
         "Found 3 obsolete datasource expenses to delete",
         "Deleting 3 obsolete datasource expenses from the database",
-        "3 obsolete datasource expenses have been deleted.",
+        "3 obsolete (older than 2024-10-01T10:00:00+00:00) datasource expenses have been deleted.",
     ]
     mocked_send_info.assert_awaited_once_with(
         "Cleanup Obsolete Datasource Expenses Success",
-        "3 obsolete datasource expenses have been deleted.",
+        "3 obsolete (older than 2024-10-01T10:00:00+00:00) datasource expenses have been deleted.",
     )
 
     num_ds_expenses_in_db = await db_session.scalar(select(func.count(DatasourceExpense.id)))

@@ -12,7 +12,7 @@ from app.db.base import session_factory
 from app.db.handlers import EntitlementHandler, OrganizationHandler
 from app.db.models import Entitlement, Organization
 from app.enums import EntitlementStatus, OrganizationStatus
-from app.notifications import send_exception, send_info
+from app.notifications import NotificationDetails, send_exception, send_info
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,6 @@ async def process_datasource(
     datasource_type = datasource["type"]
     datasource_name = datasource["name"]
     type_name = datasource_type.split("_")[0].capitalize()
-
     match datasource_type:
         case "azure_tenant" | "gcp_tenant":
             logger.debug(
@@ -61,7 +60,7 @@ async def process_datasource(
             ]
         )
         if instance:
-            await entitlement_handler.update(
+            updated_entitlement = await entitlement_handler.update(
                 instance,
                 data={
                     "status": EntitlementStatus.ACTIVE,
@@ -79,7 +78,7 @@ async def process_datasource(
                 f"for datasource {datasource_id} - {datasource_name}."
             )
             logger.info(msg)
-            await send_info("Redeem Entitlements Success", msg)
+            return updated_entitlement
         else:
             logger.info(
                 f"Entitlement not found for datasource {datasource_id} - {datasource_name}."
@@ -120,11 +119,34 @@ async def redeem_entitlements(settings: Settings):
                 logger.error(message)
                 await send_exception("Redeem Entitlements Error", message)
                 continue
+            redeemed_entitlements = []
             for datasource in datasources:
-                await process_datasource(
+                entitlement = await process_datasource(
                     datasource,
                     organization,
                     entitlement_handler,
+                )
+                if entitlement:
+                    redeemed_entitlements.append(entitlement)
+
+            if len(redeemed_entitlements) > 0:
+                msg = "Entitlement has" if len(redeemed_entitlements) == 1 else "Entitlements have"
+                msg = f"{len(redeemed_entitlements)} {msg} been successfully redeemed."
+                await send_info(
+                    "Redeem Entitlements Success",
+                    msg,
+                    details=NotificationDetails(
+                        header=("Entitlement", "Owner", "Organization", "Datasource"),
+                        rows=[
+                            (
+                                f"{ent.id}\n\n{ent.name}",
+                                f"{ent.owner.id}\n\n{ent.owner.name}",
+                                f"{ent.redeemed_by.id}\n\n{ent.redeemed_by.name}",  # type: ignore
+                                f"{ent.datasource_id}\n\n{ent.linked_datasource_name}",
+                            )
+                            for ent in redeemed_entitlements
+                        ],
+                    ),
                 )
 
 

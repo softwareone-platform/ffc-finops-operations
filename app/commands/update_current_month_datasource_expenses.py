@@ -12,7 +12,7 @@ from app.conf import Settings
 from app.db.base import session_factory
 from app.db.handlers import DatasourceExpenseHandler, OrganizationHandler
 from app.db.models import DatasourceExpense, Organization
-from app.notifications import send_exception
+from app.notifications import send_exception, send_info
 
 logger = logging.getLogger(__name__)
 
@@ -58,15 +58,14 @@ async def fetch_datasources_for_organizations(
 
             if exc.response.status_code == status.HTTP_404_NOT_FOUND:
                 msg = f"Organization {organization.id} not found on Optscale."
-                logger.error(msg)
+                logger.warning(msg)
             else:
                 msg = (
                     "Unexpected error occurred fetching "
                     f"datasources for organization {organization.id}"
                 )
                 logger.exception(msg)
-
-            await send_exception("Datasource Expenses Update Error", f"{msg}: {exc}")
+                await send_exception("Datasource Expenses Update Error", f"{msg}: {exc}")
 
             continue
 
@@ -90,7 +89,11 @@ async def store_datasource_expenses(
     year: int,
     month: int,
 ) -> None:
+    org_count = 0
+    ds_count = 0
     for organization_id, datasources in datasources_per_organization_id.items():
+        org_count += 1
+        ds_count += len(datasources)
         for datasource in datasources:
             existing_datasource_expense, created = await datasource_expense_handler.get_or_create(
                 datasource_id=datasource["id"],
@@ -107,6 +110,11 @@ async def store_datasource_expenses(
                     existing_datasource_expense,
                     {"month_expenses": datasource["details"]["cost"]},
                 )
+    await send_info(
+        "Datasource Expenses Update Success",
+        f"Expenses of {ds_count} Datasources "
+        f"configured by {org_count} Organizations have been updated.",
+    )
 
 
 async def main(settings: Settings) -> None:

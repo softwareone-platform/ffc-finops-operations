@@ -4,6 +4,7 @@ from pytest_httpx import HTTPXMock
 from pytest_mock import MockerFixture
 
 from app.notifications import (
+    NotificationDetails,
     send_error,
     send_exception,
     send_info,
@@ -26,12 +27,13 @@ async def test_send_others(mocker, function, color, icon):
         "app.notifications.send_notification",
     )
 
-    await function("title", "text", open_url=None)
+    await function("title", "text", details=None, open_url=None)
 
     mocked_send_notification.assert_awaited_once_with(
         f"{icon} title",
         "text",
         title_color=color,
+        details=None,
         open_url=None,
     )
 
@@ -69,12 +71,66 @@ async def test_send_notification_full(httpx_mock: HTTPXMock, mocker: MockerFixtu
                                 "wrap": True,
                             },
                             {
+                                "type": "ColumnSet",
+                                "columns": [
+                                    {
+                                        "type": "Column",
+                                        "items": [
+                                            {
+                                                "text": "Header 1",
+                                                "type": "TextBlock",
+                                                "weight": "bolder",
+                                                "wrap": True,
+                                            },
+                                            {
+                                                "text": "Row 1 Col 1",
+                                                "type": "TextBlock",
+                                                "color": "default",
+                                                "wrap": True,
+                                            },
+                                            {
+                                                "text": "Row 2 Col 1",
+                                                "type": "TextBlock",
+                                                "color": "accent",
+                                                "wrap": True,
+                                            },
+                                        ],
+                                        "width": "auto",
+                                    },
+                                    {
+                                        "type": "Column",
+                                        "items": [
+                                            {
+                                                "text": "Header 2",
+                                                "type": "TextBlock",
+                                                "weight": "bolder",
+                                                "wrap": True,
+                                            },
+                                            {
+                                                "text": "Row 1 Col 2",
+                                                "type": "TextBlock",
+                                                "color": "default",
+                                                "wrap": True,
+                                            },
+                                            {
+                                                "text": "Row 2 Col 2",
+                                                "type": "TextBlock",
+                                                "color": "accent",
+                                                "wrap": True,
+                                            },
+                                        ],
+                                        "width": "auto",
+                                    },
+                                ],
+                            },
+                            {
                                 "title": "Open",
                                 "mode": "primary",
                                 "url": "https://example.com",
                                 "type": "Action.OpenUrl",
                             },
                         ],
+                        "msteams": {"width": "Full"},
                     },
                 }
             ],
@@ -82,7 +138,14 @@ async def test_send_notification_full(httpx_mock: HTTPXMock, mocker: MockerFixtu
     )
 
     await send_notification(
-        "Title", "Text", title_color=ct.Colors.DARK, open_url="https://example.com"
+        "Title",
+        "Text",
+        title_color=ct.Colors.DARK,
+        open_url="https://example.com",
+        details=NotificationDetails(
+            header=("Header 1", "Header 2"),
+            rows=[("Row 1 Col 1", "Row 1 Col 2"), ("Row 2 Col 1", "Row 2 Col 2")],
+        ),
     )
 
 
@@ -119,6 +182,7 @@ async def test_send_notification_simple(httpx_mock: HTTPXMock, mocker: MockerFix
                                 "wrap": True,
                             },
                         ],
+                        "msteams": {"width": "Full"},
                     },
                 }
             ],
