@@ -1250,6 +1250,54 @@ async def test_command_filters(
     assert sorted(actual_calls_args) == sorted(expected_calls_args)
 
 
+@pytest.mark.fixed_random_seed
+@time_machine.travel("2025-04-10T10:00:00Z", tick=False)
+async def test_generate_monthly_charges_dry_run(
+    exchange_rates_factory: ModelFactory[ExchangeRates],
+    usd_org_billed_in_eur_expenses: Organization,
+    operations_account: Account,
+    test_settings: Settings,
+    db_session: AsyncSession,
+    tmp_path: pathlib.Path,
+    mocker: MockerFixture,
+    snapshot: Snapshot,
+    caplog: pytest.LogCaptureFixture,
+):
+    mock_upload_to_azure = mocker.patch(
+        "app.commands.generate_monthly_charges.upload_charges_file_to_azure"
+    )
+    charges_file_handler = ChargesFileHandler(db_session)
+    assert await charges_file_handler.count() == 0
+
+    await exchange_rates_factory(base_currency="EUR")
+    await exchange_rates_factory(base_currency="USD")
+    await exchange_rates_factory(base_currency="GBP")
+
+    with caplog.at_level(logging.INFO):
+        await generate_monthly_charges_main(
+            exports_dir=tmp_path,
+            settings=test_settings,
+            account_id=operations_account.id,
+            currency="EUR",
+            dry_run=True,
+        )
+
+    assert "Dry run enabled, skipping upload to Azure Blob Storage" in caplog.text
+    assert "Dry run enabled, skipping creating charges file database record" in caplog.text
+    assert "Dry run enabled, skipping fetching existing charges file" in caplog.text
+
+    assert not mock_upload_to_azure.called
+    assert await charges_file_handler.count() == 0
+    expected_generated_file_path = tmp_path / f"{operations_account.id}_EUR_2025_04.zip"
+    assert expected_generated_file_path.exists()
+
+    with zipfile.ZipFile(expected_generated_file_path, "r") as archive:
+        assert sorted(archive.namelist()) == ["charges.xlsx", "exchange_rates_USD.json"]
+
+        excel_file_path = pathlib.Path(archive.extract("charges.xlsx", tmp_path))
+        assert_generated_file_matches_snapshot(excel_file_path, snapshot)
+
+
 def test_cli_command(mocker: MockerFixture, test_settings: Settings, tmp_path: pathlib.Path):
     mocker.patch("app.cli.get_settings", return_value=test_settings)
     mock_command_coro = mocker.MagicMock()
@@ -1266,5 +1314,6 @@ def test_cli_command(mocker: MockerFixture, test_settings: Settings, tmp_path: p
         exports_dir=tmp_path,
         currency=None,
         account_id=None,
+        dry_run=False,
         settings=test_settings,
     )
