@@ -489,6 +489,9 @@ async def genenerate_monthly_charges(
             filename = f"{account.id}_{currency}_{today.strftime('%Y_%m')}.zip"
         else:
             if not generator.has_entries:
+                # Since we're not saving the results to an excel file in this case, we need to
+                # explicitly close the temporary file openpyxl created to avoid leaks
+                generator.worksheet.close()
                 return
 
             charges_file_db_record = await get_or_create_draft_charges_file(

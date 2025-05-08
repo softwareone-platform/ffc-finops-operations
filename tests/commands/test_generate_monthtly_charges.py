@@ -463,9 +463,15 @@ def test_charges_file_generator_append_row(
     currency_converter: CurrencyConverter,
     operations_account: Account,
     test_settings: Settings,
+    request: pytest.FixtureRequest,
     tmp_path: pathlib.Path,
 ):
     generator = ChargesFileGenerator(operations_account, "USD", currency_converter, tmp_path)
+
+    # Since we're not saving to a file in this test, we need to close the temporary file
+    # openpyxl creates explicitly when we're done with writing to it to avoid a warning
+    # in the pytest output.
+    request.addfinalizer(generator.worksheet.close)
 
     assert not generator.has_entries
     assert generator.total_rows == 0
