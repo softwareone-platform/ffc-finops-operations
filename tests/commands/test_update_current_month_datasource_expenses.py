@@ -122,6 +122,7 @@ async def test_datasource_expenses_are_updated_for_current_month(
         organization=organization,
         linked_datasource_id=datasource_id1,
         datasource_name="First cloud account",
+        datasource_id="11111111",
         year=2025,
         month=3,  # NOTE: This is for the current month, so it should be updated
         month_expenses=Decimal("123.45"),
@@ -131,6 +132,7 @@ async def test_datasource_expenses_are_updated_for_current_month(
         organization=organization,
         linked_datasource_id=datasource_id2,
         datasource_name="Second cloud account",
+        datasource_id="22222222",
         year=2025,
         month=2,  # NOTE: this is for the previous month, so it should NOT be updated
         month_expenses=Decimal("567.89"),
@@ -139,8 +141,18 @@ async def test_datasource_expenses_are_updated_for_current_month(
     mock_optscale_client.mock_fetch_datasources_for_organization(
         organization,
         [
-            {"id": datasource_id1, "name": "First cloud account", "details": {"cost": 234.56}},
-            {"id": datasource_id2, "name": "Second cloud account", "details": {"cost": 678.90}},
+            {
+                "id": datasource_id1,
+                "account_id": "11111111",
+                "name": "First cloud account",
+                "details": {"cost": 234.56},
+            },
+            {
+                "id": datasource_id2,
+                "account_id": "22222222",
+                "name": "Second cloud account",
+                "details": {"cost": 678.90},
+            },
         ],
     )
 
@@ -348,6 +360,7 @@ async def test_multiple_datasources_are_handled_correctly(
     await datasource_expense_factory(
         organization=organization1,
         linked_datasource_id=org_1_datasource_id1,
+        datasource_id="11111111",
         year=2025,
         month=2,
         month_expenses=Decimal("123.45"),
@@ -356,6 +369,7 @@ async def test_multiple_datasources_are_handled_correctly(
     await datasource_expense_factory(
         organization=organization1,
         linked_datasource_id=org_1_datasource_id1,
+        datasource_id="11111111",
         year=2025,
         month=3,
         month_expenses=Decimal("234.56"),
@@ -364,6 +378,7 @@ async def test_multiple_datasources_are_handled_correctly(
     await datasource_expense_factory(
         organization=organization1,
         linked_datasource_id=org_1_datasource_id2,
+        datasource_id="12222222",
         year=2025,
         month=3,
         month_expenses=Decimal("567.89"),
@@ -372,6 +387,7 @@ async def test_multiple_datasources_are_handled_correctly(
     await datasource_expense_factory(
         organization=organization2,
         linked_datasource_id=org_2_datasource_id1,
+        datasource_id="21111111",
         year=2025,
         month=3,
         month_expenses=Decimal("999.88"),
@@ -383,24 +399,24 @@ async def test_multiple_datasources_are_handled_correctly(
     mock_optscale_client.mock_fetch_datasources_for_organization(
         organization1,
         [
-            {"id": org_1_datasource_id1, "details": {"cost": 789.01}},
-            {"id": org_1_datasource_id2, "details": {"cost": 678.90}},
-            {"id": org_1_datasource_id3, "type": "azure_tenant"},
-            {"id": org_1_datasource_id4, "type": "gcp_tenant"},
+            {"id": org_1_datasource_id1, "account_id": "11111111", "details": {"cost": 789.01}},
+            {"id": org_1_datasource_id2, "account_id": "12222222", "details": {"cost": 678.90}},
+            {"id": org_1_datasource_id3, "account_id": "13333333", "type": "azure_tenant"},
+            {"id": org_1_datasource_id4, "account_id": "14444444", "type": "gcp_tenant"},
         ],
     )
 
     mock_optscale_client.mock_fetch_datasources_for_organization(
         organization2,
         [
-            {"id": org_2_datasource_id1, "details": {"cost": 234.56}},
-            {"id": org_2_datasource_id2, "details": {"cost": 654.32}},
+            {"id": org_2_datasource_id1, "account_id": "21111111", "details": {"cost": 234.56}},
+            {"id": org_2_datasource_id2, "account_id": "22222222", "details": {"cost": 654.32}},
         ],
     )
 
     mock_optscale_client.mock_fetch_datasources_for_organization(
         organization3,
-        [{"id": org_3_datasource_id1, "details": {"cost": 777.88}}],
+        [{"id": org_3_datasource_id1, "account_id": "31111111", "details": {"cost": 777.88}}],
     )
 
     mock_optscale_client.mock_fetch_datasources_for_organization(organization4, status_code=404)
@@ -419,6 +435,7 @@ async def test_multiple_datasources_are_handled_correctly(
         (
             ds_exp.organization_id,
             ds_exp.linked_datasource_id,
+            ds_exp.datasource_id,
             ds_exp.year,
             ds_exp.month,
             ds_exp.month_expenses,
@@ -427,12 +444,12 @@ async def test_multiple_datasources_are_handled_correctly(
     }
 
     assert expenses_data == {
-        (organization1.id, org_1_datasource_id1, 2025, 2, Decimal("123.4500")),
-        (organization1.id, org_1_datasource_id1, 2025, 3, Decimal("234.5600")),
-        (organization1.id, org_1_datasource_id2, 2025, 3, Decimal("567.8900")),
-        (organization2.id, org_2_datasource_id1, 2025, 3, Decimal("999.8800")),
-        (organization2.id, org_2_datasource_id2, 2025, 3, Decimal("654.3200")),
-        (organization3.id, org_3_datasource_id1, 2025, 3, Decimal("777.8800")),
+        (organization1.id, org_1_datasource_id1, "11111111", 2025, 2, Decimal("123.4500")),
+        (organization1.id, org_1_datasource_id1, "11111111", 2025, 3, Decimal("234.5600")),
+        (organization1.id, org_1_datasource_id2, "12222222", 2025, 3, Decimal("567.8900")),
+        (organization2.id, org_2_datasource_id1, "21111111", 2025, 3, Decimal("999.8800")),
+        (organization2.id, org_2_datasource_id2, "22222222", 2025, 3, Decimal("654.3200")),
+        (organization3.id, org_3_datasource_id1, "31111111", 2025, 3, Decimal("777.8800")),
     }
 
 
