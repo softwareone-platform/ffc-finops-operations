@@ -313,6 +313,7 @@ class DatasourceExpense(Base, HumanReadablePKMixin, TimestampMixin):
         primaryjoin=lambda: (
             (DatasourceExpense.datasource_id == Entitlement.datasource_id)
             & (DatasourceExpense.linked_datasource_type == Entitlement.linked_datasource_type)
+            & (Entitlement.status == EntitlementStatus.ACTIVE)
         ),
         foreign_keys=lambda: [
             DatasourceExpense.datasource_id,
