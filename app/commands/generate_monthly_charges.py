@@ -27,7 +27,7 @@ from app.db.handlers import (
     OrganizationHandler,
 )
 from app.db.models import Account, ChargesFile, DatasourceExpense, Organization
-from app.enums import AccountType, ChargesFileStatus, EntitlementStatus
+from app.enums import AccountType, ChargesFileStatus
 
 logger = logging.getLogger(__name__)
 
@@ -143,10 +143,7 @@ class ChargesFileGenerator:
 
         if self.account.type == AccountType.AFFILIATE:
             for entitlement in datasource_expense.entitlements:
-                if (
-                    entitlement.owner != self.account
-                    or entitlement.status != EntitlementStatus.ACTIVE
-                ):
+                if entitlement.owner != self.account:
                     continue
 
                 self.append_row(entry)
@@ -161,10 +158,7 @@ class ChargesFileGenerator:
         if self.account.type == AccountType.OPERATIONS:
             self.append_row(entry)
 
-            for entitlement in datasource_expense.entitlements:
-                if entitlement.status != EntitlementStatus.ACTIVE:
-                    continue
-
+            for _entitlement in datasource_expense.entitlements:
                 self.append_row(entry.contra_entry())
 
                 # If multiple entitlements match the same datasource expense, we need to

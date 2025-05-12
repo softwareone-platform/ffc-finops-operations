@@ -293,6 +293,10 @@ class DatasourceExpense(Base, HumanReadablePKMixin, TimestampMixin):
     PK_NUM_LENGTH = 12
 
     datasource_id: Mapped[str] = mapped_column(String(255), index=True)
+    linked_datasource_id: Mapped[str] = mapped_column(String(255))
+    linked_datasource_type: Mapped[DatasourceType] = mapped_column(
+        Enum(DatasourceType, values_callable=lambda obj: [e.value for e in obj]),
+    )
     datasource_name: Mapped[str] = mapped_column(String(255), nullable=False)
     organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"))
 
@@ -306,8 +310,15 @@ class DatasourceExpense(Base, HumanReadablePKMixin, TimestampMixin):
 
     entitlements: Mapped[list[Entitlement]] = relationship(
         "Entitlement",
-        primaryjoin=lambda: DatasourceExpense.datasource_id == Entitlement.datasource_id,
-        foreign_keys=lambda: [DatasourceExpense.datasource_id],
+        primaryjoin=lambda: (
+            (DatasourceExpense.datasource_id == Entitlement.datasource_id)
+            & (DatasourceExpense.linked_datasource_type == Entitlement.linked_datasource_type)
+            & (Entitlement.status == EntitlementStatus.ACTIVE)
+        ),
+        foreign_keys=lambda: [
+            DatasourceExpense.datasource_id,
+            DatasourceExpense.linked_datasource_type,
+        ],
         viewonly=True,
         uselist=True,
         lazy="selectin",
@@ -317,6 +328,7 @@ class DatasourceExpense(Base, HumanReadablePKMixin, TimestampMixin):
         Index("ix_datasource_expenses_year_and_month", year, month),
         UniqueConstraint(
             datasource_id,
+            linked_datasource_type,
             organization_id,
             year,
             month,

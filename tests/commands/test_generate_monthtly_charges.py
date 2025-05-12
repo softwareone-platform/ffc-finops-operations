@@ -43,6 +43,7 @@ from app.enums import (
     AccountStatus,
     AccountType,
     ChargesFileStatus,
+    DatasourceType,
     EntitlementStatus,
     OrganizationStatus,
 )
@@ -86,7 +87,9 @@ async def usd_org_billed_in_eur_expenses(
         linked_organization_id=faker.uuid4(str),
     )
     aws_acc_feb_expenses = await datasource_expense_factory(  # noqa: F841
-        datasource_id=faker.uuid4(str),
+        datasource_id="11111111111",
+        linked_datasource_id=faker.uuid4(str),
+        linked_datasource_type=DatasourceType.AWS_CNR,
         datasource_name="AWS Account",
         organization=org,
         month=2,
@@ -97,6 +100,8 @@ async def usd_org_billed_in_eur_expenses(
     )
     aws_acc_mar_expenses = await datasource_expense_factory(  # noqa: F841
         datasource_id=aws_acc_feb_expenses.datasource_id,
+        linked_datasource_id=aws_acc_feb_expenses.linked_datasource_id,
+        linked_datasource_type=aws_acc_feb_expenses.linked_datasource_type,
         datasource_name=aws_acc_feb_expenses.datasource_name,
         organization=org,
         month=3,
@@ -106,7 +111,9 @@ async def usd_org_billed_in_eur_expenses(
         updated_at=datetime(2025, 3, 31, 10, 0, 0, tzinfo=UTC),
     )
     gcp_acc_mar_expenses = await datasource_expense_factory(
-        datasource_id=faker.uuid4(str),
+        datasource_id="22222222222",
+        linked_datasource_id=faker.uuid4(str),
+        linked_datasource_type=DatasourceType.GCP_CNR,
         datasource_name="GCP Account",
         organization=org,
         month=3,
@@ -120,6 +127,8 @@ async def usd_org_billed_in_eur_expenses(
         name="free GCP account",
         affiliate_external_id="ACC-11111",
         datasource_id=gcp_acc_mar_expenses.datasource_id,
+        linked_datasource_id=gcp_acc_mar_expenses.linked_datasource_id,
+        linked_datasource_type=gcp_acc_mar_expenses.linked_datasource_type,
         status=EntitlementStatus.ACTIVE,
         owner=affiliate_account,
     )
@@ -129,6 +138,10 @@ async def usd_org_billed_in_eur_expenses(
         name="free AWS account",
         affiliate_external_id="ACC-22222",
         datasource_id=aws_acc_mar_expenses.datasource_id,
+        # Intentionally set to None to verify that the relationship
+        # with the datasource expense is still happening
+        linked_datasource_id=None,
+        linked_datasource_type=DatasourceType.AWS_CNR,
         status=EntitlementStatus.ACTIVE,
         owner=another_affiliate_account,
     )
@@ -160,7 +173,9 @@ async def eur_org_billed_in_gbp_expenses(
     )
 
     aws_acc_mar_expenses = await datasource_expense_factory(  # noqa: F841
-        datasource_id=faker.uuid4(str),
+        datasource_id="33333333333",
+        linked_datasource_id=faker.uuid4(str),
+        linked_datasource_type=DatasourceType.AWS_CNR,
         datasource_name="AWS Account",
         organization=org,
         month=3,
@@ -171,7 +186,9 @@ async def eur_org_billed_in_gbp_expenses(
     )
 
     azure_acc_mar_expenses = await datasource_expense_factory(  # noqa: F841
-        datasource_id=faker.uuid4(str),
+        datasource_id="44444444444",
+        linked_datasource_id=faker.uuid4(str),
+        linked_datasource_type=DatasourceType.AZURE_CNR,
         datasource_name="Azure Account",
         organization=org,
         month=3,
@@ -185,6 +202,8 @@ async def eur_org_billed_in_gbp_expenses(
         name="Free AWS account",
         affiliate_external_id="ACC-33333",
         datasource_id=aws_acc_mar_expenses.datasource_id,
+        linked_datasource_id=aws_acc_mar_expenses.linked_datasource_id,
+        linked_datasource_type=aws_acc_mar_expenses.linked_datasource_type,
         status=EntitlementStatus.TERMINATED,  # should be ignored
         owner=affiliate_account,
     )
@@ -193,6 +212,8 @@ async def eur_org_billed_in_gbp_expenses(
         name="Free Azure account",
         affiliate_external_id="ACC-44444",
         datasource_id=azure_acc_mar_expenses.datasource_id,
+        linked_datasource_id=azure_acc_mar_expenses.linked_datasource_id,
+        linked_datasource_type=azure_acc_mar_expenses.linked_datasource_type,
         status=EntitlementStatus.ACTIVE,
         owner=affiliate_account,
     )
@@ -222,7 +243,9 @@ async def gbp_org_billed_in_eur_expenses(
     )
 
     aws_acc_mar_expenses = await datasource_expense_factory(  # noqa: F841
-        datasource_id=faker.uuid4(str),
+        datasource_id="55555555555",
+        linked_datasource_id=faker.uuid4(str),
+        linked_datasource_type=DatasourceType.AWS_CNR,
         datasource_name="AWS Account",
         organization=org,
         month=3,
@@ -233,7 +256,9 @@ async def gbp_org_billed_in_eur_expenses(
     )
 
     azure_acc_mar_expenses = await datasource_expense_factory(  # noqa: F841
-        datasource_id=faker.uuid4(str),
+        datasource_id="66666666666",
+        linked_datasource_id=faker.uuid4(str),
+        linked_datasource_type=DatasourceType.AZURE_CNR,
         datasource_name="Azure Account",
         organization=org,
         month=3,
@@ -247,6 +272,8 @@ async def gbp_org_billed_in_eur_expenses(
         name="Free AWS account",
         affiliate_external_id="ACC-111111",
         datasource_id=aws_acc_mar_expenses.datasource_id,
+        linked_datasource_id=aws_acc_mar_expenses.linked_datasource_id,
+        linked_datasource_type=aws_acc_mar_expenses.linked_datasource_type,
         status=EntitlementStatus.TERMINATED,  # should be ignored
         owner=affiliate_account,
     )
@@ -255,6 +282,8 @@ async def gbp_org_billed_in_eur_expenses(
         name="Free Azure account",
         affiliate_external_id="ACC-888888",
         datasource_id=azure_acc_mar_expenses.datasource_id,
+        linked_datasource_id=azure_acc_mar_expenses.linked_datasource_id,
+        linked_datasource_type=azure_acc_mar_expenses.linked_datasource_type,
         status=EntitlementStatus.ACTIVE,
         owner=affiliate_account,
     )
@@ -284,7 +313,9 @@ async def eur_org_billed_in_eur_expenses(
     )
 
     aws_acc_mar_expenses = await datasource_expense_factory(  # noqa: F841
-        datasource_id=faker.uuid4(str),
+        datasource_id="77777777777",
+        linked_datasource_id=faker.uuid4(str),
+        linked_datasource_type=DatasourceType.AWS_CNR,
         datasource_name="AWS Account",
         organization=org,
         month=3,
@@ -295,7 +326,9 @@ async def eur_org_billed_in_eur_expenses(
     )
 
     azure_acc_mar_expenses = await datasource_expense_factory(  # noqa: F841
-        datasource_id=faker.uuid4(str),
+        datasource_id="88888888888",
+        linked_datasource_id=faker.uuid4(str),
+        linked_datasource_type=DatasourceType.AZURE_CNR,
         datasource_name="Azure Account",
         organization=org,
         month=3,
@@ -309,6 +342,8 @@ async def eur_org_billed_in_eur_expenses(
         name="Free AWS account",
         affiliate_external_id="ACC-99999",
         datasource_id=aws_acc_mar_expenses.datasource_id,
+        linked_datasource_id=aws_acc_mar_expenses.linked_datasource_id,
+        linked_datasource_type=aws_acc_mar_expenses.linked_datasource_type,
         status=EntitlementStatus.TERMINATED,  # should be ignored
         owner=affiliate_account,
     )
@@ -317,6 +352,8 @@ async def eur_org_billed_in_eur_expenses(
         name="Free Azure account",
         affiliate_external_id="ACC-88888",
         datasource_id=azure_acc_mar_expenses.datasource_id,
+        linked_datasource_id=azure_acc_mar_expenses.linked_datasource_id,
+        linked_datasource_type=azure_acc_mar_expenses.linked_datasource_type,
         status=EntitlementStatus.ACTIVE,
         owner=affiliate_account,
     )
@@ -345,7 +382,9 @@ async def usd_org_billed_in_usd_expenses(
         linked_organization_id=faker.uuid4(str),
     )
     aws_acc_mar_expenses = await datasource_expense_factory(  # noqa: F841
-        datasource_id=faker.uuid4(str),
+        datasource_id="99999999999",
+        linked_datasource_id=faker.uuid4(str),
+        linked_datasource_type=DatasourceType.AWS_CNR,
         datasource_name="AWS Account",
         organization=org,
         month=3,
@@ -355,7 +394,9 @@ async def usd_org_billed_in_usd_expenses(
         updated_at=datetime(2025, 3, 31, 10, 0, 0, tzinfo=UTC),
     )
     gcp_acc_mar_expenses = await datasource_expense_factory(
-        datasource_id=faker.uuid4(str),
+        datasource_id="00000000000",
+        linked_datasource_id=faker.uuid4(str),
+        linked_datasource_type=DatasourceType.GCP_CNR,
         datasource_name="GCP Account",
         organization=org,
         month=3,
@@ -365,7 +406,9 @@ async def usd_org_billed_in_usd_expenses(
         updated_at=datetime(2025, 3, 31, 10, 0, 0, tzinfo=UTC),
     )
     azure_acc_mar_expenses = await datasource_expense_factory(  # noqa: F841
-        datasource_id=faker.uuid4(str),
+        datasource_id="10101010101",
+        linked_datasource_id=faker.uuid4(str),
+        linked_datasource_type=DatasourceType.AZURE_CNR,
         datasource_name="Azure Account",
         organization=org,
         month=3,
@@ -379,6 +422,8 @@ async def usd_org_billed_in_usd_expenses(
         name="free AWS account",
         affiliate_external_id="ACC-55555",
         datasource_id=aws_acc_mar_expenses.datasource_id,
+        linked_datasource_id=aws_acc_mar_expenses.linked_datasource_id,
+        linked_datasource_type=aws_acc_mar_expenses.linked_datasource_type,
         status=EntitlementStatus.ACTIVE,
         owner=affiliate_account,
     )
@@ -388,6 +433,8 @@ async def usd_org_billed_in_usd_expenses(
         name="free GCP account",
         affiliate_external_id="ACC-66666",
         datasource_id=gcp_acc_mar_expenses.datasource_id,
+        linked_datasource_id=gcp_acc_mar_expenses.linked_datasource_id,
+        linked_datasource_type=gcp_acc_mar_expenses.linked_datasource_type,
         status=EntitlementStatus.TERMINATED,
         owner=affiliate_account,
     )
