@@ -12,6 +12,7 @@ from app.conf import Settings
 from app.db.base import session_factory
 from app.db.handlers import DatasourceExpenseHandler, OrganizationHandler
 from app.db.models import DatasourceExpense, Organization
+from app.enums import DatasourceType
 from app.notifications import send_exception, send_info
 
 logger = logging.getLogger(__name__)
@@ -104,7 +105,13 @@ async def store_datasource_expenses(
                     "month_expenses": datasource["details"]["cost"],
                     "datasource_name": datasource["name"],
                     "linked_datasource_id": datasource["id"],
+                    "linked_datasource_type": datasource["type"],
                 },
+                extra_conditions=[
+                    DatasourceExpense.linked_datasource_type.in_(
+                        [DatasourceType.UNKNOWN, datasource["type"]]
+                    ),
+                ],
             )
             if not created:
                 await datasource_expense_handler.update(
@@ -113,6 +120,7 @@ async def store_datasource_expenses(
                         "month_expenses": datasource["details"]["cost"],
                         "datasource_name": datasource["name"],
                         "linked_datasource_id": datasource["id"],
+                        "linked_datasource_type": datasource["type"],
                     },
                 )
     await send_info(

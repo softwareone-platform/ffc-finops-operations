@@ -16,7 +16,7 @@ from app.commands import update_current_month_datasource_expenses
 from app.conf import Settings
 from app.db.handlers import DatasourceExpenseHandler
 from app.db.models import DatasourceExpense, Organization
-from app.enums import OrganizationStatus
+from app.enums import DatasourceType, OrganizationStatus
 from tests.fixtures.mock_api_clients import MockOptscaleClient
 from tests.types import ModelFactory
 
@@ -121,6 +121,7 @@ async def test_datasource_expenses_are_updated_for_current_month(
     existing_datasource_expense1 = await datasource_expense_factory(
         organization=organization,
         linked_datasource_id=datasource_id1,
+        linked_datasource_type=DatasourceType.AWS_CNR,
         datasource_name="First cloud account",
         datasource_id="11111111",
         year=2025,
@@ -131,6 +132,7 @@ async def test_datasource_expenses_are_updated_for_current_month(
     existing_datasource_expense2 = await datasource_expense_factory(
         organization=organization,
         linked_datasource_id=datasource_id2,
+        linked_datasource_type=DatasourceType.AZURE_CNR,
         datasource_name="Second cloud account",
         datasource_id="22222222",
         year=2025,
@@ -144,12 +146,14 @@ async def test_datasource_expenses_are_updated_for_current_month(
             {
                 "id": datasource_id1,
                 "account_id": "11111111",
+                "type": "aws_cnr",
                 "name": "First cloud account",
                 "details": {"cost": 234.56},
             },
             {
                 "id": datasource_id2,
                 "account_id": "22222222",
+                "type": "azure_cnr",
                 "name": "Second cloud account",
                 "details": {"cost": 678.90},
             },
@@ -360,6 +364,7 @@ async def test_multiple_datasources_are_handled_correctly(
     await datasource_expense_factory(
         organization=organization1,
         linked_datasource_id=org_1_datasource_id1,
+        linked_datasource_type=DatasourceType.AWS_CNR,
         datasource_id="11111111",
         year=2025,
         month=2,
@@ -369,6 +374,7 @@ async def test_multiple_datasources_are_handled_correctly(
     await datasource_expense_factory(
         organization=organization1,
         linked_datasource_id=org_1_datasource_id1,
+        linked_datasource_type=DatasourceType.AWS_CNR,
         datasource_id="11111111",
         year=2025,
         month=3,
@@ -379,6 +385,7 @@ async def test_multiple_datasources_are_handled_correctly(
         organization=organization1,
         linked_datasource_id=org_1_datasource_id2,
         datasource_id="12222222",
+        linked_datasource_type=DatasourceType.AWS_CNR,
         year=2025,
         month=3,
         month_expenses=Decimal("567.89"),
@@ -388,6 +395,7 @@ async def test_multiple_datasources_are_handled_correctly(
         organization=organization2,
         linked_datasource_id=org_2_datasource_id1,
         datasource_id="21111111",
+        linked_datasource_type=DatasourceType.AWS_CNR,
         year=2025,
         month=3,
         month_expenses=Decimal("999.88"),
@@ -399,8 +407,18 @@ async def test_multiple_datasources_are_handled_correctly(
     mock_optscale_client.mock_fetch_datasources_for_organization(
         organization1,
         [
-            {"id": org_1_datasource_id1, "account_id": "11111111", "details": {"cost": 789.01}},
-            {"id": org_1_datasource_id2, "account_id": "12222222", "details": {"cost": 678.90}},
+            {
+                "id": org_1_datasource_id1,
+                "account_id": "11111111",
+                "type": "aws_cnr",
+                "details": {"cost": 789.01},
+            },
+            {
+                "id": org_1_datasource_id2,
+                "account_id": "12222222",
+                "type": "aws_cnr",
+                "details": {"cost": 678.90},
+            },
             {"id": org_1_datasource_id3, "account_id": "13333333", "type": "azure_tenant"},
             {"id": org_1_datasource_id4, "account_id": "14444444", "type": "gcp_tenant"},
         ],
@@ -409,14 +427,31 @@ async def test_multiple_datasources_are_handled_correctly(
     mock_optscale_client.mock_fetch_datasources_for_organization(
         organization2,
         [
-            {"id": org_2_datasource_id1, "account_id": "21111111", "details": {"cost": 234.56}},
-            {"id": org_2_datasource_id2, "account_id": "22222222", "details": {"cost": 654.32}},
+            {
+                "id": org_2_datasource_id1,
+                "account_id": "21111111",
+                "type": "aws_cnr",
+                "details": {"cost": 234.56},
+            },
+            {
+                "id": org_2_datasource_id2,
+                "account_id": "22222222",
+                "type": "aws_cnr",
+                "details": {"cost": 654.32},
+            },
         ],
     )
 
     mock_optscale_client.mock_fetch_datasources_for_organization(
         organization3,
-        [{"id": org_3_datasource_id1, "account_id": "31111111", "details": {"cost": 777.88}}],
+        [
+            {
+                "id": org_3_datasource_id1,
+                "account_id": "31111111",
+                "type": "azure_cnr",
+                "details": {"cost": 777.88},
+            }
+        ],
     )
 
     mock_optscale_client.mock_fetch_datasources_for_organization(organization4, status_code=404)
