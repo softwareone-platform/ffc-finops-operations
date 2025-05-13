@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import pathlib
+import tempfile
 import zipfile
 from collections.abc import AsyncGenerator, Sequence
 from copy import copy
@@ -560,8 +561,15 @@ async def main(
 def command(
     ctx: typer.Context,
     exports_dir: Annotated[
-        pathlib.Path, typer.Option("--exports-dir", help="Directory to export the charge files to")
-    ],
+        pathlib.Path | None,
+        typer.Option(
+            "--exports-dir",
+            help=(
+                "Directory to export the charge files to. "
+                "If not set the command will create a temporary directory"
+            ),
+        ),
+    ] = None,
     currency: Annotated[
         str | None,
         typer.Option(
@@ -595,12 +603,21 @@ def command(
     """
     logger.info("Starting command function")
 
-    if exports_dir.is_file():  # pragma: no cover
-        raise ValueError("The exports directory must be a directory, not a file.")
+    if exports_dir is None:
+        exports_dir = pathlib.Path(tempfile.TemporaryDirectory().name)
+        logger.info(
+            "No exports directory specified, using a temporary directory: %s",
+            str(exports_dir.resolve()),
+        )
+    else:
+        if exports_dir.is_file():  # pragma: no cover
+            raise ValueError("The exports directory must be a directory, not a file.")
 
-    if not exports_dir.exists():  # pragma: no cover
-        logger.info("Exports directory %s does not exist, creating it", str(exports_dir.resolve()))
-        exports_dir.mkdir(parents=True)
+        if not exports_dir.exists():  # pragma: no cover
+            logger.info(
+                "Exports directory %s does not exist, creating it", str(exports_dir.resolve())
+            )
+            exports_dir.mkdir(parents=True)
 
     asyncio.run(
         main(

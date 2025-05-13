@@ -1,6 +1,7 @@
 import io
 import logging
 import pathlib
+import tempfile
 import zipfile
 from contextlib import nullcontext
 from datetime import UTC, date, datetime, timedelta
@@ -1317,3 +1318,22 @@ def test_cli_command(mocker: MockerFixture, test_settings: Settings, tmp_path: p
         account_id=None,
         dry_run=False,
     )
+
+
+def test_cli_command_default_exports_dir(mocker: MockerFixture, test_settings: Settings):
+    mocker.patch("app.cli.get_settings", return_value=test_settings)
+    mock_command_coro = mocker.MagicMock()
+    mock_command = mocker.MagicMock(return_value=mock_command_coro)
+
+    mocker.patch("app.commands.generate_monthly_charges.main", mock_command)
+    mock_run = mocker.patch("app.commands.generate_monthly_charges.asyncio.run")
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["generate-monthly-charges"])
+    assert result.exit_code == 0
+    mock_run.assert_called_once_with(mock_command_coro)
+
+    calls = mock_command.call_args_list
+    assert len(calls) == 1
+    exports_dir = calls[0].kwargs.get("exports_dir")
+    assert exports_dir.is_relative_to(tempfile.gettempdir())
