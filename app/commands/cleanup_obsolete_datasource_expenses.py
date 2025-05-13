@@ -10,10 +10,12 @@ from app.conf import Settings
 from app.db.base import session_factory
 from app.db.models import DatasourceExpense
 from app.notifications import send_info
+from app.telemetry import capture_telemetry
 
 logger = logging.getLogger(__name__)
 
 
+@capture_telemetry(__name__, "Cleanup Obsolete Datasource Expenses")
 async def main(settings: Settings) -> None:
     async with session_factory.begin() as session:
         logger.info("Fetching obsolete datasource expenses from the database")

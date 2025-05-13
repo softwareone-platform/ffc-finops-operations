@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.conf import Settings
+from app.telemetry import setup_sqlalchemy_instrumentor
 
 session_factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
     class_=AsyncSession, expire_on_commit=False
@@ -20,6 +21,7 @@ def configure_db_engine(settings: Settings) -> AsyncEngine:
         future=True,
     )
     session_factory.configure(bind=db_engine)
+    setup_sqlalchemy_instrumentor(settings, db_engine)
     return db_engine
 
 
