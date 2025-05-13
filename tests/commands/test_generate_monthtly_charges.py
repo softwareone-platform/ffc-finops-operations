@@ -1,6 +1,7 @@
 import io
 import logging
 import pathlib
+import tempfile
 import zipfile
 from contextlib import nullcontext
 from datetime import UTC, date, datetime, timedelta
@@ -463,9 +464,15 @@ def test_charges_file_generator_append_row(
     currency_converter: CurrencyConverter,
     operations_account: Account,
     test_settings: Settings,
+    request: pytest.FixtureRequest,
     tmp_path: pathlib.Path,
 ):
     generator = ChargesFileGenerator(operations_account, "USD", currency_converter, tmp_path)
+
+    # Since we're not saving to a file in this test, we need to close the temporary file
+    # openpyxl creates explicitly when we're done with writing to it to avoid a warning
+    # in the pytest output.
+    request.addfinalizer(generator.worksheet.close)
 
     assert not generator.has_entries
     assert generator.total_rows == 0
@@ -532,7 +539,6 @@ async def test_charges_file_generator_add_datasource_expense(
     usd_org_billed_in_usd_expenses: Organization,
     usd_org_billed_in_eur_expenses: Organization,
     eur_org_billed_in_gbp_expenses: Organization,
-    test_settings: Settings,
     db_session: AsyncSession,
     request: pytest.FixtureRequest,
     tmp_path: pathlib.Path,
@@ -1039,7 +1045,7 @@ async def test_full_run(
     # (both new records and updating existing ones), so that we can filter the affected records
     # bellow
     with caplog.at_level(logging.INFO), time_machine.travel("2025-04-10T11:00:00Z", tick=False):
-        await generate_monthly_charges_main(exports_dir=tmp_path, settings=test_settings)
+        await generate_monthly_charges_main(exports_dir=tmp_path)
 
     await db_session.refresh(generated_charges_file)
     await db_session.refresh(processed_charges_file)
@@ -1205,7 +1211,6 @@ async def test_command_filters(
     affiliate_account: Account,
     another_affiliate_account: Account,
     operations_account: Account,
-    test_settings: Settings,
     db_session: AsyncSession,
     caplog: pytest.LogCaptureFixture,
     tmp_path: pathlib.Path,
@@ -1234,7 +1239,6 @@ async def test_command_filters(
     with pytest.raises(exception.__class__, match=str(exception)) if exception else nullcontext():
         await generate_monthly_charges_main(
             exports_dir=tmp_path,
-            settings=test_settings,
             account_id=account_id,
             currency=currency,
         )
@@ -1248,6 +1252,52 @@ async def test_command_filters(
         (call.args[1], call.args[2].id) for call in mock_genenerate_monthly_charges.call_args_list
     ]
     assert sorted(actual_calls_args) == sorted(expected_calls_args)
+
+
+@pytest.mark.fixed_random_seed
+@time_machine.travel("2025-04-10T10:00:00Z", tick=False)
+async def test_generate_monthly_charges_dry_run(
+    exchange_rates_factory: ModelFactory[ExchangeRates],
+    usd_org_billed_in_eur_expenses: Organization,
+    operations_account: Account,
+    db_session: AsyncSession,
+    tmp_path: pathlib.Path,
+    mocker: MockerFixture,
+    snapshot: Snapshot,
+    caplog: pytest.LogCaptureFixture,
+):
+    mock_upload_to_azure = mocker.patch(
+        "app.commands.generate_monthly_charges.upload_charges_file_to_azure"
+    )
+    charges_file_handler = ChargesFileHandler(db_session)
+    assert await charges_file_handler.count() == 0
+
+    await exchange_rates_factory(base_currency="EUR")
+    await exchange_rates_factory(base_currency="USD")
+    await exchange_rates_factory(base_currency="GBP")
+
+    with caplog.at_level(logging.INFO):
+        await generate_monthly_charges_main(
+            exports_dir=tmp_path,
+            account_id=operations_account.id,
+            currency="EUR",
+            dry_run=True,
+        )
+
+    assert "Dry run enabled, skipping upload to Azure Blob Storage" in caplog.text
+    assert "Dry run enabled, skipping creating charges file database record" in caplog.text
+    assert "Dry run enabled, skipping fetching existing charges file" in caplog.text
+
+    assert not mock_upload_to_azure.called
+    assert await charges_file_handler.count() == 0
+    expected_generated_file_path = tmp_path / f"{operations_account.id}_EUR_2025_04.zip"
+    assert expected_generated_file_path.exists()
+
+    with zipfile.ZipFile(expected_generated_file_path, "r") as archive:
+        assert sorted(archive.namelist()) == ["charges.xlsx", "exchange_rates_USD.json"]
+
+        excel_file_path = pathlib.Path(archive.extract("charges.xlsx", tmp_path))
+        assert_generated_file_matches_snapshot(excel_file_path, snapshot)
 
 
 def test_cli_command(mocker: MockerFixture, test_settings: Settings, tmp_path: pathlib.Path):
@@ -1266,5 +1316,24 @@ def test_cli_command(mocker: MockerFixture, test_settings: Settings, tmp_path: p
         exports_dir=tmp_path,
         currency=None,
         account_id=None,
-        settings=test_settings,
+        dry_run=False,
     )
+
+
+def test_cli_command_default_exports_dir(mocker: MockerFixture, test_settings: Settings):
+    mocker.patch("app.cli.get_settings", return_value=test_settings)
+    mock_command_coro = mocker.MagicMock()
+    mock_command = mocker.MagicMock(return_value=mock_command_coro)
+
+    mocker.patch("app.commands.generate_monthly_charges.main", mock_command)
+    mock_run = mocker.patch("app.commands.generate_monthly_charges.asyncio.run")
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["generate-monthly-charges"])
+    assert result.exit_code == 0
+    mock_run.assert_called_once_with(mock_command_coro)
+
+    calls = mock_command.call_args_list
+    assert len(calls) == 1
+    exports_dir = calls[0].kwargs.get("exports_dir")
+    assert exports_dir.is_relative_to(tempfile.gettempdir())

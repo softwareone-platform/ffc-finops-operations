@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import pathlib
+import tempfile
 import zipfile
 from collections.abc import AsyncGenerator, Sequence
 from copy import copy
@@ -17,7 +18,7 @@ from sqlalchemy import extract, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.blob_storage import upload_charges_file
-from app.conf import Settings, get_settings
+from app.conf import get_settings
 from app.currency import CurrencyConverter
 from app.db.base import session_factory
 from app.db.handlers import (
@@ -461,32 +462,49 @@ async def genenerate_monthly_charges(
     account: Account,
     currency_converter: CurrencyConverter,
     exports_dir: pathlib.Path,
+    dry_run: bool,
 ) -> None:
     today = datetime.now(UTC).date()
     loop = asyncio.get_event_loop()
 
     async with session.begin():
-        generated_charges_file = await fetch_existing_generated_charges_file(
-            session, account, currency
-        )
+        if dry_run:
+            logger.info("Dry run enabled, skipping fetching existing charges file")
+        else:
+            generated_charges_file = await fetch_existing_generated_charges_file(
+                session, account, currency
+            )
 
-        if generated_charges_file is not None:
-            return
+            if generated_charges_file is not None:
+                return
 
         generator = ChargesFileGenerator(account, currency, currency_converter, exports_dir)
         async for ds_exp in fetch_datasource_expenses(session, currency):
             await loop.run_in_executor(None, generator.add_datasource_expense, ds_exp)
 
-        if not generator.has_entries:
-            return
+        if dry_run:
+            logger.info("Dry run enabled, skipping creating charges file database record")
 
-        charges_file_db_record = await get_or_create_draft_charges_file(
-            session, account, currency, today
-        )
+            # When in dry_run mode, we don't have access to the the charges_file ID,
+            # so we should use a different filename
+            filename = f"{account.id}_{currency}_{today.strftime('%Y_%m')}.zip"
+        else:
+            if not generator.has_entries:
+                # Since we're not saving the results to an excel file in this case, we need to
+                # explicitly close the temporary file openpyxl created to avoid leaks
+                generator.worksheet.close()
+                return
 
-    zip_file_path = await loop.run_in_executor(
-        None, generator.save, f"{charges_file_db_record.id}.zip"
-    )
+            charges_file_db_record = await get_or_create_draft_charges_file(
+                session, account, currency, today
+            )
+            filename = f"{charges_file_db_record.id}.zip"
+
+    zip_file_path = await loop.run_in_executor(None, generator.make_archive, filename)
+
+    if dry_run:
+        logger.info("Dry run enabled, skipping upload to Azure Blob Storage")
+        return
 
     successful_upload = await upload_charges_file_to_azure(charges_file_db_record, zip_file_path)
 
@@ -503,9 +521,9 @@ async def genenerate_monthly_charges(
 
 async def main(
     exports_dir: pathlib.Path,
-    settings: Settings,
     currency: str | None = None,
     account_id: str | None = None,
+    dry_run: bool = False,
 ) -> None:
     async with session_factory() as session:
         async with session.begin():
@@ -536,15 +554,22 @@ async def main(
         for currency in unique_billing_currencies:
             for account in accounts:
                 await genenerate_monthly_charges(
-                    session, currency, account, currency_converter, exports_dir
+                    session, currency, account, currency_converter, exports_dir, dry_run
                 )
 
 
 def command(
     ctx: typer.Context,
     exports_dir: Annotated[
-        pathlib.Path, typer.Option("--exports-dir", help="Directory to export the charge files to")
-    ],
+        pathlib.Path | None,
+        typer.Option(
+            "--exports-dir",
+            help=(
+                "Directory to export the charge files to. "
+                "If not set the command will create a temporary directory"
+            ),
+        ),
+    ] = None,
     currency: Annotated[
         str | None,
         typer.Option(
@@ -561,6 +586,14 @@ def command(
             show_default=False,
         ),
     ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run",
+            help="If set, only generate charge files but do not upload them to Azure Blob Storage",
+            show_default=False,
+        ),
+    ] = False,
 ) -> None:
     """
     Generate monthly charge files for the previous month and upload them to Azure Blob Storage.
@@ -570,15 +603,29 @@ def command(
     """
     logger.info("Starting command function")
 
-    if exports_dir.is_file():  # pragma: no cover
-        raise ValueError("The exports directory must be a directory, not a file.")
+    if exports_dir is None:
+        exports_dir = pathlib.Path(tempfile.TemporaryDirectory().name)
+        logger.info(
+            "No exports directory specified, using a temporary directory: %s",
+            str(exports_dir.resolve()),
+        )
+    else:
+        if exports_dir.is_file():  # pragma: no cover
+            raise ValueError("The exports directory must be a directory, not a file.")
 
-    if not exports_dir.exists():  # pragma: no cover
-        logger.info("Exports directory %s does not exist, creating it", str(exports_dir.resolve()))
-        exports_dir.mkdir(parents=True)
+        if not exports_dir.exists():  # pragma: no cover
+            logger.info(
+                "Exports directory %s does not exist, creating it", str(exports_dir.resolve())
+            )
+            exports_dir.mkdir(parents=True)
 
     asyncio.run(
-        main(exports_dir=exports_dir, currency=currency, account_id=account_id, settings=ctx.obj)
+        main(
+            exports_dir=exports_dir,
+            currency=currency,
+            account_id=account_id,
+            dry_run=dry_run,
+        )
     )
 
     logger.info("Completed command function")
