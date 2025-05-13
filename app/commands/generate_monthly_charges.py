@@ -17,7 +17,7 @@ from sqlalchemy import extract, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.blob_storage import upload_charges_file
-from app.conf import Settings, get_settings
+from app.conf import get_settings
 from app.currency import CurrencyConverter
 from app.db.base import session_factory
 from app.db.handlers import (
@@ -520,7 +520,6 @@ async def genenerate_monthly_charges(
 
 async def main(
     exports_dir: pathlib.Path,
-    settings: Settings,
     currency: str | None = None,
     account_id: str | None = None,
     dry_run: bool = False,
@@ -609,7 +608,6 @@ def command(
             currency=currency,
             account_id=account_id,
             dry_run=dry_run,
-            settings=ctx.obj,
         )
     )
 

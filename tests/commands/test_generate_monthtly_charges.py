@@ -538,7 +538,6 @@ async def test_charges_file_generator_add_datasource_expense(
     usd_org_billed_in_usd_expenses: Organization,
     usd_org_billed_in_eur_expenses: Organization,
     eur_org_billed_in_gbp_expenses: Organization,
-    test_settings: Settings,
     db_session: AsyncSession,
     request: pytest.FixtureRequest,
     tmp_path: pathlib.Path,
@@ -1045,7 +1044,7 @@ async def test_full_run(
     # (both new records and updating existing ones), so that we can filter the affected records
     # bellow
     with caplog.at_level(logging.INFO), time_machine.travel("2025-04-10T11:00:00Z", tick=False):
-        await generate_monthly_charges_main(exports_dir=tmp_path, settings=test_settings)
+        await generate_monthly_charges_main(exports_dir=tmp_path)
 
     await db_session.refresh(generated_charges_file)
     await db_session.refresh(processed_charges_file)
@@ -1211,7 +1210,6 @@ async def test_command_filters(
     affiliate_account: Account,
     another_affiliate_account: Account,
     operations_account: Account,
-    test_settings: Settings,
     db_session: AsyncSession,
     caplog: pytest.LogCaptureFixture,
     tmp_path: pathlib.Path,
@@ -1240,7 +1238,6 @@ async def test_command_filters(
     with pytest.raises(exception.__class__, match=str(exception)) if exception else nullcontext():
         await generate_monthly_charges_main(
             exports_dir=tmp_path,
-            settings=test_settings,
             account_id=account_id,
             currency=currency,
         )
@@ -1262,7 +1259,6 @@ async def test_generate_monthly_charges_dry_run(
     exchange_rates_factory: ModelFactory[ExchangeRates],
     usd_org_billed_in_eur_expenses: Organization,
     operations_account: Account,
-    test_settings: Settings,
     db_session: AsyncSession,
     tmp_path: pathlib.Path,
     mocker: MockerFixture,
@@ -1282,7 +1278,6 @@ async def test_generate_monthly_charges_dry_run(
     with caplog.at_level(logging.INFO):
         await generate_monthly_charges_main(
             exports_dir=tmp_path,
-            settings=test_settings,
             account_id=operations_account.id,
             currency="EUR",
             dry_run=True,
@@ -1321,5 +1316,4 @@ def test_cli_command(mocker: MockerFixture, test_settings: Settings, tmp_path: p
         currency=None,
         account_id=None,
         dry_run=False,
-        settings=test_settings,
     )
