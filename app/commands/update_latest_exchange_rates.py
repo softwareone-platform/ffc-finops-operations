@@ -13,6 +13,7 @@ from app.db.base import session_factory
 from app.db.handlers import ExchangeRatesHandler
 from app.db.models import ExchangeRates, Organization
 from app.notifications import send_exception, send_info
+from app.telemetry import capture_telemetry
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +68,7 @@ async def get_currencies_to_update(session: AsyncSession) -> list[str]:
     return currencies_to_update
 
 
+@capture_telemetry(__name__, "Update Latest Exchange Rates")
 async def main(settings: Settings) -> None:
     async with session_factory() as session:
         async with session.begin():
