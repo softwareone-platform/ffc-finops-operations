@@ -20,6 +20,7 @@ from app.routers import (
     systems,
     users,
 )
+from app.telemetry import setup_fastapi_instrumentor
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +136,10 @@ def setup_app():
 
     app.openapi = partial(generate_openapi_spec, app)
 
+    setup_fastapi_instrumentor(
+        get_settings(),
+        app,
+    )
     return app
 
 

@@ -29,6 +29,7 @@ from app.db.handlers import (
 )
 from app.db.models import Account, ChargesFile, DatasourceExpense, Organization
 from app.enums import AccountType, ChargesFileStatus
+from app.telemetry import capture_telemetry
 
 logger = logging.getLogger(__name__)
 
@@ -519,6 +520,7 @@ async def genenerate_monthly_charges(
         )
 
 
+@capture_telemetry(__name__, "Generate Monthly Charges")
 async def main(
     exports_dir: pathlib.Path,
     currency: str | None = None,

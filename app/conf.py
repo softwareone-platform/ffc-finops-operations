@@ -66,6 +66,7 @@ class Settings(BaseSettings):
     debug: bool = False
 
     msteams_notifications_webhook_url: str | None = None
+    azure_insights_connection_string: str | None = None
 
     @computed_field
     def azure_sa_connection_string(self) -> str:
