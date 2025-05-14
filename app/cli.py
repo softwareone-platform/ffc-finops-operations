@@ -7,6 +7,7 @@ from rich.text import Text
 
 from app import commands
 from app.conf import get_settings
+from app.db.base import configure_db_engine
 from app.logging import setup_logging
 from app.telemetry import setup_telemetry
 
@@ -75,3 +76,4 @@ def main(
     setup_telemetry(settings)
     if ctx.invoked_subcommand != "serve":
         setup_logging(settings)
+        configure_db_engine(settings)
