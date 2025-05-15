@@ -75,6 +75,7 @@ jobs:
           FFC_OPERATIONS_POSTGRES_PASSWORD: mysecurepass#
 
       - name: Compute added/removed lines for notification
+        if: ${{ github.event_name == 'pull_request' }}
         id: diff
         run: |
           PR_DATA=$(gh pr view "${{ github.event.pull_request.number }}" --json additions,deletions -q '.')
@@ -85,7 +86,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Notify Microsoft Teams
-        uses: softwareone-platform/notify-pr-teams-action@v1
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: softwareone-platform/notify-pr-teams-action@v3
         with:
           webhook_url: ${{ secrets.TEAMS_WEBHOOK_URL }}
           bot_image_url: https://raw.githubusercontent.com/softwareone-platform/ffc-finops-operations/main/.github/workflows/assets/turing_team_pr_bot.png
