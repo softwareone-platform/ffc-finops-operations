@@ -22,6 +22,7 @@ from app.schemas.entitlements import (
     EntitlementRead,
     EntitlementRedeemInput,
 )
+from app.utils import wrap_http_error_in_502, wrap_http_not_found_in_400
 
 # ============
 # Dependencies
@@ -188,10 +189,18 @@ async def redeem_entitlement(
             ),
         )
 
-    optscale_datasource_response = await optscale_client.fetch_datasource_by_id(
-        redeem_info.datasource.id
-    )
-    optscale_datasource = optscale_datasource_response.json()
+    optscale_datasource = None
+
+    with wrap_http_error_in_502():
+        with wrap_http_not_found_in_400(
+            f"Cannot redeem Entitlement {entitlement.id}: "
+            f"datasource {redeem_info.datasource.id} not found."
+        ):
+            optscale_datasource_response = await optscale_client.fetch_datasource_by_id(
+                redeem_info.datasource.id
+            )
+
+            optscale_datasource = optscale_datasource_response.json()
 
     if optscale_datasource["organization_id"] != redeemer_organization.linked_organization_id:
         raise HTTPException(
