@@ -22,7 +22,7 @@ from app.schemas.entitlements import (
     EntitlementRead,
     EntitlementRedeemInput,
 )
-from app.utils import wrap_http_error_in_502, wrap_http_not_found_in_400
+from app.utils import wrap_exc_in_http_response, wrap_http_error_in_502, wrap_http_not_found_in_400
 
 # ============
 # Dependencies
@@ -177,8 +177,15 @@ async def redeem_entitlement(
                 f"current status is {entitlement.status.value}."
             ),
         )
-
-    redeemer_organization = await organization_repo.get(redeem_info.organization.id)
+    with wrap_exc_in_http_response(
+        NotFoundError,
+        error_msg=(
+            f"Cannot redeem Entitlement {entitlement.id}: "
+            f"organization {redeem_info.organization.id} not found."
+        ),
+        status_code=status.HTTP_400_BAD_REQUEST,
+    ):
+        redeemer_organization = await organization_repo.get(redeem_info.organization.id)
 
     if redeemer_organization.status != OrganizationStatus.ACTIVE:
         raise HTTPException(

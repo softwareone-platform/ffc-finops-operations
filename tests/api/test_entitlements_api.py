@@ -728,6 +728,27 @@ async def test_redeem_non_new_entitlement(
     )
 
 
+async def test_redeem_entitlement_organization_doesnt_exist(
+    operations_client: AsyncClient,
+    entitlement_gcp: Entitlement,
+):
+    response = await operations_client.post(
+        f"/entitlements/{entitlement_gcp.id}/redeem",
+        json={
+            "organization": {"id": "FORG-1001-0110"},
+            "datasource": {
+                "id": entitlement_gcp.datasource_id,
+                "name": "GCP Dev Project",
+                "type": "gcp_cnr",
+            },
+        },
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == (
+        f"Cannot redeem Entitlement {entitlement_gcp.id}: organization FORG-1001-0110 not found."
+    )
+
+
 async def test_redeem_entitlement_inactive_organization(
     operations_client: AsyncClient,
     entitlement_gcp: Entitlement,
