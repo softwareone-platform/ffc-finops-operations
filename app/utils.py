@@ -46,6 +46,19 @@ def wrap_http_error_in_502(base_msg: str = "Error in FinOps for Cloud"):
 
 
 @contextlib.contextmanager
+def wrap_http_not_found_in_400(message: str):
+    try:
+        yield
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code != httpx.codes.NOT_FOUND:
+            raise
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=message,
+        ) from e
+
+
+@contextlib.contextmanager
 def wrap_exc_in_http_response(
     exc_cls: type[Exception],
     error_msg: str | None = None,
