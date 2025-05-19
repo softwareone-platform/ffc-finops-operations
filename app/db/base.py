@@ -19,6 +19,8 @@ def configure_db_engine(settings: Settings) -> AsyncEngine:
         str(settings.postgres_async_url),
         echo=settings.debug,
         future=True,
+        pool_pre_ping=True,
+        pool_recycle=280,
     )
     session_factory.configure(bind=db_engine)
     setup_sqlalchemy_instrumentor(settings, db_engine)
