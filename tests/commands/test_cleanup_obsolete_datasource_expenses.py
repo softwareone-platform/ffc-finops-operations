@@ -132,7 +132,6 @@ async def test_command_delete_only_old_datasource_expenses(
 
 
 def test_command(mocker: MockerFixture, test_settings: Settings):
-    mocker.patch("app.cli.get_settings", return_value=test_settings)
     mock_check_coro = mocker.MagicMock()
     mock_check = mocker.MagicMock(return_value=mock_check_coro)
 

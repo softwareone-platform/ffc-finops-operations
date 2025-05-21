@@ -89,6 +89,7 @@ def test_settings() -> Settings:
     settings.azure_sa_account_key = (
         "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
     )
+    settings.opentelemetry_exporter = None
     settings.smtp_sender_email = "test@example.com"
     settings.smtp_sender_name = "Test Sender"
     settings.smtp_host = "smtp.example.com"
