@@ -249,10 +249,8 @@ async def test_exchange_rate_api_timeouts_then_succeeds(
 
 def test_cli_command(
     mocker: MockerFixture,
-    test_settings: Settings,
     mock_exchange_rate_api_client: MockExchangeRateAPIClient,
 ):
-    mocker.patch("app.cli.get_settings", return_value=test_settings)
     mock_command_coro = mocker.MagicMock()
     mock_command = mocker.MagicMock(return_value=mock_command_coro)
 

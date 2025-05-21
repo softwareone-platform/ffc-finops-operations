@@ -5,8 +5,8 @@ import tempfile
 import aiofiles  # type: ignore
 from httpx import AsyncClient
 
-from app import settings
 from app.blob_storage import upload_charges_file
+from app.conf import Settings
 from app.db.models import Account, ChargesFile
 from app.enums import ChargesFileStatus
 from tests.types import ModelFactory
@@ -248,6 +248,7 @@ async def test_get_charges_download_url_by_id(
     operations_client: AsyncClient,
     charges_file_factory: ModelFactory[ChargesFile],
     operations_account: Account,
+    test_settings: Settings,
 ):
     charge_file = await charges_file_factory(
         owner=operations_account,
@@ -277,7 +278,7 @@ async def test_get_charges_download_url_by_id(
     headers = response.headers["Location"]
     headers_parts = headers.split("?")[0].split("/")
     assert headers_parts[0] == "https:"
-    assert headers_parts[3] == settings.azure_sa_container_name
+    assert headers_parts[3] == test_settings.azure_sa_container_name
     assert headers_parts[4] == "EUR"
     assert headers_parts[5] == "2025"
     assert headers_parts[6] == "03"
@@ -288,6 +289,7 @@ async def test_get_charges_file_by_id_affiliate_account(
     affiliate_client: AsyncClient,
     charges_file_factory: ModelFactory[ChargesFile],
     gcp_account: Account,
+    test_settings: Settings,
 ):
     charge_file = await charges_file_factory(
         owner=gcp_account,
@@ -316,7 +318,7 @@ async def test_get_charges_file_by_id_affiliate_account(
     headers = response.headers["Location"]
     headers_parts = headers.split("?")[0].split("/")
     assert headers_parts[0] == "https:"
-    assert headers_parts[3] == settings.azure_sa_container_name
+    assert headers_parts[3] == test_settings.azure_sa_container_name
     assert headers_parts[4] == "EUR"
     assert headers_parts[5] == "2025"
     assert headers_parts[6] == "03"
