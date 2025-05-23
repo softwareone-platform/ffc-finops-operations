@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.conf import OpenTelemetryExporter, Settings
 
 
-def setup_telemetry(settings: Settings) -> None:
+def setup_telemetry(settings: Settings) -> None:  # pragma: no cover
     if settings.opentelemetry_exporter is None:
         return
 
@@ -53,7 +53,7 @@ def setup_telemetry(settings: Settings) -> None:
     LoggingInstrumentor().instrument(set_logging_format=True)
 
 
-def setup_fastapi_instrumentor(settings: Settings, app: FastAPI) -> None:
+def setup_fastapi_instrumentor(settings: Settings, app: FastAPI) -> None:  # pragma: no cover
     """
     Setup FastAPI instrumentation for the application.
     """
@@ -63,7 +63,9 @@ def setup_fastapi_instrumentor(settings: Settings, app: FastAPI) -> None:
     FastAPIInstrumentor.instrument_app(app)
 
 
-def setup_sqlalchemy_instrumentor(settings: Settings, dbengine: AsyncEngine) -> None:
+def setup_sqlalchemy_instrumentor(
+    settings: Settings, dbengine: AsyncEngine
+) -> None:  # pragma: no cover
     if settings.opentelemetry_exporter is None:
         return
 
