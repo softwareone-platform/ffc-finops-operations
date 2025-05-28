@@ -64,7 +64,7 @@ class ChargeEntry:
         usage_end = min(usage_start + relativedelta(day=31), exp.updated_at.date())
 
         price = currency_converter.convert_currency(
-            exp.month_expenses * Decimal(settings.billing_percentage) / 100,
+            exp.expenses * Decimal(settings.billing_percentage) / 100,
             from_currency=exp.organization.currency,
             to_currency=exp.organization.billing_currency,
         )
