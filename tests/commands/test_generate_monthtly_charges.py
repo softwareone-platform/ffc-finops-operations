@@ -95,7 +95,8 @@ async def usd_org_billed_in_eur_expenses(
         organization=org,
         month=2,
         year=2025,
-        month_expenses=Decimal("50.00"),
+        day=1,
+        expenses=Decimal("50.00"),
         created_at=datetime(2025, 2, 1, 10, 0, 0, tzinfo=UTC),
         updated_at=datetime(2025, 2, 28, 10, 0, 0, tzinfo=UTC),
     )
@@ -107,7 +108,8 @@ async def usd_org_billed_in_eur_expenses(
         organization=org,
         month=3,
         year=2025,
-        month_expenses=Decimal("60.00"),
+        day=1,
+        expenses=Decimal("60.00"),
         created_at=datetime(2025, 3, 1, 10, 0, 0, tzinfo=UTC),
         updated_at=datetime(2025, 3, 31, 10, 0, 0, tzinfo=UTC),
     )
@@ -119,7 +121,8 @@ async def usd_org_billed_in_eur_expenses(
         organization=org,
         month=3,
         year=2025,
-        month_expenses=Decimal("70.00"),
+        day=1,
+        expenses=Decimal("70.00"),
         created_at=datetime(2025, 3, 1, 10, 0, 0, tzinfo=UTC),
         updated_at=datetime(2025, 3, 31, 10, 0, 0, tzinfo=UTC),
     )
@@ -181,7 +184,8 @@ async def eur_org_billed_in_gbp_expenses(
         organization=org,
         month=3,
         year=2025,
-        month_expenses=Decimal("50.00"),
+        day=1,
+        expenses=Decimal("50.00"),
         created_at=datetime(2025, 3, 1, 10, 0, 0, tzinfo=UTC),
         updated_at=datetime(2025, 3, 31, 10, 0, 0, tzinfo=UTC),
     )
@@ -194,7 +198,8 @@ async def eur_org_billed_in_gbp_expenses(
         organization=org,
         month=3,
         year=2025,
-        month_expenses=Decimal("40.00"),
+        day=1,
+        expenses=Decimal("40.00"),
         created_at=datetime(2025, 3, 1, 10, 0, 0, tzinfo=UTC),
         updated_at=datetime(2025, 3, 31, 10, 0, 0, tzinfo=UTC),
     )
@@ -251,7 +256,8 @@ async def gbp_org_billed_in_eur_expenses(
         organization=org,
         month=3,
         year=2025,
-        month_expenses=Decimal("50.00"),
+        day=1,
+        expenses=Decimal("50.00"),
         created_at=datetime(2025, 3, 1, 10, 0, 0, tzinfo=UTC),
         updated_at=datetime(2025, 3, 31, 10, 0, 0, tzinfo=UTC),
     )
@@ -264,7 +270,8 @@ async def gbp_org_billed_in_eur_expenses(
         organization=org,
         month=3,
         year=2025,
-        month_expenses=Decimal("40.00"),
+        day=1,
+        expenses=Decimal("40.00"),
         created_at=datetime(2025, 3, 1, 10, 0, 0, tzinfo=UTC),
         updated_at=datetime(2025, 3, 31, 10, 0, 0, tzinfo=UTC),
     )
@@ -321,7 +328,8 @@ async def eur_org_billed_in_eur_expenses(
         organization=org,
         month=3,
         year=2025,
-        month_expenses=Decimal("50.00"),
+        day=1,
+        expenses=Decimal("50.00"),
         created_at=datetime(2025, 3, 1, 10, 0, 0, tzinfo=UTC),
         updated_at=datetime(2025, 3, 31, 10, 0, 0, tzinfo=UTC),
     )
@@ -334,7 +342,8 @@ async def eur_org_billed_in_eur_expenses(
         organization=org,
         month=3,
         year=2025,
-        month_expenses=Decimal("40.00"),
+        day=1,
+        expenses=Decimal("40.00"),
         created_at=datetime(2025, 3, 1, 10, 0, 0, tzinfo=UTC),
         updated_at=datetime(2025, 3, 31, 10, 0, 0, tzinfo=UTC),
     )
@@ -390,7 +399,8 @@ async def usd_org_billed_in_usd_expenses(
         organization=org,
         month=3,
         year=2025,
-        month_expenses=Decimal("60.00"),
+        day=1,
+        expenses=Decimal("60.00"),
         created_at=datetime(2025, 3, 1, 10, 0, 0, tzinfo=UTC),
         updated_at=datetime(2025, 3, 31, 10, 0, 0, tzinfo=UTC),
     )
@@ -402,7 +412,8 @@ async def usd_org_billed_in_usd_expenses(
         organization=org,
         month=3,
         year=2025,
-        month_expenses=Decimal("70.00"),
+        day=1,
+        expenses=Decimal("70.00"),
         created_at=datetime(2025, 3, 1, 10, 0, 0, tzinfo=UTC),
         updated_at=datetime(2025, 3, 31, 10, 0, 0, tzinfo=UTC),
     )
@@ -414,7 +425,8 @@ async def usd_org_billed_in_usd_expenses(
         organization=org,
         month=3,
         year=2025,
-        month_expenses=Decimal("40.00"),
+        day=1,
+        expenses=Decimal("40.00"),
         created_at=datetime(2025, 3, 1, 10, 0, 0, tzinfo=UTC),
         updated_at=datetime(2025, 3, 31, 10, 0, 0, tzinfo=UTC),
     )
@@ -844,7 +856,8 @@ async def test_charge_entry_from_datasource_expense(
         organization=organization,
         month=2,
         year=2025,
-        month_expenses=Decimal("100.00"),  # 100, so that it's easy to calculate
+        day=1,
+        expenses=Decimal("100.00"),  # 100, so that it's easy to calculate
         created_at=datetime(2025, 2, 1, 10, 0, 0, tzinfo=UTC),
         updated_at=datetime(2025, 2, 28, 10, 0, 0, tzinfo=UTC),
     )
@@ -882,7 +895,8 @@ async def test_charge_entry_from_datasource_expense_no_linked_organization_id(
         organization=organization,
         month=2,
         year=2025,
-        month_expenses=Decimal("100.00"),  # 100, so that it's easy to calculate
+        day=1,
+        expenses=Decimal("100.00"),  # 100, so that it's easy to calculate
         created_at=datetime(2025, 2, 1, 10, 0, 0, tzinfo=UTC),
         updated_at=datetime(2025, 2, 28, 10, 0, 0, tzinfo=UTC),
     )
