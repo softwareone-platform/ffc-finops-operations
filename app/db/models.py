@@ -306,7 +306,8 @@ class DatasourceExpense(Base, HumanReadablePKMixin, TimestampMixin):
 
     year: Mapped[int] = mapped_column(Integer(), nullable=False)
     month: Mapped[int] = mapped_column(Integer(), nullable=False)
-    month_expenses: Mapped[Decimal] = mapped_column(sa.Numeric(18, 4))
+    day: Mapped[int] = mapped_column(Integer(), nullable=False)
+    expenses: Mapped[Decimal] = mapped_column(sa.Numeric(18, 4), nullable=False)
 
     entitlements: Mapped[list[Entitlement]] = relationship(
         "Entitlement",
@@ -332,7 +333,8 @@ class DatasourceExpense(Base, HumanReadablePKMixin, TimestampMixin):
             organization_id,
             year,
             month,
-            name="uq_datasource_expenses_per_month",
+            day,
+            name="uq_datasource_expenses_per_day",
         ),
     )
 

@@ -46,7 +46,9 @@ async def fetch_datasources_for_organizations(
     for organization in organizations:
         if organization.linked_organization_id is None:
             logger.warning(
-                "Organization %s has no linked organization ID. Skipping...", organization.id
+                "Organization %s - %s has no linked organization ID. Skipping...",
+                organization.id,
+                organization.name,
             )
             continue
 
@@ -73,9 +75,10 @@ async def fetch_datasources_for_organizations(
 
         response_datasources = response.json()["cloud_accounts"]
         logger.info(
-            "Fetched %d datasources for organization %s",
+            "Fetched %d datasources for organization %s - %s",
             len(response_datasources),
             organization.id,
+            organization.name,
         )
 
         datasources_per_organization_id[organization.id] = filter_relevant_datasources(
@@ -90,6 +93,7 @@ async def store_datasource_expenses(
     datasources_per_organization_id: dict[str, list[dict]],
     year: int,
     month: int,
+    day: int,
 ) -> None:
     org_count = 0
     ds_count = 0
@@ -102,8 +106,9 @@ async def store_datasource_expenses(
                 organization_id=organization_id,
                 year=year,
                 month=month,
+                day=day,
                 defaults={
-                    "month_expenses": datasource["details"]["cost"],
+                    "expenses": datasource["details"]["cost"],
                     "datasource_name": datasource["name"],
                     "linked_datasource_id": datasource["id"],
                     "linked_datasource_type": datasource["type"],
@@ -118,17 +123,18 @@ async def store_datasource_expenses(
                 await datasource_expense_handler.update(
                     existing_datasource_expense,
                     {
-                        "month_expenses": datasource["details"]["cost"],
+                        "expenses": datasource["details"]["cost"],
                         "datasource_name": datasource["name"],
                         "linked_datasource_id": datasource["id"],
                         "linked_datasource_type": datasource["type"],
                     },
                 )
-    await send_info(
-        "Datasource Expenses Update Success",
+    msg = (
         f"Expenses of {ds_count} Datasources "
-        f"configured by {org_count} Organizations have been updated.",
+        f"configured by {org_count} Organizations have been updated."
     )
+    logger.info(msg)
+    await send_info("Datasource Expenses Update Success", msg)
 
 
 @capture_telemetry(__name__, "Update Current Month Datasource Expenses")
@@ -141,12 +147,7 @@ async def main(settings: Settings) -> None:
 
         async with session.begin():
             logger.info("Querying organizations with no recent datasource expenses")
-            organizations = await organization_handler.query_db(
-                where_clauses=[
-                    ~Organization.datasource_expenses.any(DatasourceExpense.updated_at >= today)
-                ],
-                unique=True,
-            )
+            organizations = await organization_handler.query_db()
             logger.info("Found %d organizations to process", len(organizations))
 
         async with OptscaleClient(settings) as optscale_client:
@@ -161,13 +162,14 @@ async def main(settings: Settings) -> None:
             logger.info(
                 "Storing datasource expenses for %s organiziations for %s",
                 len(organizations),
-                today.strftime("%B %Y"),  # e.g. "March 2025"
+                today.strftime("%d %B %Y"),  # e.g. "March 2025"
             )
             await store_datasource_expenses(
                 datasource_expense_handler,
                 datasources_per_organization_id,
                 year=today.year,
                 month=today.month,
+                day=today.day,
             )
 
             logger.info("Completed storing datasource expenses")
