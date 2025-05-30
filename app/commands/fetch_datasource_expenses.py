@@ -1,7 +1,6 @@
 import asyncio
 import logging
-from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 import typer
 from fastapi import status
@@ -25,10 +24,8 @@ def filter_relevant_datasources(datasources: list[dict]) -> list[dict]:
     for datasource in datasources:
         if datasource["type"] in ["azure_tenant", "gcp_tenant"]:
             logger.warning(
-                "Skipping child datasource %s of type %s since it's a child datasource "
-                "and its expenses will always be zero",
-                datasource["id"],
-                datasource["type"],
+                f"Skipping child datasource {datasource['id']} of type {datasource['type']} "
+                "since it's a child datasource and its expenses will always be zero",
             )
             continue
 
@@ -37,29 +34,35 @@ def filter_relevant_datasources(datasources: list[dict]) -> list[dict]:
     return result
 
 
-async def fetch_datasources_for_organizations(
-    organizations: Sequence[Organization],
+async def process_datasources_for_organization(
+    organization: Organization,
     optscale_client: OptscaleClient,
-) -> dict[str, list[dict]]:
-    datasources_per_organization_id: dict[str, list[dict]] = {}
-
-    for organization in organizations:
-        if organization.linked_organization_id is None:
-            logger.warning(
-                "Organization %s - %s has no linked organization ID. Skipping...",
-                organization.id,
-                organization.name,
-            )
-            continue
-
+    semaphore: asyncio.Semaphore,
+    today: date,
+) -> int:
+    async with semaphore:
         try:
-            logger.info("Fetching datasources for organization %s", organization.id)
+            logger.info(f"Fetching datasources for organization {organization.id}")
             response = await optscale_client.fetch_datasources_for_organization(
-                organization.linked_organization_id
+                organization.linked_organization_id,
             )
-        except HTTPStatusError as exc:
-            response = exc.response
+            response_datasources = response.json()["cloud_accounts"]
+            logger.info(
+                f"Fetched {len(response_datasources)} datasources for "
+                f"organization {organization.id} - {organization.name}"
+            )
+            filtered_datasources = filter_relevant_datasources(response_datasources)
 
+            await store_datasource_expenses(
+                organization.id,
+                filtered_datasources,
+                year=today.year,
+                month=today.month,
+                day=today.day,
+            )
+
+            return len(filtered_datasources)
+        except HTTPStatusError as exc:
             if exc.response.status_code == status.HTTP_404_NOT_FOUND:
                 msg = f"Organization {organization.id} not found on Optscale."
                 logger.warning(msg)
@@ -70,71 +73,50 @@ async def fetch_datasources_for_organizations(
                 )
                 logger.exception(msg)
                 await send_exception("Datasource Expenses Update Error", f"{msg}: {exc}")
-
-            continue
-
-        response_datasources = response.json()["cloud_accounts"]
-        logger.info(
-            "Fetched %d datasources for organization %s - %s",
-            len(response_datasources),
-            organization.id,
-            organization.name,
-        )
-
-        datasources_per_organization_id[organization.id] = filter_relevant_datasources(
-            response_datasources
-        )
-
-    return datasources_per_organization_id
+            return 0
 
 
 async def store_datasource_expenses(
-    datasource_expense_handler: DatasourceExpenseHandler,
-    datasources_per_organization_id: dict[str, list[dict]],
+    organization_id: str,
+    datasources: list[dict],
     year: int,
     month: int,
     day: int,
-) -> None:
-    org_count = 0
-    ds_count = 0
-    for organization_id, datasources in datasources_per_organization_id.items():
-        org_count += 1
-        ds_count += len(datasources)
-        for datasource in datasources:
-            existing_datasource_expense, created = await datasource_expense_handler.get_or_create(
-                datasource_id=datasource["account_id"],
-                organization_id=organization_id,
-                year=year,
-                month=month,
-                day=day,
-                defaults={
-                    "expenses": datasource["details"]["cost"],
-                    "datasource_name": datasource["name"],
-                    "linked_datasource_id": datasource["id"],
-                    "linked_datasource_type": datasource["type"],
-                },
-                extra_conditions=[
-                    DatasourceExpense.linked_datasource_type.in_(
-                        [DatasourceType.UNKNOWN, datasource["type"]]
-                    ),
-                ],
-            )
-            if not created:
-                await datasource_expense_handler.update(
-                    existing_datasource_expense,
-                    {
+):
+    async with session_factory() as session:
+        datasource_handler = DatasourceExpenseHandler(session)
+        async with session.begin():
+            for datasource in datasources:
+                existing_datasource_expense, created = await datasource_handler.get_or_create(
+                    datasource_id=datasource["account_id"],
+                    organization_id=organization_id,
+                    year=year,
+                    month=month,
+                    day=day,
+                    defaults={
                         "expenses": datasource["details"]["cost"],
                         "datasource_name": datasource["name"],
                         "linked_datasource_id": datasource["id"],
                         "linked_datasource_type": datasource["type"],
                     },
+                    extra_conditions=[
+                        DatasourceExpense.linked_datasource_type.in_(
+                            [DatasourceType.UNKNOWN, datasource["type"]]
+                        ),
+                    ],
                 )
-    msg = (
-        f"Expenses of {ds_count} Datasources "
-        f"configured by {org_count} Organizations have been updated."
-    )
-    logger.info(msg)
-    await send_info("Datasource Expenses Update Success", msg)
+                if not created:
+                    await datasource_handler.update(
+                        existing_datasource_expense,
+                        {
+                            "expenses": datasource["details"]["cost"],
+                            "datasource_name": datasource["name"],
+                            "linked_datasource_id": datasource["id"],
+                            "linked_datasource_type": datasource["type"],
+                        },
+                    )
+
+    logger.info(f"Stored {len(datasources)} datasource expenses for organization {organization_id}")
 
 
 @capture_telemetry(__name__, "Update Current Month Datasource Expenses")
@@ -142,37 +124,43 @@ async def main(settings: Settings) -> None:
     today = datetime.now(UTC).date()
 
     async with session_factory() as session:
-        datasource_expense_handler = DatasourceExpenseHandler(session)
         organization_handler = OrganizationHandler(session)
-
         async with session.begin():
-            logger.info("Querying organizations with no recent datasource expenses")
+            logger.info("Querying organizations")
             organizations = await organization_handler.query_db()
-            logger.info("Found %d organizations to process", len(organizations))
+            logger.info(f"Found {len(organizations)} organizations to process")
 
-        async with OptscaleClient(settings) as optscale_client:
-            logger.info("Fetching datasources for the organizations to process from Optscale")
-            datasources_per_organization_id = await fetch_datasources_for_organizations(
-                organizations,
-                optscale_client,
-            )
-            logger.info("Completed fetching datasources for organizations")
+    logger.info("Fetching datasources for the organizations to process from Optscale")
+    optscale_client = OptscaleClient(settings)
+    semaphore = asyncio.Semaphore(settings.max_parallel_tasks)
+    tasks = []
 
-        async with session.begin():
-            logger.info(
-                "Storing datasource expenses for %s organiziations for %s",
-                len(organizations),
-                today.strftime("%d %B %Y"),  # e.g. "March 2025"
+    for organization in organizations:
+        if organization.linked_organization_id is None:
+            logger.warning(
+                f"Organization {organization.id} - {organization.name} "
+                f"has no linked organization ID. Skipping...",
             )
-            await store_datasource_expenses(
-                datasource_expense_handler,
-                datasources_per_organization_id,
-                year=today.year,
-                month=today.month,
-                day=today.day,
-            )
+            continue
 
-            logger.info("Completed storing datasource expenses")
+        tasks.append(
+            asyncio.create_task(
+                process_datasources_for_organization(
+                    organization,
+                    optscale_client,
+                    semaphore,
+                    today,
+                )
+            )
+        )
+
+    results = await asyncio.gather(*tasks)
+    msg = (
+        f"Expenses of {sum(results)} Datasources "
+        f"configured by {len(results)} Organizations have been updated."
+    )
+    logger.info(msg)
+    await send_info("Datasource Expenses Update Success", msg)
 
 
 def command(ctx: typer.Context) -> None:

@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     datasources_expenses_obsolete_after_months: int = 6
     billing_percentage: float = 1.0
     ffc_external_product_id: str = "FIN-0001-P1M"
+    max_parallel_tasks: int = 10
 
     optscale_auth_api_base_url: str
     optscale_rest_api_base_url: str

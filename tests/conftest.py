@@ -15,6 +15,7 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from pytest_asyncio import is_async_test
 from sqlalchemy.ext.asyncio import (
+    AsyncConnection,
     AsyncEngine,
     AsyncSession,
 )
@@ -137,6 +138,20 @@ async def db_session(db_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, Non
             await outer_transaction.rollback()
 
 
+@pytest.fixture
+async def raw_db_connection(db_engine: AsyncEngine) -> AsyncConnection:
+    """
+    Yields a clean DB connection with an outer transaction.
+    You can safely bind your own sessionmaker to this.
+    """
+    async with db_engine.connect() as conn:
+        tx = await conn.begin()
+        try:
+            yield conn
+        finally:
+            await tx.rollback()
+
+
 @pytest.fixture(scope="session")
 def fastapi_app(test_settings: Settings) -> FastAPI:
     from app.main import app
@@ -243,7 +258,9 @@ def organization_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory
         created_by: Actor | None = None,
         updated_by: Actor | None = None,
         status: OrganizationStatus = OrganizationStatus.ACTIVE,
+        session: AsyncSession | None = None,
     ) -> Organization:
+        session = session or db_session
         organization = Organization(
             name=name or faker.company(),
             currency=currency or "EUR",
@@ -254,9 +271,9 @@ def organization_factory(faker: Faker, db_session: AsyncSession) -> ModelFactory
             updated_by=updated_by,
             status=status,
         )
-        db_session.add(organization)
-        await db_session.commit()
-        await db_session.refresh(organization)
+        session.add(organization)
+        await session.commit()
+        await session.refresh(organization)
         return organization
 
     return _organization
@@ -456,7 +473,9 @@ def datasource_expense_factory(
         datasource_name: str | None = None,
         created_at: datetime | None = None,
         updated_at: datetime | None = None,
+        session: AsyncSession | None = None,
     ) -> DatasourceExpense:
+        session = session or db_session
         organization = organization or await organization_factory()
 
         datasource_expense = DatasourceExpense(
@@ -472,9 +491,9 @@ def datasource_expense_factory(
             created_at=created_at or datetime.now(UTC) - timedelta(days=7),
             updated_at=updated_at or datetime.now(UTC) - timedelta(days=7),
         )
-        db_session.add(datasource_expense)
-        await db_session.commit()
-        await db_session.refresh(datasource_expense)
+        session.add(datasource_expense)
+        await session.commit()
+        await session.refresh(datasource_expense)
         return datasource_expense
 
     return _datasource_expense
