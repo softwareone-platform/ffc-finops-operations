@@ -37,29 +37,20 @@ def filter_relevant_datasources(datasources: list[dict]) -> list[dict]:
     return result
 
 
-async def fetch_datasources_for_organizations(
-    organizations: Sequence[Organization],
+async def fetch_datasources_for_organization(
+    organization: Organization,
     optscale_client: OptscaleClient,
-) -> dict[str, list[dict]]:
-    datasources_per_organization_id: dict[str, list[dict]] = {}
-
-    for organization in organizations:
-        if organization.linked_organization_id is None:
-            logger.warning(
-                "Organization %s - %s has no linked organization ID. Skipping...",
-                organization.id,
-                organization.name,
-            )
-            continue
-
+    datasources_per_organization_id: dict[str, list[dict]],
+    semaphore: asyncio.Semaphore,
+    lock: asyncio.Lock,
+):
+    async with semaphore:
         try:
             logger.info("Fetching datasources for organization %s", organization.id)
             response = await optscale_client.fetch_datasources_for_organization(
-                organization.linked_organization_id
+                organization.linked_organization_id,
             )
         except HTTPStatusError as exc:
-            response = exc.response
-
             if exc.response.status_code == status.HTTP_404_NOT_FOUND:
                 msg = f"Organization {organization.id} not found on Optscale."
                 logger.warning(msg)
@@ -70,8 +61,7 @@ async def fetch_datasources_for_organizations(
                 )
                 logger.exception(msg)
                 await send_exception("Datasource Expenses Update Error", f"{msg}: {exc}")
-
-            continue
+            return
 
         response_datasources = response.json()["cloud_accounts"]
         logger.info(
@@ -80,11 +70,45 @@ async def fetch_datasources_for_organizations(
             organization.id,
             organization.name,
         )
+        filtered_datasources = filter_relevant_datasources(response_datasources)
+        async with lock:
+            datasources_per_organization_id[organization.id] = filtered_datasources
+        return
 
-        datasources_per_organization_id[organization.id] = filter_relevant_datasources(
-            response_datasources
+
+async def fetch_datasources_for_organizations(
+    organizations: Sequence[Organization],
+    optscale_client: OptscaleClient,
+    settings: Settings,
+) -> dict[str, list[dict]]:
+    datasources_per_organization_id: dict[str, list[dict]] = {}
+
+    semaphore = asyncio.Semaphore(settings.semaphore_count)
+    tasks = []
+    lock = asyncio.Lock()
+
+    for organization in organizations:
+        if organization.linked_organization_id is None:
+            logger.warning(
+                "Organization %s - %s has no linked organization ID. Skipping...",
+                organization.id,
+                organization.name,
+            )
+            continue
+
+        tasks.append(
+            asyncio.create_task(
+                fetch_datasources_for_organization(
+                    organization,
+                    optscale_client,
+                    datasources_per_organization_id,
+                    semaphore,
+                    lock,
+                )
+            )
         )
 
+    await asyncio.gather(*tasks)
     return datasources_per_organization_id
 
 
@@ -155,6 +179,7 @@ async def main(settings: Settings) -> None:
             datasources_per_organization_id = await fetch_datasources_for_organizations(
                 organizations,
                 optscale_client,
+                settings,
             )
             logger.info("Completed fetching datasources for organizations")
 
