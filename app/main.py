@@ -16,6 +16,7 @@ from app.routers import (
     chargesfiles,
     employees,
     entitlements,
+    expenses,
     organizations,
     systems,
     users,
@@ -86,6 +87,7 @@ def setup_app():
         accounts.router,
         users.router,
         chargesfiles.router,
+        expenses.router,
     ):
         setup_custom_serialization(router)
 
@@ -99,6 +101,12 @@ def setup_app():
     app.include_router(
         chargesfiles.router,
         prefix="/charges",
+        dependencies=[Depends(authentication_required)],
+        tags=["Billing"],
+    )
+    app.include_router(
+        expenses.router,
+        prefix="/expenses",
         dependencies=[Depends(authentication_required)],
         tags=["Billing"],
     )
