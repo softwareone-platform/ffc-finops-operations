@@ -8,7 +8,7 @@ from fastapi.routing import APIRoute, APIRouter
 
 from app.conf import get_settings
 from app.db.base import configure_db_engine, verify_db_connection
-from app.dependencies.auth import authentication_required
+from app.dependencies.auth import authentication_required, check_operations_account
 from app.openapi import generate_openapi_spec
 from app.routers import (
     accounts,
@@ -16,6 +16,7 @@ from app.routers import (
     chargesfiles,
     employees,
     entitlements,
+    expenses,
     organizations,
     systems,
     users,
@@ -86,10 +87,17 @@ def setup_app():
         accounts.router,
         users.router,
         chargesfiles.router,
+        expenses.router,
     ):
         setup_custom_serialization(router)
 
     # TODO: Add healthcheck
+    app.include_router(
+        expenses.router,
+        prefix="/expenses",
+        dependencies=[Depends(check_operations_account)],
+        tags=["Billing"],
+    )
     app.include_router(
         entitlements.router,
         prefix="/entitlements",
