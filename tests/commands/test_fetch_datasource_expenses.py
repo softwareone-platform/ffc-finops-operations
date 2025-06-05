@@ -8,7 +8,7 @@ import time_machine
 from fastapi import status
 from pytest_httpx import HTTPXMock
 from pytest_mock import MockerFixture
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession, async_sessionmaker
 from typer.testing import CliRunner
 
 from app.cli import app
@@ -249,7 +249,7 @@ async def test_organization_with_no_linked_organization_id(
 
 
 @time_machine.travel("2025-03-20T10:00:00Z", tick=False)
-async def test_organization_with_recent_updates_to_datasource_expences(
+async def test_organization_with_recent_updates_to_datasource_expenses(
     test_settings: Settings,
     db_session: AsyncSession,
     organization_factory: ModelFactory[Organization],
@@ -259,6 +259,9 @@ async def test_organization_with_recent_updates_to_datasource_expences(
 ):
     organization = await organization_factory(linked_organization_id=None)
 
+    mocker.patch(
+        "app.commands.fetch_datasource_expenses.send_info",
+    )
     store_datasource_expenses_mock = mocker.patch(
         "app.commands.fetch_datasource_expenses.store_datasource_expenses"
     )
@@ -274,13 +277,7 @@ async def test_organization_with_recent_updates_to_datasource_expences(
 
     await fetch_datasource_expenses.main(test_settings)
     assert not httpx_mock.get_request()
-    store_datasource_expenses_mock.assert_called_once_with(
-        mocker.ANY,
-        {},
-        year=2025,
-        month=3,
-        day=20,
-    )
+    store_datasource_expenses_mock.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -341,149 +338,173 @@ async def test_multiple_datasources_are_handled_correctly(
     mocker: MockerFixture,
     caplog: pytest.LogCaptureFixture,
     test_settings: Settings,
-    db_session: AsyncSession,
+    raw_db_connection: AsyncConnection,
     mock_optscale_client: MockOptscaleClient,
     organization_factory: ModelFactory[Organization],
     datasource_expense_factory: ModelFactory[DatasourceExpense],
 ):
+    session_factory = async_sessionmaker(
+        bind=raw_db_connection,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        join_transaction_mode="conditional_savepoint",
+    )
+    mocker.patch("app.commands.fetch_datasource_expenses.session_factory", new=session_factory)
+
     mocker.patch(
         "app.commands.fetch_datasource_expenses.send_exception",
     )
     mocker.patch(
         "app.commands.fetch_datasource_expenses.send_info",
     )
-    datasource_expense_handler = DatasourceExpenseHandler(db_session)
-    organization1 = await organization_factory(
-        linked_organization_id=str(uuid.uuid4()), operations_external_id="org_1_external_id"
-    )
-    organization2 = await organization_factory(
-        linked_organization_id=str(uuid.uuid4()), operations_external_id="org_2_external_id"
-    )
-    organization3 = await organization_factory(
-        linked_organization_id=str(uuid.uuid4()), operations_external_id="org_3_external_id"
-    )
-    organization4 = await organization_factory(
-        linked_organization_id=str(uuid.uuid4()), operations_external_id="org_4_external_id"
-    )
 
-    org_1_datasource_id1 = str(uuid.uuid4())
-    org_1_datasource_id2 = str(uuid.uuid4())
-    org_1_datasource_id3 = str(uuid.uuid4())
-    org_1_datasource_id4 = str(uuid.uuid4())
-
-    org_2_datasource_id1 = str(uuid.uuid4())
-    org_2_datasource_id2 = str(uuid.uuid4())
-
-    org_3_datasource_id1 = str(uuid.uuid4())
-
-    await datasource_expense_factory(
-        organization=organization1,
-        linked_datasource_id=org_1_datasource_id1,
-        linked_datasource_type=DatasourceType.AWS_CNR,
-        datasource_id="11111111",
-        year=2025,
-        month=2,
-        day=20,
-        expenses=Decimal("123.45"),
-    )
-
-    await datasource_expense_factory(
-        organization=organization1,
-        linked_datasource_id=org_1_datasource_id1,
-        linked_datasource_type=DatasourceType.AWS_CNR,
-        datasource_id="11111111",
-        year=2025,
-        month=3,
-        day=20,
-        expenses=Decimal("234.56"),
-    )
-
-    await datasource_expense_factory(
-        organization=organization1,
-        linked_datasource_id=org_1_datasource_id2,
-        datasource_id="12222222",
-        linked_datasource_type=DatasourceType.AWS_CNR,
-        year=2025,
-        month=3,
-        day=20,
-        expenses=Decimal("567.89"),
-    )
-
-    await datasource_expense_factory(
-        organization=organization2,
-        linked_datasource_id=org_2_datasource_id1,
-        datasource_id="21111111",
-        linked_datasource_type=DatasourceType.AWS_CNR,
-        year=2025,
-        month=3,
-        day=20,
-        expenses=Decimal("999.88"),
-    )
-
-    existing_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
-    assert len(existing_datasource_expenses) == 4
-
-    mock_optscale_client.mock_fetch_datasources_for_organization(
-        organization1,
-        [
-            {
-                "id": org_1_datasource_id1,
-                "account_id": "11111111",
-                "type": "aws_cnr",
-                "details": {"cost": 789.01},
-            },
-            {
-                "id": org_1_datasource_id2,
-                "account_id": "12222222",
-                "type": "aws_cnr",
-                "details": {"cost": 678.90},
-            },
-            {"id": org_1_datasource_id3, "account_id": "13333333", "type": "azure_tenant"},
-            {"id": org_1_datasource_id4, "account_id": "14444444", "type": "gcp_tenant"},
-        ],
-    )
-
-    mock_optscale_client.mock_fetch_datasources_for_organization(
-        organization2,
-        [
-            {
-                "id": org_2_datasource_id1,
-                "account_id": "21111111",
-                "type": "aws_cnr",
-                "details": {"cost": 234.56},
-            },
-            {
-                "id": org_2_datasource_id2,
-                "account_id": "22222222",
-                "type": "aws_cnr",
-                "details": {"cost": 654.32},
-            },
-        ],
-    )
-
-    mock_optscale_client.mock_fetch_datasources_for_organization(
-        organization3,
-        [
-            {
-                "id": org_3_datasource_id1,
-                "account_id": "31111111",
-                "type": "azure_cnr",
-                "details": {"cost": 777.88},
-            }
-        ],
-    )
-
-    mock_optscale_client.mock_fetch_datasources_for_organization(organization4, status_code=404)
-
-    with caplog.at_level(logging.WARNING):
-        await fetch_datasource_expenses.main(test_settings)
-        assert (
-            f"Skipping child datasource {org_1_datasource_id3} of type azure_tenant" in caplog.text
+    async with session_factory() as session:
+        datasource_expense_handler = DatasourceExpenseHandler(session)
+        organization1 = await organization_factory(
+            linked_organization_id=str(uuid.uuid4()),
+            operations_external_id="org_1_external_id",
+            session=session,
         )
-        assert f"Skipping child datasource {org_1_datasource_id4} of type gcp_tenant" in caplog.text
-        assert f"Organization {organization4.id} not found on Optscale." in caplog.text
+        organization2 = await organization_factory(
+            linked_organization_id=str(uuid.uuid4()),
+            operations_external_id="org_2_external_id",
+            session=session,
+        )
+        organization3 = await organization_factory(
+            linked_organization_id=str(uuid.uuid4()),
+            operations_external_id="org_3_external_id",
+            session=session,
+        )
+        organization4 = await organization_factory(
+            linked_organization_id=str(uuid.uuid4()),
+            operations_external_id="org_4_external_id",
+            session=session,
+        )
 
-    new_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
+        org_1_datasource_id1 = str(uuid.uuid4())
+        org_1_datasource_id2 = str(uuid.uuid4())
+        org_1_datasource_id3 = str(uuid.uuid4())
+        org_1_datasource_id4 = str(uuid.uuid4())
+
+        org_2_datasource_id1 = str(uuid.uuid4())
+        org_2_datasource_id2 = str(uuid.uuid4())
+
+        org_3_datasource_id1 = str(uuid.uuid4())
+
+        await datasource_expense_factory(
+            organization=organization1,
+            linked_datasource_id=org_1_datasource_id1,
+            linked_datasource_type=DatasourceType.AWS_CNR,
+            datasource_id="11111111",
+            year=2025,
+            month=2,
+            day=20,
+            expenses=Decimal("123.45"),
+            session=session,
+        )
+
+        await datasource_expense_factory(
+            organization=organization1,
+            linked_datasource_id=org_1_datasource_id1,
+            linked_datasource_type=DatasourceType.AWS_CNR,
+            datasource_id="11111111",
+            year=2025,
+            month=3,
+            day=20,
+            expenses=Decimal("234.56"),
+            session=session,
+        )
+
+        await datasource_expense_factory(
+            organization=organization1,
+            linked_datasource_id=org_1_datasource_id2,
+            datasource_id="12222222",
+            linked_datasource_type=DatasourceType.AWS_CNR,
+            year=2025,
+            month=3,
+            day=20,
+            expenses=Decimal("567.89"),
+            session=session,
+        )
+
+        await datasource_expense_factory(
+            organization=organization2,
+            linked_datasource_id=org_2_datasource_id1,
+            datasource_id="21111111",
+            linked_datasource_type=DatasourceType.AWS_CNR,
+            year=2025,
+            month=3,
+            day=20,
+            expenses=Decimal("999.88"),
+            session=session,
+        )
+
+        existing_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
+        assert len(existing_datasource_expenses) == 4
+
+        mock_optscale_client.mock_fetch_datasources_for_organization(
+            organization1,
+            [
+                {
+                    "id": org_1_datasource_id1,
+                    "account_id": "11111111",
+                    "type": "aws_cnr",
+                    "details": {"cost": 789.01},
+                },
+                {
+                    "id": org_1_datasource_id2,
+                    "account_id": "12222222",
+                    "type": "aws_cnr",
+                    "details": {"cost": 678.90},
+                },
+                {"id": org_1_datasource_id3, "account_id": "13333333", "type": "azure_tenant"},
+                {"id": org_1_datasource_id4, "account_id": "14444444", "type": "gcp_tenant"},
+            ],
+        )
+
+        mock_optscale_client.mock_fetch_datasources_for_organization(
+            organization2,
+            [
+                {
+                    "id": org_2_datasource_id1,
+                    "account_id": "21111111",
+                    "type": "aws_cnr",
+                    "details": {"cost": 234.56},
+                },
+                {
+                    "id": org_2_datasource_id2,
+                    "account_id": "22222222",
+                    "type": "aws_cnr",
+                    "details": {"cost": 654.32},
+                },
+            ],
+        )
+
+        mock_optscale_client.mock_fetch_datasources_for_organization(
+            organization3,
+            [
+                {
+                    "id": org_3_datasource_id1,
+                    "account_id": "31111111",
+                    "type": "azure_cnr",
+                    "details": {"cost": 777.88},
+                }
+            ],
+        )
+
+        mock_optscale_client.mock_fetch_datasources_for_organization(organization4, status_code=404)
+
+        with caplog.at_level(logging.INFO):
+            await fetch_datasource_expenses.main(test_settings)
+            msgs = [
+                f"Skipping child datasource {org_1_datasource_id3} of type azure_tenant",
+                f"Skipping child datasource {org_1_datasource_id4} of type gcp_tenant",
+                f"Organization {organization4.id} not found on Optscale.",
+            ]
+            for msg in msgs:
+                assert msg in caplog.text
+
+        new_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
 
     expenses_data = {
         (
