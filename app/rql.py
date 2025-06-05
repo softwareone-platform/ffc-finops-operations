@@ -9,6 +9,7 @@ from app.db.models import (
     AccountUser,
     Actor,
     ChargesFile,
+    DatasourceExpense,
     Entitlement,
     Organization,
     System,
@@ -109,6 +110,16 @@ class ChargesFileRules(ModelRQLRules, AuditableMixin):
     amount = FieldRule()
     owner = RelationshipRule(rules=AccountRules())
     status = FieldRule()
+
+
+class DatasourceExpenseRules(ModelRQLRules, AuditableMixin):
+    __model__ = DatasourceExpense
+
+    day = FieldRule()
+    month = FieldRule()
+    year = FieldRule()
+    organization = RelationshipRule(rules=OrganizationRules())
+    entitlement = RelationshipRule(rules=EntitlementRules())
 
 
 class RQLQuery:
