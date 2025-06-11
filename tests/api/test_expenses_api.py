@@ -236,7 +236,8 @@ async def test_test_get_all_expenses_success_with_lt_filters(
         created_at=datetime(2025, 4, 20, 10, 0, 0, tzinfo=UTC),
     )
     response = await api_client.get(
-        "/expenses?lt(month,4)", headers={"Authorization": f"Bearer {ffc_jwt_token}"}
+        "/expenses?lt(month,4)&order_by(linked_datasource_id)",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
     )
 
     assert response.status_code == 200
