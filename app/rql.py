@@ -115,6 +115,7 @@ class ChargesFileRules(ModelRQLRules, AuditableMixin):
 class DatasourceExpenseRules(ModelRQLRules, AuditableMixin):
     __model__ = DatasourceExpense
 
+    linked_datasource_id = FieldRule()
     day = FieldRule()
     month = FieldRule()
     year = FieldRule()
