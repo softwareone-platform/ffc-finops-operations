@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Callable, Coroutine
 from functools import wraps
 from typing import Any
@@ -7,6 +8,7 @@ from azure.monitor.opentelemetry.exporter import (
 )
 from fastapi import FastAPI
 from opentelemetry import trace
+from opentelemetry.context import Context
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
@@ -14,13 +16,60 @@ from opentelemetry.instrumentation.logging import LoggingInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 from opentelemetry.instrumentation.sqlalchemy.engine import EngineTracer
 from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor, TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter, SpanExporter
 from opentelemetry.semconv.trace import SpanAttributes
 from sqlalchemy import Connection
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.conf import OpenTelemetryExporter, Settings
+
+logger = logging.getLogger(__name__)
+
+SpanFilter = Callable[[ReadableSpan], bool]
+
+
+def slow_sqlalchemy_queries(*, min_duration_ms: int) -> SpanFilter:  # pragma: no cover
+    def filter(span: ReadableSpan) -> bool:
+        if span.instrumentation_info.name != "opentelemetry.instrumentation.sqlalchemy":
+            # Apply this filter only for SQLAlchemy spans
+            return True
+
+        if not span.status.is_ok:
+            # Always include failed queries
+            return True
+
+        if span.end_time is None or span.start_time is None:
+            # execution time is unknown, always include it
+            return True
+
+        span_duration_ms = (span.end_time - span.start_time) / 1_000_000
+
+        return span_duration_ms >= min_duration_ms
+
+    return filter
+
+
+class FilteredSpanProcessor(SpanProcessor):  # pragma: no cover
+    def __init__(self, delegate_processor: SpanProcessor, filter_func: SpanFilter) -> None:
+        self.delegate_processor = delegate_processor
+        self.filter_func = filter_func
+
+    def on_start(self, span: Span, parent_context: Context | None = None) -> None:
+        self.delegate_processor.on_start(span, parent_context)
+
+    def on_end(self, span: ReadableSpan) -> None:
+        if not self.filter_func(span):
+            # If the span does not pass the filter, we drop it
+            return
+
+        self.delegate_processor.on_end(span)
+
+    def shutdown(self) -> None:
+        self.delegate_processor.shutdown()
+
+    def force_flush(self, timeout_millis: int = 30_000) -> bool:
+        return self.delegate_processor.force_flush(timeout_millis)
 
 
 def setup_telemetry(settings: Settings) -> None:  # pragma: no cover
@@ -45,7 +94,16 @@ def setup_telemetry(settings: Settings) -> None:  # pragma: no cover
     else:
         raise ValueError(f"Unsupported OpenTelemetry exporter: {settings.opentelemetry_exporter}")
 
-    trace_provider.add_span_processor(BatchSpanProcessor(exporter))
+    span_processor: SpanProcessor = BatchSpanProcessor(exporter)
+
+    if settings.opentelemetry_sqlalchemy_min_query_duration_ms is not None:
+        span_processor = FilteredSpanProcessor(
+            span_processor,
+            slow_sqlalchemy_queries(
+                min_duration_ms=settings.opentelemetry_sqlalchemy_min_query_duration_ms
+            ),
+        )
+    trace_provider.add_span_processor(span_processor)
 
     trace.set_tracer_provider(trace_provider)
 

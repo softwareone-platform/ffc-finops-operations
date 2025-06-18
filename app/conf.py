@@ -76,6 +76,7 @@ class Settings(BaseSettings):
     jaeger_host: str = "jaeger"
     jaeger_port: int = 4318
     azure_insights_connection_string: str | None = None
+    opentelemetry_sqlalchemy_min_query_duration_ms: int | None = 100
 
     msteams_notifications_webhook_url: str | None = None
 
