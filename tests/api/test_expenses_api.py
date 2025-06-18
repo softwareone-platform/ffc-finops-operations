@@ -62,6 +62,8 @@ async def test_get_all_expenses_success(
     assert ret["total"] > 0
     assert ret["items"][0]["organization"]["id"] == get_organization.id
     assert ret["items"][0]["year"] == expenses.year
+    assert "datasource_id" in ret["items"][0]
+    assert ret["items"][0]["datasource_id"] is not None
 
 
 async def test_test_get_all_expenses_success_with_and_eq_filters(
