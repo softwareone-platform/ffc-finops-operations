@@ -1314,8 +1314,7 @@ async def test_generate_monthly_charges_dry_run(
         assert_generated_file_matches_snapshot(excel_file_path, snapshot)
 
 
-def test_cli_command(mocker: MockerFixture, test_settings: Settings, tmp_path: pathlib.Path):
-    mocker.patch("app.cli.get_settings", return_value=test_settings)
+def test_cli_command(mocker: MockerFixture, tmp_path: pathlib.Path):
     mock_command_coro = mocker.MagicMock()
     mock_command = mocker.MagicMock(return_value=mock_command_coro)
 
@@ -1334,8 +1333,7 @@ def test_cli_command(mocker: MockerFixture, test_settings: Settings, tmp_path: p
     )
 
 
-def test_cli_command_default_exports_dir(mocker: MockerFixture, test_settings: Settings):
-    mocker.patch("app.cli.get_settings", return_value=test_settings)
+def test_cli_command_default_exports_dir(mocker: MockerFixture):
     mock_command_coro = mocker.MagicMock()
     mock_command = mocker.MagicMock(return_value=mock_command_coro)
 

@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from collections.abc import Sequence
-from typing import Any
+from typing import Annotated, Any
 
 import typer
 from sqlalchemy import select
@@ -13,7 +13,7 @@ from app.db.base import session_factory
 from app.db.handlers import ExchangeRatesHandler
 from app.db.models import ExchangeRates, Organization
 from app.notifications import send_exception, send_info
-from app.telemetry import capture_telemetry
+from app.telemetry import capture_telemetry_cli_command
 
 logger = logging.getLogger(__name__)
 
@@ -68,15 +68,18 @@ async def get_currencies_to_update(session: AsyncSession) -> list[str]:
     return currencies_to_update
 
 
-@capture_telemetry(__name__, "Update Latest Exchange Rates")
-async def main(settings: Settings) -> None:
+@capture_telemetry_cli_command(__name__, "Update Latest Exchange Rates")
+async def main(settings: Settings, currency: str | None = None) -> None:
     async with session_factory() as session:
-        async with session.begin():
-            currencies_to_update = await get_currencies_to_update(session)
+        if currency:
+            currencies_to_update = [currency]
+        else:
+            async with session.begin():
+                currencies_to_update = await get_currencies_to_update(session)
 
-        if not currencies_to_update:
-            logger.info("No currencies to update, exiting")
-            return
+            if not currencies_to_update:
+                logger.info("No currencies to update, exiting")
+                return
 
         exchange_rates_per_currency: dict[str, dict[str, Any]] = {}
 
@@ -111,8 +114,18 @@ async def main(settings: Settings) -> None:
             await send_info("Exchange Rates Update Success", msg)
 
 
-def command(ctx: typer.Context) -> None:
+def command(
+    ctx: typer.Context,
+    currency: Annotated[
+        str | None,
+        typer.Option(
+            "--currency",
+            help="If set, fetch exchange rates for this currency only",
+            show_default=False,
+        ),
+    ] = None,
+) -> None:
     """Fetch exahnge rates from the exchange rate API and store them in the database"""
     logger.info("Starting command function")
-    asyncio.run(main(ctx.obj))
+    asyncio.run(main(ctx.obj, currency))
     logger.info("Completed command function")

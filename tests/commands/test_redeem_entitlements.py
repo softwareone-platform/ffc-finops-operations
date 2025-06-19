@@ -176,7 +176,6 @@ def test_redeem_entitlements_command(
     mocker: MockerFixture,
     test_settings: Settings,
 ):
-    mocker.patch("app.cli.get_settings", return_value=test_settings)
     mock_redeem_coro = mocker.MagicMock()
     mock_redeem_entitlements = mocker.MagicMock(return_value=mock_redeem_coro)
 

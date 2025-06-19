@@ -24,9 +24,6 @@ class APIClientError(Exception):
         super().__init__(f"{self.client_name} API client error: {message}")
 
 
-HEADERS_TO_REDACT_IN_LOGS = {"authorization", "secret"}
-
-
 class BaseAPIClient(ABC):
     def __init__(self, settings: Settings):
         self.settings = settings
