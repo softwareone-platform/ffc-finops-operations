@@ -11,6 +11,7 @@ def test_setup_telemetry(mocker: MockerFixture):
     mock_settings = mocker.MagicMock()
     mock_settings.opentelemetry_exporter = "azure_app_insights"
     mock_settings.azure_insights_connection_string = "mock_connection_string"
+    mock_settings.opentelemetry_sqlalchemy_min_query_duration_ms = None
     mocked_exporter = mocker.MagicMock()
     mocked_tracer_provider = mocker.MagicMock()
     mocked_set_tracer_provider = mocker.patch(
