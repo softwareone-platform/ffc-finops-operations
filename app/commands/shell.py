@@ -23,9 +23,7 @@ def command():
         "entitlement_handler": handlers.EntitlementHandler(session),
         "system_handler": handlers.SystemHandler(session),
         "organization_handler": handlers.OrganizationHandler(session),
-        "chargesfile_handler": handlers.ChargesFileHandler(session),
         "datasource_expense_handler": handlers.DatasourceExpenseHandler(session),
-        "exchange_rate_handler": handlers.ExchangeRatesHandler(session),
     }
 
     table = Table(

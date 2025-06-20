@@ -13,7 +13,6 @@ from app.openapi import generate_openapi_spec
 from app.routers import (
     accounts,
     auth,
-    chargesfiles,
     employees,
     entitlements,
     expenses,
@@ -86,7 +85,6 @@ def setup_app():
         employees.router,
         accounts.router,
         users.router,
-        chargesfiles.router,
         expenses.router,
     ):
         setup_custom_serialization(router)
@@ -101,12 +99,6 @@ def setup_app():
     app.include_router(
         entitlements.router,
         prefix="/entitlements",
-        dependencies=[Depends(authentication_required)],
-        tags=["Billing"],
-    )
-    app.include_router(
-        chargesfiles.router,
-        prefix="/charges",
         dependencies=[Depends(authentication_required)],
         tags=["Billing"],
     )

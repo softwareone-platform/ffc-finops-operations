@@ -13,8 +13,6 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
@@ -32,7 +30,6 @@ from app.enums import (
     AccountType,
     AccountUserStatus,
     ActorType,
-    ChargesFileStatus,
     DatasourceType,
     EntitlementStatus,
     OrganizationStatus,
@@ -272,9 +269,6 @@ class Organization(Base, AuditableMixin, HumanReadablePKMixin):
         default=OrganizationStatus.ACTIVE,
         server_default=OrganizationStatus.ACTIVE.value,
     )
-    datasource_expenses: Mapped[list[DatasourceExpense]] = relationship(
-        "DatasourceExpense", back_populates="organization"
-    )
 
     __table_args__ = (
         Index(
@@ -300,30 +294,12 @@ class DatasourceExpense(Base, HumanReadablePKMixin, TimestampMixin):
     datasource_name: Mapped[str] = mapped_column(String(255), nullable=False)
     organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"))
 
-    organization: Mapped[Organization] = relationship(
-        "Organization", back_populates="datasource_expenses", lazy="joined"
-    )
+    organization: Mapped[Organization] = relationship(lazy="noload", foreign_keys=[organization_id])
 
     year: Mapped[int] = mapped_column(Integer(), nullable=False)
     month: Mapped[int] = mapped_column(Integer(), nullable=False)
     day: Mapped[int] = mapped_column(Integer(), nullable=False)
     expenses: Mapped[Decimal] = mapped_column(sa.Numeric(18, 4), nullable=False)
-
-    entitlements: Mapped[list[Entitlement]] = relationship(
-        "Entitlement",
-        primaryjoin=lambda: (
-            (DatasourceExpense.datasource_id == Entitlement.datasource_id)
-            & (DatasourceExpense.linked_datasource_type == Entitlement.linked_datasource_type)
-            & (Entitlement.status == EntitlementStatus.ACTIVE)
-        ),
-        foreign_keys=lambda: [
-            DatasourceExpense.datasource_id,
-            DatasourceExpense.linked_datasource_type,
-        ],
-        viewonly=True,
-        uselist=True,
-        lazy="selectin",
-    )
 
     __table_args__ = (
         Index("ix_datasource_expenses_year_and_month", year, month),
@@ -337,48 +313,6 @@ class DatasourceExpense(Base, HumanReadablePKMixin, TimestampMixin):
             name="uq_datasource_expenses_per_day",
         ),
     )
-
-
-class ExchangeRates(Base, HumanReadablePKMixin, TimestampMixin):
-    __tablename__ = "exchange_rates"
-
-    PK_PREFIX = "FEXR"
-    PK_NUM_LENGTH = 12
-
-    api_response: Mapped[dict] = mapped_column(JSONB(), nullable=False)
-
-    @hybrid_property
-    def base_currency(self) -> str:
-        return self.api_response["base_code"]
-
-    @base_currency.inplace.expression
-    @classmethod
-    def _base_currency_sql_expr(cls) -> sa.ColumnElement[str]:
-        return cls.api_response["base_code"].astext
-
-    @hybrid_property
-    def last_update(self) -> datetime.datetime:
-        last_update_unix = self.api_response["time_last_update_unix"]
-        return datetime.datetime.fromtimestamp(last_update_unix, datetime.UTC)
-
-    @last_update.inplace.expression
-    @classmethod
-    def _last_update_sql_expr(cls) -> sa.ColumnElement[datetime.datetime]:
-        return sa.func.to_timestamp(
-            sa.cast(cls.api_response["time_last_update_unix"].astext, sa.Integer)
-        )
-
-    @hybrid_property
-    def next_update(self) -> datetime.datetime:
-        next_update_unix = self.api_response["time_next_update_unix"]
-        return datetime.datetime.fromtimestamp(next_update_unix, datetime.UTC)
-
-    @next_update.inplace.expression
-    @classmethod
-    def _next_update_sql_expr(cls) -> sa.ColumnElement[datetime.datetime]:
-        return sa.func.to_timestamp(
-            sa.cast(cls.api_response["time_next_update_unix"].astext, sa.Integer)
-        )
 
 
 class Entitlement(Base, HumanReadablePKMixin, AuditableMixin):
@@ -411,40 +345,3 @@ class Entitlement(Base, HumanReadablePKMixin, AuditableMixin):
     terminated_at: Mapped[datetime.datetime | None] = mapped_column(sa.DateTime(timezone=True))
     terminated_by_id: Mapped[str | None] = mapped_column(ForeignKey("actors.id"))
     terminated_by: Mapped[Actor | None] = relationship(foreign_keys=[terminated_by_id])
-
-
-class ChargesFile(Base, HumanReadablePKMixin, TimestampMixin):
-    __tablename__ = "chargesfiles"
-
-    PK_PREFIX = "FCHG"
-    PK_NUM_LENGTH = 12
-
-    document_date: Mapped[datetime.date] = mapped_column(sa.Date())
-    currency: Mapped[str] = mapped_column(String(3), nullable=False)
-    amount: Mapped[Decimal | None] = mapped_column(sa.Numeric(18, 4), nullable=True)
-    owner_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), nullable=False)
-    owner: Mapped[Account] = relationship(foreign_keys=[owner_id])
-    status: Mapped[ChargesFileStatus] = mapped_column(
-        Enum(ChargesFileStatus, values_callable=lambda obj: [e.value for e in obj]),
-        nullable=False,
-        default=ChargesFileStatus.DRAFT,
-        server_default=ChargesFileStatus.DRAFT.value,
-    )
-
-    @hybrid_property
-    def azure_blob_name(self) -> str:
-        return (
-            f"{self.currency}/{self.document_date.year}/{self.document_date.month:02}/{self.id}.zip"
-        )
-
-    @azure_blob_name.inplace.expression
-    @classmethod
-    def _azure_blob_name_sql_expr(cls) -> sa.ColumnElement[str]:
-        return sa.func.concat(
-            cls.currency,
-            "/",
-            sa.func.to_char(cls.document_date, "YYYY/MM"),
-            "/",
-            cls.id,
-            ".zip",
-        )
