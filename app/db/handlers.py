@@ -7,7 +7,7 @@ from typing import Any
 from uuid import UUID
 
 import sqlalchemy
-from sqlalchemy import ColumnExpressionArgument, Select, desc, func, select, update
+from sqlalchemy import ColumnExpressionArgument, Select, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -18,10 +18,8 @@ from app.db.models import (
     Account,
     AccountUser,
     AuditableMixin,
-    ChargesFile,
     DatasourceExpense,
     Entitlement,
-    ExchangeRates,
     Organization,
     System,
     TimestampMixin,
@@ -30,7 +28,6 @@ from app.db.models import (
 from app.db.models import Base as BaseModel
 from app.enums import (
     AccountUserStatus,
-    ChargesFileStatus,
     EntitlementStatus,
 )
 
@@ -495,26 +492,3 @@ class AccountUserHandler(ModelHandler[AccountUser]):
 
 class DatasourceExpenseHandler(ModelHandler[DatasourceExpense]):
     pass
-
-
-class ChargesFileHandler(ModelHandler[ChargesFile]):
-    def __init__(self, session):
-        super().__init__(session)
-        self.default_options = [
-            joinedload(ChargesFile.owner),
-        ]
-
-    async def mark_processed(self, charge_file: ChargesFile) -> ChargesFile:
-        return await self.update(
-            charge_file,
-            data={"status": ChargesFileStatus.PROCESSED},
-        )
-
-
-class ExchangeRatesHandler(ModelHandler[ExchangeRates]):
-    async def fetch_latest_valid(self) -> Sequence[ExchangeRates]:
-        return await self.query_db(
-            select(ExchangeRates)
-            .filter(ExchangeRates.next_update > datetime.now(UTC))
-            .order_by(desc(ExchangeRates.last_update))
-        )

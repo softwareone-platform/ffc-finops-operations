@@ -34,7 +34,6 @@ dependencies = [
     # ref: https://github.com/hynek/stamina/blob/main/.github/SECURITY.md
     "stamina==25.1.*",
     "azure-identity==1.21.*",
-    "azure-storage-blob==12.25.*",
     "aiofiles==24.1.*",
     "python-dateutil==2.9.*",
     "aiohttp==3.11.*",
