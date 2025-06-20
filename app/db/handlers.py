@@ -491,4 +491,8 @@ class AccountUserHandler(ModelHandler[AccountUser]):
 
 
 class DatasourceExpenseHandler(ModelHandler[DatasourceExpense]):
-    pass
+    def __init__(self, session):
+        super().__init__(session)
+        self.default_options = [
+            joinedload(DatasourceExpense.organization),
+        ]

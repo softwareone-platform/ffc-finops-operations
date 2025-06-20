@@ -252,7 +252,7 @@ def test_invite_user_invalid_email():
     runner = CliRunner()
     result = runner.invoke(app, shlex.split("invite-user invalid-email UserName"))
     assert result.exit_code != 0
-    assert "Invalid value for 'EMAIL'" in result.stdout.replace("\n", "")
+    assert "Invalid value for 'EMAIL'" in result.stderr.replace("\n", "")
 
 
 def test_invite_user_command(
