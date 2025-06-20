@@ -246,21 +246,6 @@ wheels = [
 ]
 
 [[package]]
-name = "azure-storage-blob"
-version = "12.25.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "azure-core" },
-    { name = "cryptography" },
-    { name = "isodate" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/8b/f3/f764536c25cc3829d36857167f03933ce9aee2262293179075439f3cd3ad/azure_storage_blob-12.25.1.tar.gz", hash = "sha256:4f294ddc9bc47909ac66b8934bd26b50d2000278b10ad82cc109764fdc6e0e3b", size = 570541, upload-time = "2025-03-27T17:13:05.424Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/57/33/085d9352d416e617993821b9d9488222fbb559bc15c3641d6cbd6d16d236/azure_storage_blob-12.25.1-py3-none-any.whl", hash = "sha256:1f337aab12e918ec3f1b638baada97550673911c4ceed892acc8e4e891b74167", size = 406990, upload-time = "2025-03-27T17:13:06.879Z" },
-]
-
-[[package]]
 name = "bandit"
 version = "1.8.3"
 source = { registry = "https://pypi.org/simple" }
@@ -1036,7 +1021,6 @@ dependencies = [
     { name = "asyncpg" },
     { name = "azure-identity" },
     { name = "azure-monitor-opentelemetry-exporter" },
-    { name = "azure-storage-blob" },
     { name = "cryptography" },
     { name = "email-validator" },
     { name = "fastapi", extra = ["standard"] },
@@ -1103,7 +1087,6 @@ requires-dist = [
     { name = "asyncpg", specifier = "==0.30.*" },
     { name = "azure-identity", specifier = "==1.21.*" },
     { name = "azure-monitor-opentelemetry-exporter", specifier = "==1.0.0b36" },
-    { name = "azure-storage-blob", specifier = "==12.25.*" },
     { name = "cryptography", specifier = "==44.0.*" },
     { name = "email-validator", specifier = "==2.2.*" },
     { name = "fastapi", extras = ["standard"], specifier = "==0.115.*" },
