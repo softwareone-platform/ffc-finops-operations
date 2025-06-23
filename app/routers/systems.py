@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 from sqlalchemy import ColumnExpressionArgument, Select
 
 from app.db.handlers import ConstraintViolationError, NotFoundError
@@ -9,6 +9,7 @@ from app.dependencies.auth import CurrentAuthContext
 from app.dependencies.db import AccountRepository, SystemRepository
 from app.dependencies.path import SystemId
 from app.enums import AccountType, SystemStatus
+from app.openapi import examples
 from app.pagination import LimitOffsetPage, paginate
 from app.rql import RQLQuery, SystemRules
 from app.schemas.core import convert_model_to_schema
@@ -50,7 +51,25 @@ async def fetch_system_or_404(
 router = APIRouter()
 
 
-@router.get("", response_model=LimitOffsetPage[SystemRead])
+@router.get(
+    "",
+    response_model=LimitOffsetPage[SystemRead],
+    responses={
+        200: {
+            "description": "List of Systems",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "items": [examples.SYSTEM_RESPONSE],
+                        "total": 1,
+                        "limit": 10,
+                        "offset": 0,
+                    },
+                },
+            },
+        },
+    },
+)
 async def get_systems(
     system_repo: SystemRepository,
     extra_conditions: CommonConditions,
@@ -61,7 +80,21 @@ async def get_systems(
     )
 
 
-@router.post("", response_model=SystemCreateResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=SystemCreateResponse,
+    responses={
+        201: {
+            "description": "System",
+            "content": {
+                "application/json": {
+                    "example": examples.SYSTEM_CREATE_RESPONSE,
+                },
+            },
+        },
+    },
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_system(
     data: SystemCreate,
     account_repo: AccountRepository,
@@ -103,16 +136,53 @@ async def create_system(
     return convert_model_to_schema(SystemCreateResponse, system)
 
 
-@router.get("/{id}", response_model=SystemRead)
+@router.get(
+    "/{id}",
+    response_model=SystemRead,
+    responses={
+        200: {
+            "description": "System",
+            "content": {
+                "application/json": {
+                    "example": examples.SYSTEM_RESPONSE,
+                },
+            },
+        },
+    },
+)
 async def get_system_by_id(system: Annotated[System, Depends(fetch_system_or_404)]):
     return convert_model_to_schema(SystemRead, system)
 
 
-@router.put("/{id}", response_model=SystemRead)
+@router.put(
+    "/{id}",
+    response_model=SystemRead,
+    responses={
+        200: {
+            "description": "System",
+            "content": {
+                "application/json": {
+                    "example": examples.SYSTEM_UPDATE_RESPONSE,
+                },
+            },
+        },
+    },
+)
 async def update_system(
     system: Annotated[System, Depends(fetch_system_or_404)],
     system_repo: SystemRepository,
-    data: SystemUpdate,
+    data: Annotated[
+        SystemUpdate,
+        Body(
+            openapi_examples={
+                "update_system": {
+                    "summary": "Update System.",
+                    "description": ("Update an existing System"),
+                    "value": {"name": "ibm extension", "description": "ibm cloud extension"},
+                }
+            }
+        ),
+    ],
 ):
     update_fields = data.model_dump(exclude_unset=True)
 
@@ -157,7 +227,20 @@ async def delete_system_by_id(
     await system_repo.delete(system)
 
 
-@router.post("/{id}/disable", response_model=SystemRead)
+@router.post(
+    "/{id}/disable",
+    response_model=SystemRead,
+    responses={
+        200: {
+            "description": "System",
+            "content": {
+                "application/json": {
+                    "example": examples.SYSTEM_DISABLED_RESPONSE,
+                },
+            },
+        },
+    },
+)
 async def disable_system(
     system: Annotated[System, Depends(fetch_system_or_404)],
     system_repo: SystemRepository,
@@ -182,7 +265,20 @@ async def disable_system(
     return convert_model_to_schema(SystemRead, system)
 
 
-@router.post("/{id}/enable", response_model=SystemRead)
+@router.post(
+    "/{id}/enable",
+    response_model=SystemRead,
+    responses={
+        200: {
+            "description": "System",
+            "content": {
+                "application/json": {
+                    "example": examples.SYSTEM_RESPONSE,
+                },
+            },
+        },
+    },
+)
 async def enable_system(
     system: Annotated[System, Depends(fetch_system_or_404)],
     system_repo: SystemRepository,
