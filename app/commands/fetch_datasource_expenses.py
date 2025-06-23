@@ -14,7 +14,7 @@ from app.db.handlers import DatasourceExpenseHandler, OrganizationHandler
 from app.db.models import DatasourceExpense, Organization
 from app.enums import DatasourceType
 from app.notifications import send_exception, send_info
-from app.telemetry import capture_telemetry_cli_command
+from app.telemetry import capture_telemetry
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +137,7 @@ async def store_datasource_expenses(
     await send_info("Datasource Expenses Update Success", msg)
 
 
-@capture_telemetry_cli_command(__name__, "Update Current Month Datasource Expenses")
+@capture_telemetry(__name__, "Update Current Month Datasource Expenses")
 async def main(settings: Settings) -> None:
     today = datetime.now(UTC).date()
 
