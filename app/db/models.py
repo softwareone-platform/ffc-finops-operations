@@ -269,9 +269,6 @@ class Organization(Base, AuditableMixin, HumanReadablePKMixin):
         default=OrganizationStatus.ACTIVE,
         server_default=OrganizationStatus.ACTIVE.value,
     )
-    datasource_expenses: Mapped[list[DatasourceExpense]] = relationship(
-        "DatasourceExpense", back_populates="organization"
-    )
 
     __table_args__ = (
         Index(
@@ -297,9 +294,7 @@ class DatasourceExpense(Base, HumanReadablePKMixin, TimestampMixin):
     datasource_name: Mapped[str] = mapped_column(String(255), nullable=False)
     organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"))
 
-    organization: Mapped[Organization] = relationship(
-        "Organization", back_populates="datasource_expenses", lazy="joined"
-    )
+    organization: Mapped[Organization] = relationship(lazy="noload", foreign_keys=[organization_id])
 
     year: Mapped[int] = mapped_column(Integer(), nullable=False)
     month: Mapped[int] = mapped_column(Integer(), nullable=False)
