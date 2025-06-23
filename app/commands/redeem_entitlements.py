@@ -13,7 +13,7 @@ from app.db.handlers import EntitlementHandler, OrganizationHandler
 from app.db.models import Entitlement, Organization
 from app.enums import EntitlementStatus, OrganizationStatus
 from app.notifications import NotificationDetails, send_exception, send_info
-from app.telemetry import capture_telemetry_cli_command
+from app.telemetry import capture_telemetry
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,7 @@ async def process_datasource(
         await send_exception("Redeem Entitlements Error", msg)
 
 
-@capture_telemetry_cli_command(__name__, "Redeem Entitlements")
+@capture_telemetry(__name__, "Redeem Entitlements")
 async def redeem_entitlements(settings: Settings):
     # FIXME: Long-lived DB transaction (making API calls inside the transaction)
 
