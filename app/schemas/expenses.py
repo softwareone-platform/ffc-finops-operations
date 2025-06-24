@@ -6,6 +6,7 @@ from app.schemas.organizations import OrganizationReference
 
 
 class DatasourceExpenseRead(IdSchema, CommonEventsSchema):
+    datasource_id: str
     linked_datasource_id: str
     datasource_name: str
     linked_datasource_type: DatasourceType
