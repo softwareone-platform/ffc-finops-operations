@@ -27,12 +27,6 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-      azurite:
-        image: mcr.microsoft.com/azure-storage/azurite
-        ports:
-          - 10000:10000
-          - 10001:10001
-          - 10002:10002
     runs-on: ubuntu-latest
     timeout-minutes: 10
 

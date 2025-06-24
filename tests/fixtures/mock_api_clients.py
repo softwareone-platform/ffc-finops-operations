@@ -1,6 +1,5 @@
 import textwrap
 import uuid
-from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol, TypeVar
 
 import httpx
@@ -10,7 +9,6 @@ from pydantic.v1.utils import deep_update
 from pytest_httpx import HTTPXMock
 
 from app.api_clients.base import BaseAPIClient
-from app.api_clients.exchange_rate import ExchangeRateAPIClient, ExchangeRateAPIErrorType
 from app.api_clients.optscale import OptscaleClient
 from app.conf import Settings
 from app.db.models import Organization
@@ -128,68 +126,3 @@ class MockOptscaleClient(BaseMockAPIClient[OptscaleClient]):
 @pytest.fixture
 def mock_optscale_client(test_settings: Settings, httpx_mock: HTTPXMock) -> MockOptscaleClient:
     return MockOptscaleClient(test_settings, httpx_mock)
-
-
-class MockExchangeRateAPIClient(BaseMockAPIClient[ExchangeRateAPIClient]):
-    API_RESPONSE_DATETIME_FORMAT = "%a, %d %b %Y %H:%M:%S %z"
-
-    def __init__(
-        self,
-        test_settings: Settings,
-        httpx_mock: HTTPXMock,
-        default_exchange_rates: dict[str, dict[str, float]] | None = None,
-    ) -> None:
-        super().__init__(test_settings, httpx_mock)
-
-        self.default_exchange_rates = default_exchange_rates or {}
-
-    def mock_get_latest_rates(
-        self,
-        exchange_rates: dict[str, float] | None = None,
-        base_currency: str = "USD",
-        last_update: datetime | None = None,
-        next_update: datetime | None = None,
-        error_code: ExchangeRateAPIErrorType | None = None,
-    ) -> None:
-        if exchange_rates is None:
-            exchange_rates = self.default_exchange_rates.get(base_currency)
-
-        if last_update is None:
-            last_update = datetime.now(UTC)
-
-        if next_update is None:
-            next_update = last_update + timedelta(days=1)
-
-        if last_update > next_update:
-            raise ValueError("Last update time must be before next update time")
-
-        if error_code is None:
-            response = {
-                "result": "success",
-                "time_last_update_unix": int(last_update.timestamp()),
-                "time_last_update_utc": last_update.strftime(self.API_RESPONSE_DATETIME_FORMAT),
-                "time_next_update_unix": int(next_update.timestamp()),
-                "time_next_update_utc": next_update.strftime(self.API_RESPONSE_DATETIME_FORMAT),
-                "base_code": base_currency,
-                "conversion_rates": exchange_rates,
-            }
-        else:
-            response = {
-                "result": "error",
-                "error-type": error_code.value,
-            }
-
-        self.add_mock_response("GET", f"/latest/{base_currency}", json=response)
-
-
-@pytest.fixture
-def mock_exchange_rate_api_client(
-    test_settings: Settings,
-    httpx_mock: HTTPXMock,
-    exchange_rates_per_currency: dict[str, dict[str, float]],
-) -> MockExchangeRateAPIClient:
-    return MockExchangeRateAPIClient(
-        test_settings,
-        httpx_mock,
-        default_exchange_rates=exchange_rates_per_currency,
-    )

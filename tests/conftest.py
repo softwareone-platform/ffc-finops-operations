@@ -3,7 +3,6 @@ import secrets
 import uuid
 from collections.abc import AsyncGenerator, Callable, Generator
 from datetime import UTC, datetime, timedelta
-from decimal import Decimal
 from typing import Final
 
 import jwt
@@ -26,10 +25,8 @@ from app.db.models import (
     AccountUser,
     Actor,
     Base,
-    ChargesFile,
     DatasourceExpense,
     Entitlement,
-    ExchangeRates,
     Organization,
     System,
     User,
@@ -38,7 +35,6 @@ from app.enums import (
     AccountStatus,
     AccountType,
     AccountUserStatus,
-    ChargesFileStatus,
     DatasourceType,
     EntitlementStatus,
     OrganizationStatus,
@@ -82,13 +78,6 @@ def test_settings() -> Settings:
     settings.api_modifier_jwt_secret = "test_jwt_secret"
     settings.auth_access_jwt_secret = "auth_access_jwt_secret"
     settings.auth_refresh_jwt_secret = "auth_refresh_jwt_secret"
-    settings.exchange_rate_api_base_url = "https://v6.exchangerate-api.com/v6"
-    settings.exchange_rate_api_token = "my_exchange_rate_api_token"
-    settings.azure_sa_protocol = "http"
-    settings.azure_sa_blob_endpoint = "http://azurite:10000/devstoreaccount1"
-    settings.azure_sa_account_key = (
-        "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
-    )
     settings.smtp_sender_email = "test@example.com"
     settings.smtp_sender_name = "Test Sender"
     settings.smtp_host = "smtp.example.com"
@@ -405,40 +394,6 @@ def system_jwt_token_factory(
 
 
 @pytest.fixture
-def charges_file_factory(
-    faker: Faker,
-    db_session: AsyncSession,
-    gcp_account: Account,
-) -> ModelFactory[ChargesFile]:
-    async def _charges_file(
-        currency: str | None = None,
-        amount: Decimal | None = None,
-        owner: Account | None = None,
-        status: str | None = None,
-        document_date: str | None = None,
-    ):
-        owner = owner or gcp_account
-        charges_file = ChargesFile(
-            id=faker.uuid4(),
-            document_date=datetime.strptime(document_date, format("%Y-%m-%d")).date()
-            if document_date
-            else faker.date_time().date(),
-            currency=currency or "USD",
-            amount=amount
-            or Decimal(f"{faker.pydecimal(left_digits=14, right_digits=4, positive=True)}"),
-            owner=owner,
-            owner_id=owner.id or gcp_account.id,
-            status=status or ChargesFileStatus.DRAFT,
-        )
-        db_session.add(charges_file)
-        await db_session.commit()
-        await db_session.refresh(charges_file)
-        return charges_file
-
-    return _charges_file
-
-
-@pytest.fixture
 def datasource_expense_factory(
     faker: Faker,
     db_session: AsyncSession,
@@ -478,68 +433,6 @@ def datasource_expense_factory(
         return datasource_expense
 
     return _datasource_expense
-
-
-@pytest.fixture
-def exchange_rates_per_currency() -> dict[str, dict[str, float]]:
-    return {
-        "USD": {
-            "USD": 1.0,
-            "EUR": 0.9252,
-            "GBP": 0.7737,
-        },
-        "EUR": {
-            "USD": 1.0808,
-            "EUR": 1.0,
-            "GBP": 0.8555,
-        },
-        "GBP": {
-            "USD": 1.2925,
-            "EUR": 1.1689,
-            "GBP": 1.0,
-        },
-    }
-
-
-@pytest.fixture
-def exchange_rates_factory(
-    db_session: AsyncSession,
-    exchange_rates_per_currency: dict[str, dict[str, float]],
-) -> ModelFactory[ExchangeRates]:
-    async def _exchange_rates(
-        exchange_rates: dict[str, float] | None = None,
-        base_currency: str = "USD",
-        last_update: datetime | None = None,
-        next_update: datetime | None = None,
-    ):
-        if exchange_rates is None:
-            exchange_rates = exchange_rates_per_currency[base_currency]
-
-        if last_update is None:
-            last_update = datetime.now(UTC)
-
-        if next_update is None:
-            next_update = last_update + timedelta(days=1)
-
-        if last_update > next_update:
-            raise ValueError("Last update time must be before next update time")
-
-        exchange_rates_model = ExchangeRates(
-            api_response={
-                "result": "success",
-                "time_last_update_unix": int(last_update.timestamp()),
-                "time_next_update_unix": int(next_update.timestamp()),
-                "base_code": base_currency,
-                "conversion_rates": exchange_rates,
-            },
-        )
-
-        db_session.add(exchange_rates_model)
-        await db_session.commit()
-        await db_session.refresh(exchange_rates_model)
-        return exchange_rates_model
-
-    return _exchange_rates
 
 
 @pytest.fixture
@@ -666,15 +559,6 @@ def stamina_testing_mode():
         yield
     finally:
         stamina.set_testing(False)
-
-
-# @pytest.fixture(scope="session", autouse=True)
-# def mock_default_azure_credentials():
-#     test_key = (
-#         "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
-#     )
-#     with patch("app.api_clients.azure.AZURE_SA_CREDENTIALS", test_key):
-#         yield
 
 
 def assert_equal_or_raises[T](

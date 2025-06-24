@@ -15,13 +15,34 @@ services:
       - .env
     ports:
       - "8000:8000"
-  azurite:
-    image: mcr.microsoft.com/azure-storage/azurite:latest
-    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8000"]
+      interval: 1s
+      timeout: 1s
+      retries: 15
+    develop:
+      watch:
+        - action: rebuild
+          path: uv.lock
+        - action: rebuild
+          path: Dockerfile
+        - action: rebuild
+          path: dev.Dockerfile
+        - action: sync+restart
+          path: app/
+          target: /app/app
+  jaeger:
+    image: jaegertracing/all-in-one:latest
     ports:
-      - "10000:10000"
-      - "10001:10001"
-      - "10002:10002"
+      - "16686:16686" # UI
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "16686"]
+      interval: 1s
+      timeout: 1s
+      retries: 15
+    depends_on:
+      app:
+        condition: "service_healthy"
   db: &db
     image: postgres:17
     restart: unless-stopped
@@ -54,8 +75,6 @@ services:
     depends_on:
       test_db:
         condition: "service_healthy"
-      azurite:
-        condition: "service_started"
     command: >
       bash -c "
         set -e

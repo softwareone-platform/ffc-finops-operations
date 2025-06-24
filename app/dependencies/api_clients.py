@@ -3,7 +3,7 @@ from typing import Annotated
 
 from fastapi import Depends
 
-from app.api_clients import api_modifier, exchange_rate, optscale
+from app.api_clients import api_modifier, optscale
 from app.api_clients.base import BaseAPIClient
 from app.dependencies.core import AppSettings
 
@@ -29,8 +29,4 @@ OptscaleClient = Annotated[
 OptscaleAuthClient = Annotated[
     optscale.OptscaleAuthClient,
     Depends(APIClientFactory(optscale.OptscaleAuthClient)),
-]
-ExchangeRateAPIClient = Annotated[
-    exchange_rate.ExchangeRateAPIClient,
-    Depends(APIClientFactory(exchange_rate.ExchangeRateAPIClient)),
 ]

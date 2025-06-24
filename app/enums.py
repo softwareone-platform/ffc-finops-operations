@@ -69,11 +69,3 @@ class OrganizationStatus(str, enum.Enum):
     ACTIVE = "active"
     CANCELLED = "cancelled"
     DELETED = "deleted"
-
-
-@enum.unique
-class ChargesFileStatus(str, enum.Enum):
-    DRAFT = "draft"
-    GENERATED = "generated"
-    DELETED = "deleted"
-    PROCESSED = "processed"

@@ -41,9 +41,6 @@ AccountUserRepository = Annotated[
 SystemRepository = Annotated[
     handlers.SystemHandler, Depends(HandlerFactory(handlers.SystemHandler))
 ]
-ChargesFileRepository = Annotated[
-    handlers.ChargesFileHandler, Depends(HandlerFactory(handlers.ChargesFileHandler))
-]
 DatasourceExpenseRepository = Annotated[
     handlers.DatasourceExpenseHandler, Depends(HandlerFactory(handlers.DatasourceExpenseHandler))
 ]
