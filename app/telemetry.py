@@ -3,9 +3,7 @@ from collections.abc import Callable, Coroutine
 from functools import wraps
 from typing import Any
 
-from azure.monitor.opentelemetry.exporter import (
-    AzureMonitorTraceExporter,
-)
+from azure.monitor.opentelemetry.exporter import AzureMonitorTraceExporter
 from fastapi import FastAPI
 from opentelemetry import trace
 from opentelemetry.context import Context
@@ -14,12 +12,9 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
-from opentelemetry.instrumentation.sqlalchemy.engine import EngineTracer
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor, TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter, SpanExporter
-from opentelemetry.semconv.trace import SpanAttributes
-from sqlalchemy import Connection
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.conf import OpenTelemetryExporter, Settings
@@ -127,43 +122,7 @@ def setup_sqlalchemy_instrumentor(
     if settings.opentelemetry_exporter is None:
         return
 
-    engine_tracer: EngineTracer | None = SQLAlchemyInstrumentor().instrument(
-        engine=dbengine.sync_engine, enable_commenter=True
-    )
-
-    if engine_tracer is None:
-        return
-
-    def on_begin(conn: Connection) -> None:
-        transaction_span_ctx_mngr = engine_tracer.tracer.start_as_current_span(
-            "SQLAlchemy Transaction",
-            kind=trace.SpanKind.CLIENT,
-            attributes={
-                SpanAttributes.DB_NAME: dbengine.url.database,
-                SpanAttributes.DB_STATEMENT: "BEGIN",
-                SpanAttributes.DB_OPERATION: "BEGIN",
-            },
-        )
-
-        transaction_span_ctx_mngr.__enter__()
-
-        conn.info["otel_transaction_span_ctx_mngr"] = transaction_span_ctx_mngr
-
-    def on_commit(conn: Connection) -> None:
-        transaction_span_ctx_mngr = conn.info.pop("otel_transaction_span_ctx_mngr", None)
-
-        if transaction_span_ctx_mngr is not None:
-            transaction_span_ctx_mngr.__exit__(None, None, None)
-
-    def on_rollback(conn: Connection) -> None:
-        transaction_span_ctx_mngr = conn.info.pop("otel_transaction_span_ctx_mngr", None)
-
-        if transaction_span_ctx_mngr is not None:
-            transaction_span_ctx_mngr.__exit__(None, None, None)
-
-    engine_tracer._register_event_listener(dbengine.sync_engine, "begin", on_begin)
-    engine_tracer._register_event_listener(dbengine.sync_engine, "commit", on_commit)
-    engine_tracer._register_event_listener(dbengine.sync_engine, "rollback", on_rollback)
+    SQLAlchemyInstrumentor().instrument(engine=dbengine.sync_engine, enable_commenter=True)
 
 
 def capture_telemetry_cli_command[**P, R](
