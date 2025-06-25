@@ -10,12 +10,12 @@ from app.db.base import session_factory
 from app.db.models import Account, AccountUser, User
 from app.enums import AccountUserStatus
 from app.notifications import NotificationDetails, send_info
-from app.telemetry import capture_telemetry
+from app.telemetry import capture_telemetry_cli_command
 
 logger = logging.getLogger(__name__)
 
 
-@capture_telemetry(__name__, "Check Expired Invitations")
+@capture_telemetry_cli_command(__name__, "Check Expired Invitations")
 async def check_expired_invitations(settings: Settings):
     async with session_factory.begin() as session:
         stmt = (
