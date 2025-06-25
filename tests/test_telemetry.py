@@ -9,7 +9,9 @@ from app.telemetry import (
 
 def test_setup_telemetry(mocker: MockerFixture):
     mock_settings = mocker.MagicMock()
+    mock_settings.opentelemetry_exporter = "azure_app_insights"
     mock_settings.azure_insights_connection_string = "mock_connection_string"
+    mock_settings.opentelemetry_sqlalchemy_min_query_duration_ms = None
     mocked_exporter = mocker.MagicMock()
     mocked_tracer_provider = mocker.MagicMock()
     mocked_set_tracer_provider = mocker.patch(
@@ -55,7 +57,7 @@ def test_setup_telemetry(mocker: MockerFixture):
 
 def test_setup_telemetry_disabled(mocker: MockerFixture):
     mock_settings = mocker.MagicMock()
-    mock_settings.azure_insights_connection_string = None
+    mock_settings.opentelemetry_exporter = None
     mocked_exporter = mocker.MagicMock()
     mocked_tracer_provider = mocker.MagicMock()
     mocked_set_tracer_provider = mocker.patch(
@@ -96,6 +98,7 @@ def test_setup_telemetry_disabled(mocker: MockerFixture):
 
 def test_setup_fastapi_instrumentor(mocker: MockerFixture):
     mock_settings = mocker.MagicMock()
+    mock_settings.opentelemetry_exporter = "azure_app_insights"
     mock_settings.azure_insights_connection_string = "mock_connection_string"
     mocked_instrument_app = mocker.patch(
         "app.telemetry.FastAPIInstrumentor.instrument_app",
@@ -109,7 +112,7 @@ def test_setup_fastapi_instrumentor(mocker: MockerFixture):
 
 def test_setup_fastapi_instrumentor_disabled(mocker: MockerFixture):
     mock_settings = mocker.MagicMock()
-    mock_settings.azure_insights_connection_string = None
+    mock_settings.opentelemetry_exporter = None
     mocked_instrument_app = mocker.patch(
         "app.telemetry.FastAPIInstrumentor.instrument_app",
     )
@@ -122,6 +125,7 @@ def test_setup_fastapi_instrumentor_disabled(mocker: MockerFixture):
 
 def test_setup_sqlalchemy_instrumentor(mocker: MockerFixture):
     mock_settings = mocker.MagicMock()
+    mock_settings.opentelemetry_exporter = "azure_app_insights"
     mock_settings.azure_insights_connection_string = "mock_connection_string"
     mocked_instrument_sqlalchemy = mocker.MagicMock()
     mocker.patch(
@@ -140,7 +144,7 @@ def test_setup_sqlalchemy_instrumentor(mocker: MockerFixture):
 
 def test_setup_sqlalchemy_disabled(mocker: MockerFixture):
     mock_settings = mocker.MagicMock()
-    mock_settings.azure_insights_connection_string = None
+    mock_settings.opentelemetry_exporter = None
     mocked_instrument_sqlalchemy = mocker.MagicMock()
     mocker.patch(
         "app.telemetry.SQLAlchemyInstrumentor",

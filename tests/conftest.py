@@ -78,6 +78,7 @@ def test_settings() -> Settings:
     settings.api_modifier_jwt_secret = "test_jwt_secret"
     settings.auth_access_jwt_secret = "auth_access_jwt_secret"
     settings.auth_refresh_jwt_secret = "auth_refresh_jwt_secret"
+    settings.opentelemetry_exporter = None
     settings.smtp_sender_email = "test@example.com"
     settings.smtp_sender_name = "Test Sender"
     settings.smtp_host = "smtp.example.com"
