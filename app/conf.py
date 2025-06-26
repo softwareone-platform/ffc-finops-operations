@@ -64,10 +64,8 @@ class Settings(BaseSettings):
     cli_rich_logging: bool = True
     debug: bool = False
 
-    opentelemetry_exporter: OpenTelemetryExporter | None = OpenTelemetryExporter.JAEGER
-    jaeger_host: str = "jaeger"
-    jaeger_port: int = 4318
-    azure_insights_connection_string: str | None = None
+    opentelemetry_exporter: OpenTelemetryExporter = OpenTelemetryExporter.JAEGER
+    opentelemetry_connection_string: str | None = "http://jaeger:4318/v1/traces"
     opentelemetry_sqlalchemy_min_query_duration_ms: int | None = 100
 
     msteams_notifications_webhook_url: str | None = None
@@ -93,10 +91,6 @@ class Settings(BaseSettings):
             port=self.postgres_port,
             path=self.postgres_db,
         )
-
-    @computed_field
-    def jaeger_endpoint(self) -> str:
-        return f"http://{self.jaeger_host}:{self.jaeger_port}/v1/traces"
 
 
 _settings = None

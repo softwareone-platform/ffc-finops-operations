@@ -80,10 +80,10 @@ def setup_telemetry(settings: Settings) -> None:  # pragma: no cover
 
     if settings.opentelemetry_exporter == OpenTelemetryExporter.AZURE_APP_INSIGHTS:
         exporter = AzureMonitorTraceExporter(
-            connection_string=settings.azure_insights_connection_string,
+            connection_string=settings.opentelemetry_connection_string
         )
     elif settings.opentelemetry_exporter == OpenTelemetryExporter.JAEGER:
-        exporter = OTLPSpanExporter(endpoint=settings.jaeger_endpoint)  # type: ignore[arg-type]
+        exporter = OTLPSpanExporter(endpoint=settings.opentelemetry_connection_string)  # type: ignore[arg-type]
     elif settings.opentelemetry_exporter == OpenTelemetryExporter.CONSOLE:
         exporter = ConsoleSpanExporter()
     else:
