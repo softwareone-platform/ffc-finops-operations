@@ -8,7 +8,6 @@ from app.db.models import (
     Account,
     AccountUser,
     Actor,
-    ChargesFile,
     DatasourceExpense,
     Entitlement,
     Organization,
@@ -101,17 +100,6 @@ class EntitlementRules(ModelRQLRules, AuditableMixin):
     terminated_at = FieldRule(alias="events.terminated.at")
 
 
-class ChargesFileRules(ModelRQLRules, AuditableMixin):
-    __model__ = ChargesFile
-
-    id = FieldRule()
-    document_date = FieldRule()
-    currency = FieldRule()
-    amount = FieldRule()
-    owner = RelationshipRule(rules=AccountRules())
-    status = FieldRule()
-
-
 class DatasourceExpenseRules(ModelRQLRules, AuditableMixin):
     __model__ = DatasourceExpense
 
@@ -120,7 +108,6 @@ class DatasourceExpenseRules(ModelRQLRules, AuditableMixin):
     month = FieldRule()
     year = FieldRule()
     organization = RelationshipRule(rules=OrganizationRules())
-    entitlement = RelationshipRule(rules=EntitlementRules())
 
 
 class RQLQuery:

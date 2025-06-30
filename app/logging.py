@@ -12,7 +12,6 @@ class FFCOpsHighlighter(ReprHighlighter):
     prefixes = (
         models.Account.PK_PREFIX,
         models.Actor.PK_PREFIX,
-        models.ChargesFile.PK_PREFIX,
         models.Entitlement.PK_PREFIX,
         models.Organization.PK_PREFIX,
         models.System.PK_PREFIX,
