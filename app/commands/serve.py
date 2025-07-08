@@ -74,8 +74,7 @@ def command(
         ),
     ] = False,
 ):
-    """
-    Run the application with Gunicorn and Uvicorn workers."""
+    """Run the application with Gunicorn and Uvicorn workers."""
     options = {
         "bind": f"{host}:{port}",
         "workers": workers,
