@@ -79,7 +79,8 @@ jobs:
       - name: Upload SBOM
         uses: DependencyTrack/gh-upload-sbom@v3
         with:
-          serverHostname: 'https://dependency-track.s1.team/'
+          serverHostname: 'dependency-track.s1.team'
+          protocol: 'https'
           apiKey: ${{ secrets.DEPENDENCYTRACK_APIKEY }}
           projectName: 'ffc-finops-operations'
           projectVersion: ${{ steps.get_version.outputs.MAJOR }}
