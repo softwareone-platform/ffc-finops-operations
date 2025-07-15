@@ -25,15 +25,15 @@ EXCLUDED_CURRENCIES = [
 
 
 class OrganizationExpensesInfo(BaseSchema):
-    limit: Annotated[Decimal, Field(max_length=255, examples=["10,000.00"], default=Decimal(0))]
+    limit: Annotated[Decimal, Field(max_length=255, examples=["10000.00"], default=Decimal(0))]
     expenses_last_month: Annotated[
-        Decimal, Field(max_length=255, examples=["4,321.26"], default=Decimal(0))
+        Decimal, Field(max_length=255, examples=["4321.26"], default=Decimal(0))
     ]
     expenses_this_month: Annotated[
-        Decimal, Field(max_length=255, examples=["2,111.49"], default=Decimal(0))
+        Decimal, Field(max_length=255, examples=["2111.49"], default=Decimal(0))
     ]
     expenses_this_month_forecast: Annotated[
-        Decimal, Field(max_length=255, examples=["5,001.12"], default=Decimal(0))
+        Decimal, Field(max_length=255, examples=["5001.12"], default=Decimal(0))
     ]
     possible_monthly_saving: Annotated[
         Decimal, Field(max_length=255, examples=["4.66"], default=Decimal(0))
@@ -41,9 +41,9 @@ class OrganizationExpensesInfo(BaseSchema):
 
 
 class OrganizationBase(BaseSchema):
-    name: Annotated[str, Field(min_length=1, max_length=255, examples=["Nimbus Nexus Inc."])]
-    currency: Annotated[str, Field(min_length=3, max_length=3, examples=["EUR"])]
-    billing_currency: Annotated[str, Field(min_length=3, max_length=3, examples=["USD"])]
+    name: Annotated[str, Field(min_length=1, max_length=255, examples=["Red Hat"])]
+    currency: Annotated[str, Field(min_length=3, max_length=3, examples=["USD"])]
+    billing_currency: Annotated[str, Field(min_length=3, max_length=3, examples=["EUR"])]
     operations_external_id: Annotated[
         str, Field(min_length=1, max_length=255, examples=["AGR-9876-5534-9172"])
     ]
@@ -73,9 +73,7 @@ class OrganizationRead(IdSchema, CommonEventsSchema, OrganizationBase):
 
 
 class OrganizationUpdate(BaseSchema):
-    name: Annotated[
-        str | None, Field(min_length=1, max_length=255, examples=["Nimbus Nexus Inc."])
-    ] = None
+    name: Annotated[str | None, Field(min_length=1, max_length=255, examples=["red hat"])] = None
     operations_external_id: Annotated[
         str | None, Field(min_length=1, max_length=255, examples=["AGR-9876-5534-9172"])
     ] = None

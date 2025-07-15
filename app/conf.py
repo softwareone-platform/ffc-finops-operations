@@ -56,10 +56,11 @@ class Settings(BaseSettings):
     smtp_sender_email: str
     smtp_sender_name: str
 
+    api_base_url: str = "https://api.finops.softwareone.com/ops/v1"
     cli_rich_logging: bool = True
     debug: bool = False
 
-    opentelemetry_exporter: OpenTelemetryExporter = OpenTelemetryExporter.JAEGER
+    opentelemetry_exporter: OpenTelemetryExporter | None = OpenTelemetryExporter.JAEGER
     opentelemetry_connection_string: str | None = "http://jaeger:4318/v1/traces"
     opentelemetry_sqlalchemy_min_query_duration_ms: int | None = 100
 
