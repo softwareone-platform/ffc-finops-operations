@@ -15,6 +15,7 @@ class OutputFormat(str, Enum):
 
 
 def command(
+    ctx: typer.Context,
     output: Annotated[
         Path | None,
         typer.Option(
@@ -38,7 +39,7 @@ def command(
     from app import main
 
     dump_fn = json.dump if output_format == OutputFormat.json else yaml.dump
-    spec = generate_openapi_spec(main.app)
+    spec = generate_openapi_spec(main.app, ctx.obj)
 
     with open(output, "w") as f:  # type: ignore
         dump_fn(spec, f, indent=2)

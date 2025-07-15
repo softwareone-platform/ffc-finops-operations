@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 from sqlalchemy import and_, exists
 from sqlalchemy.sql.selectable import Select
 
@@ -20,6 +20,7 @@ from app.dependencies.db import (
 )
 from app.dependencies.path import AccountId, UserId
 from app.enums import AccountStatus, AccountType, AccountUserStatus, UserStatus
+from app.openapi import examples
 from app.pagination import LimitOffsetPage, paginate
 from app.rql import AccountRules, RQLQuery
 from app.schemas.accounts import AccountCreate, AccountRead, AccountUpdate
@@ -126,24 +127,36 @@ async def fetch_account_or_404(id: AccountId, account_repo: AccountRepository) -
 @router.post(
     "",
     response_model=AccountRead,
+    responses={
+        201: {
+            "description": "Account",
+            "content": {
+                "application/json": {
+                    "example": examples.ACCOUNT_RESPONSE,
+                }
+            },
+        },
+    },
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(check_operations_account)],
 )
-async def create_account(data: AccountCreate, account_repo: AccountRepository):
+async def create_account(
+    data: Annotated[
+        AccountCreate,
+        Body(
+            openapi_examples={
+                "create_account": {
+                    "summary": "Create Account.",
+                    "description": ("Create a new affiliate Account."),
+                    "value": {"name": "IBM", "external_id": "A-1234", "type": "affiliate"},
+                }
+            }
+        ),
+    ],
+    account_repo: AccountRepository,
+):
     """
-    This Endpoint creates an Affiliate Account.
-
-    There are 3 conditions to check before proceeding with the operation of creation for an account.
-    1. The Account type must be OPERATIONS, otherwise a 403 error will be returned
-    2. Only Accounts classified as of type “Affiliate” can be created.
-    3. The external_id field has to be unique and not in DELETED status.
-
-    The newly created account's status will be assigned as ACTIVE
-
-    Raises:
-        - HTTPException with status 403 if the check (1) fails
-        - HTTPException with status 400 if the checks (2) or (3) fail.
-
+    Creates an Account of type **Affiliate**.
     """
     await validate_account_type_and_required_conditions(account_repo, data)
     return await persist_data_and_format_response(account_repo, data)
@@ -152,6 +165,12 @@ async def create_account(data: AccountCreate, account_repo: AccountRepository):
 @router.get(
     "/{id}",
     response_model=AccountRead,
+    responses={
+        200: {
+            "description": "Account",
+            "content": {"application/json": {"example": examples.ACCOUNT_RESPONSE}},
+        },
+    },
     dependencies=[Depends(check_operations_account)],
 )
 async def get_account_by_id(
@@ -163,6 +182,21 @@ async def get_account_by_id(
 @router.get(
     "",
     response_model=LimitOffsetPage[AccountRead],
+    responses={
+        200: {
+            "description": "List of Accounts",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "items": [examples.ACCOUNT_RESPONSE],
+                        "total": 1,
+                        "limit": 10,
+                        "offset": 0,
+                    },
+                },
+            },
+        },
+    },
     dependencies=[Depends(check_operations_account)],
 )
 async def get_accounts(
@@ -175,10 +209,27 @@ async def get_accounts(
 @router.put(
     "/{id}",
     response_model=AccountRead,
+    responses={
+        200: {
+            "description": "Account",
+            "content": {"application/json": {"example": examples.ACCOUNT_UPDATE_RESPONSE}},
+        },
+    },
     dependencies=[Depends(check_operations_account)],
 )
 async def update_account(
-    data: AccountUpdate,
+    data: Annotated[
+        AccountUpdate,
+        Body(
+            openapi_examples={
+                "update_account": {
+                    "summary": "Update Account.",
+                    "description": ("Update an existing affiliate Account."),
+                    "value": {"name": "ibm", "external_id": "A-5678"},
+                }
+            }
+        ),
+    ],
     account_repo: AccountRepository,
     account: Annotated[Account, Depends(fetch_account_or_404)],
 ):
@@ -206,6 +257,21 @@ async def update_account(
 @router.get(
     "/{id}/users",
     response_model=LimitOffsetPage[UserRead],
+    responses={
+        200: {
+            "description": "List of Users within the Account.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "items": [examples.USER_RESPONSE],
+                        "total": 1,
+                        "limit": 10,
+                        "offset": 0,
+                    },
+                },
+            },
+        },
+    },
     dependencies=[Depends(authentication_required)],
 )
 async def list_account_users(
