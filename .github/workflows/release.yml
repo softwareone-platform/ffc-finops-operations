@@ -51,7 +51,7 @@ jobs:
       run: echo ${{ steps.docker_build.outputs.digest }}
 
   dtrack:
-    uses: softwareone-platform/ops-template/.github/workflows/dependencyTrack.yml@main
+    uses: softwareone-platform/ops-template/.github/workflows/dependency-track-python-uv.yml@v1
     with:
       projectName: 'ffc-finops-operations'
     secrets:
