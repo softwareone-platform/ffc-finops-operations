@@ -72,6 +72,7 @@ def setup_app():
     app = FastAPI(
         title="FinOps for Cloud Operations API",
         description="API to be used to manage FinOps for Cloud tool",
+        swagger_ui_parameters={"showExtensions": False, "showCommonExtensions": False},
         openapi_tags=tags_metadata,
         version="4.0.0",
         root_path="/ops/v1",
