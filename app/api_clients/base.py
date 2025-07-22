@@ -43,7 +43,12 @@ class BaseAPIClient(ABC):
         return httpx.AsyncClient(
             base_url=self.base_url,
             auth=self.auth,
-            timeout=httpx.Timeout(connect=0.25, read=30.0, write=2.0, pool=5.0),
+            timeout=httpx.Timeout(
+                connect=0.25,
+                read=self.settings.optscale_read_timeout,
+                write=2.0,
+                pool=5.0,
+            ),
         )
 
     async def __aenter__(self) -> Self:

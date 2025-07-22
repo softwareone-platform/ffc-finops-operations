@@ -116,7 +116,7 @@ async def redeem_entitlements(settings: Settings):
                     settings,
                     organization.linked_organization_id,  # type: ignore
                 )
-            except httpx.HTTPError as e:
+            except (httpx.HTTPError, httpx.ReadTimeout) as e:
                 message = f"Failed to fetch datasources for organization {organization.id}: {e}"
                 logger.error(message)
                 await send_exception("Redeem Entitlements Error", message)
