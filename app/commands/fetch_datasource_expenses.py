@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 
 import typer
 from fastapi import status
-from httpx import HTTPStatusError
+from httpx import HTTPStatusError, ReadTimeout
 
 from app.api_clients.optscale import OptscaleClient
 from app.conf import Settings
@@ -57,10 +57,11 @@ async def fetch_datasources_for_organizations(
             response = await optscale_client.fetch_datasources_for_organization(
                 organization.linked_organization_id
             )
-        except HTTPStatusError as exc:
-            response = exc.response
-
-            if exc.response.status_code == status.HTTP_404_NOT_FOUND:
+        except (HTTPStatusError, ReadTimeout) as exc:
+            if (
+                isinstance(exc, HTTPStatusError)
+                and exc.response.status_code == status.HTTP_404_NOT_FOUND
+            ):
                 msg = f"Organization {organization.id} not found on Optscale."
                 logger.warning(msg)
             else:
