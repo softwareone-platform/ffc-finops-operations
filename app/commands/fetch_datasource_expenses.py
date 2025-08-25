@@ -65,11 +65,14 @@ async def fetch_daily_organization_expenses(
 
         expenses = filter_relevant_datasources(response_datasources)
     except (HTTPStatusError, ReadTimeout) as exc:
-        if (
-            isinstance(exc, HTTPStatusError)
-            and exc.response.status_code == status.HTTP_404_NOT_FOUND
-        ):
-            logger.warning(f"Organization {organization.id} not found on Optscale.")
+        if isinstance(exc, HTTPStatusError) and exc.response.status_code in [
+            status.HTTP_404_NOT_FOUND,
+            status.HTTP_424_FAILED_DEPENDENCY,
+        ]:
+            logger.warning(
+                f"Organization {organization.id} not found or "
+                "organization doesn't have any cloud accounts connected in Optscale."
+            )
         else:
             msg = (
                 "Unexpected error occurred fetching daily "

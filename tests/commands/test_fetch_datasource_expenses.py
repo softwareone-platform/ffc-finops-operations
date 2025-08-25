@@ -400,7 +400,13 @@ async def test_organization_with_recent_updates_to_datasource_expenses(
         (
             status.HTTP_404_NOT_FOUND,
             logging.WARNING,
-            ["Organization %s not found on Optscale."],
+            [
+                "Organization %s not found on Optscale.",
+                (
+                    "Organization %s not found or organization doesn't have "
+                    "any cloud accounts connected in Optscale."
+                ),
+            ],
         ),
         (
             status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -647,7 +653,7 @@ async def test_multiple_datasources_are_handled_correctly(
         int(datetime(2025, 3, 19, 0, 0, 0).timestamp()),
         int(datetime(2025, 3, 19, 23, 59, 59).timestamp()),
         {},
-        status_code=404,
+        status_code=424,
     )
 
     with caplog.at_level(logging.WARNING):
@@ -656,7 +662,10 @@ async def test_multiple_datasources_are_handled_correctly(
             f"Skipping child datasource {org1_datasource_id3} of type azure_tenant" in caplog.text
         )
         assert f"Skipping child datasource {org1_datasource_id4} of type gcp_tenant" in caplog.text
-        assert f"Organization {organization4.id} not found on Optscale." in caplog.text
+        assert (
+            f"Organization {organization4.id} not found or "
+            "organization doesn't have any cloud accounts connected in Optscale."
+        ) in caplog.text
 
     new_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
 
