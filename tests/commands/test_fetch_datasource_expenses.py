@@ -297,7 +297,7 @@ async def test_datasource_expenses_are_updated_for_current_month(
     assert ds_exp1.month == 3
     assert ds_exp1.day == 20
     assert ds_exp1.total_expenses == Decimal("234.56")
-    assert ds_exp1.expenses is None
+    assert ds_exp1.expenses == Decimal("0.0000")
 
     assert ds_exp2_current_month.id == existing_datasource_expense2.id
     assert ds_exp2_current_month.datasource_name == "Second cloud account"
@@ -318,7 +318,7 @@ async def test_datasource_expenses_are_updated_for_current_month(
     assert ds_exp2_this_month.month == 3
     assert ds_exp2_this_month.day == 20
     assert ds_exp2_this_month.total_expenses == Decimal("678.90")
-    assert ds_exp2_this_month.expenses is None
+    assert ds_exp2_this_month.expenses == Decimal("0.0000")
 
     assert ds_exp3_this_month.id == existing_datasource_expense3.id
     assert ds_exp3_this_month.month == 3
@@ -684,9 +684,36 @@ async def test_multiple_datasources_are_handled_correctly(
     }
 
     assert expenses_data == {
-        (organization1.id, org1_datasource_id1, "11111111", 2025, 2, 20, Decimal("123.4500"), None),
-        (organization1.id, org1_datasource_id1, "11111111", 2025, 3, 20, Decimal("234.5600"), None),
-        (organization1.id, org1_datasource_id2, "12222222", 2025, 3, 20, Decimal("567.8900"), None),
+        (
+            organization1.id,
+            org1_datasource_id1,
+            "11111111",
+            2025,
+            2,
+            20,
+            Decimal("123.4500"),
+            Decimal("0.0000"),
+        ),
+        (
+            organization1.id,
+            org1_datasource_id1,
+            "11111111",
+            2025,
+            3,
+            20,
+            Decimal("234.5600"),
+            Decimal("0.0000"),
+        ),
+        (
+            organization1.id,
+            org1_datasource_id2,
+            "12222222",
+            2025,
+            3,
+            20,
+            Decimal("567.8900"),
+            Decimal("0.0000"),
+        ),
         (
             organization2.id,
             org2_datasource_id1,
@@ -697,8 +724,26 @@ async def test_multiple_datasources_are_handled_correctly(
             Decimal("999.8800"),
             Decimal("56.7800"),
         ),
-        (organization2.id, org2_datasource_id2, "22222222", 2025, 3, 20, Decimal("654.3200"), None),
-        (organization3.id, org3_datasource_id1, "31111111", 2025, 3, 20, Decimal("777.8800"), None),
+        (
+            organization2.id,
+            org2_datasource_id2,
+            "22222222",
+            2025,
+            3,
+            20,
+            Decimal("654.3200"),
+            Decimal("0.0000"),
+        ),
+        (
+            organization3.id,
+            org3_datasource_id1,
+            "31111111",
+            2025,
+            3,
+            20,
+            Decimal("777.8800"),
+            Decimal("0.0000"),
+        ),
         (organization1.id, org1_datasource_id1, "11111111", 2025, 3, 19, None, Decimal("12.3400")),
         (organization2.id, org2_datasource_id1, "21111111", 2025, 3, 19, None, Decimal("12.3400")),
         (organization3.id, org3_datasource_id1, "31111111", 2025, 3, 19, None, Decimal("12.3400")),

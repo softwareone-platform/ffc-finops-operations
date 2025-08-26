@@ -346,6 +346,10 @@ class ModelHandler[M: BaseModel]:
 
 
 class EntitlementHandler(ModelHandler[Entitlement]):
+    """
+    Handles CRUD operations for the Entitlement model.
+    """
+
     def __init__(self, session):
         super().__init__(session)
         self.default_options = [
@@ -406,10 +410,18 @@ class EntitlementHandler(ModelHandler[Entitlement]):
 
 
 class OrganizationHandler(ModelHandler[Organization]):
+    """
+    Handles CRUD operations for the Organization model.
+    """
+
     pass
 
 
 class SystemHandler(ModelHandler[System]):
+    """
+    Handles CRUD operations for the System model.
+    """
+
     def __init__(self, session):
         super().__init__(session)
         self.default_options = [
@@ -421,6 +433,10 @@ class SystemHandler(ModelHandler[System]):
 
 
 class AccountHandler(ModelHandler[Account]):
+    """
+    Handles CRUD operations for the Account model.
+    """
+
     def __init__(self, session):
         super().__init__(session)
         self.default_options = [
@@ -431,6 +447,10 @@ class AccountHandler(ModelHandler[Account]):
 
 
 class UserHandler(ModelHandler[User]):
+    """
+    Handles CRUD operations for the User model.
+    """
+
     def __init__(self, session):
         super().__init__(session)
         self.default_options = [
@@ -442,6 +462,10 @@ class UserHandler(ModelHandler[User]):
 
 
 class AccountUserHandler(ModelHandler[AccountUser]):
+    """
+    Handles CRUD operations for the AccountUser model.
+    """
+
     def __init__(self, session):
         super().__init__(session)
         self.default_options = [
@@ -491,6 +515,10 @@ class AccountUserHandler(ModelHandler[AccountUser]):
 
 
 class DatasourceExpenseHandler(ModelHandler[DatasourceExpense]):
+    """
+    Handles CRUD operations for the DatasourceExpense model.
+    """
+
     def __init__(self, session):
         super().__init__(session)
         self.default_options = [
