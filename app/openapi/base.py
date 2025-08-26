@@ -1,11 +1,14 @@
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from fastapi.routing import APIRoute
+from snippettoni.injector import inject_code_samples
+from snippettoni.renderer import SnippetRenderer
 
+from app.conf import Settings
 from app.rql import RQLQuery
 
 
-def generate_openapi_spec(app: FastAPI):
+def generate_openapi_spec(app: FastAPI, settings: Settings):
     if app.openapi_schema:  # pragma: no cover
         return app.openapi_schema
 
@@ -26,6 +29,11 @@ def generate_openapi_spec(app: FastAPI):
         description=app.description,
         tags=app.openapi_tags,
         routes=app.routes,
+    )
+    spec = inject_code_samples(
+        spec,
+        SnippetRenderer(),
+        settings.api_base_url,
     )
     app.openapi_schema = spec
     return app.openapi_schema

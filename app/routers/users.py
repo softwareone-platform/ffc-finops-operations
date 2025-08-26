@@ -5,7 +5,7 @@ import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 from sqlalchemy import ColumnExpressionArgument, Select, and_, func
 from sqlalchemy.orm import joinedload, with_loader_criteria
 
@@ -32,6 +32,7 @@ from app.dependencies.db import (
 from app.dependencies.path import AccountId, UserId
 from app.enums import AccountStatus, AccountType, AccountUserStatus, UserStatus
 from app.hasher import pbkdf2_sha256
+from app.openapi import examples
 from app.pagination import LimitOffsetPage, paginate
 from app.rql import AccountRules, RQLQuery, UserRules
 from app.schemas.accounts import AccountRead
@@ -81,6 +82,21 @@ router = APIRouter()
     "",
     dependencies=[Depends(authentication_required)],
     response_model=LimitOffsetPage[UserRead],
+    responses={
+        200: {
+            "description": "List of Users within the Account.",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "items": [examples.USER_RESPONSE],
+                        "total": 1,
+                        "limit": 10,
+                        "offset": 0,
+                    },
+                },
+            },
+        },
+    },
 )
 async def get_users(
     user_repo: UserRepository,
@@ -134,6 +150,16 @@ async def get_users(
     "",
     dependencies=[Depends(authentication_required)],
     response_model=UserInvitationRead,
+    responses={
+        201: {
+            "description": "Invited User.",
+            "content": {
+                "application/json": {
+                    "example": examples.USER_INVITE_RESPONSE,
+                },
+            },
+        },
+    },
     status_code=status.HTTP_201_CREATED,
 )
 async def invite_user(
@@ -142,7 +168,22 @@ async def invite_user(
     user_repo: UserRepository,
     account_repo: AccountRepository,
     accountuser_repo: AccountUserRepository,
-    data: AccountUserCreate,
+    data: Annotated[
+        AccountUserCreate,
+        Body(
+            openapi_examples={
+                "invite_user": {
+                    "summary": "Invite an User.",
+                    "description": "Invite a User to a given Account.",
+                    "value": {
+                        "name": "Fred Nerk",
+                        "email": "fred.nerk@example.com",
+                        "account": {"id": "FACC-5810-4583"},
+                    },
+                }
+            }
+        ),
+    ],
 ):
     """
     This method is responsible for inviting the provided user.
@@ -291,9 +332,32 @@ async def validate_and_get_account(
     "/{id}",
     dependencies=[Depends(authentication_required)],
     response_model=UserRead,
+    responses={
+        200: {
+            "description": "Invited User.",
+            "content": {
+                "application/json": {
+                    "example": examples.USER_UPDATE_RESPONSE,
+                },
+            },
+        },
+    },
 )
 async def update_user(
-    data: UserUpdate,
+    data: Annotated[
+        UserUpdate,
+        Body(
+            openapi_examples={
+                "update_user": {
+                    "summary": "Update an User.",
+                    "description": "Update the name of an User.",
+                    "value": {
+                        "name": "fred nerk",
+                    },
+                }
+            }
+        ),
+    ],
     user_repo: UserRepository,
     user: Annotated[User, Depends(fetch_user_or_404)],
 ):
@@ -315,6 +379,21 @@ async def update_user(
     "/{id}/accounts",
     dependencies=[Depends(authentication_required)],
     response_model=LimitOffsetPage[AccountRead],
+    responses={
+        200: {
+            "description": "List of User's Accounts",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "items": [examples.ACCOUNT_RESPONSE],
+                        "total": 1,
+                        "limit": 10,
+                        "offset": 0,
+                    },
+                },
+            },
+        },
+    },
 )
 async def get_user_accounts(
     user: Annotated[User, Depends(fetch_user_or_404)],
@@ -372,6 +451,14 @@ async def delete_user(
     "/{id}/disable",
     dependencies=[Depends(check_operations_account)],
     response_model=UserRead,
+    responses={
+        200: {
+            "description": "Disabled User",
+            "content": {
+                "application/json": {"example": examples.USER_DISABLED_RESPONSE},
+            },
+        },
+    },
     status_code=status.HTTP_200_OK,
 )
 async def disable_user(
@@ -402,6 +489,14 @@ async def disable_user(
     "/{id}/enable",
     dependencies=[Depends(check_operations_account)],
     response_model=UserRead,
+    responses={
+        200: {
+            "description": "Enabled User",
+            "content": {
+                "application/json": {"example": examples.USER_RESPONSE},
+            },
+        },
+    },
 )
 async def enable_user(
     user_repo: UserRepository,
@@ -432,6 +527,16 @@ async def enable_user(
     "/{id}/accounts/{account_id}/resend-invitation",
     dependencies=[Depends(authentication_required)],
     response_model=UserInvitationRead,
+    responses={
+        200: {
+            "description": "Invited User.",
+            "content": {
+                "application/json": {
+                    "example": examples.USER_INVITE_RESPONSE,
+                },
+            },
+        },
+    },
 )
 async def resend_user_invitation(
     settings: AppSettings,
@@ -496,7 +601,20 @@ async def resend_user_invitation(
     return response
 
 
-@router.get("/{id}", response_model=UserRead)
+@router.get(
+    "/{id}",
+    response_model=UserRead,
+    responses={
+        200: {
+            "description": "User.",
+            "content": {
+                "application/json": {
+                    "example": examples.USER_RESPONSE,
+                },
+            },
+        },
+    },
+)
 async def get_user_by_id(
     id: str,
     auth_context: CurrentAuthContext,
@@ -564,6 +682,16 @@ async def get_user_by_id(
 @router.post(
     "/{id}/accept-invitation",
     response_model=UserRead,
+    responses={
+        200: {
+            "description": "User.",
+            "content": {
+                "application/json": {
+                    "example": examples.USER_RESPONSE,
+                },
+            },
+        },
+    },
 )
 async def accept_user_invitation(
     id: UserId,
