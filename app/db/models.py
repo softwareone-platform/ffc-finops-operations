@@ -1,3 +1,8 @@
+"""
+Project's ORM models module: defines database models such as
+Account, Organization, Entitlement, etc.
+"""
+
 from __future__ import annotations
 
 import datetime
@@ -299,7 +304,12 @@ class DatasourceExpense(Base, HumanReadablePKMixin, TimestampMixin):
     year: Mapped[int] = mapped_column(Integer(), nullable=False)
     month: Mapped[int] = mapped_column(Integer(), nullable=False)
     day: Mapped[int] = mapped_column(Integer(), nullable=False)
-    expenses: Mapped[Decimal] = mapped_column(sa.Numeric(18, 4), nullable=True)
+    expenses: Mapped[Decimal] = mapped_column(
+        sa.Numeric(18, 4),
+        nullable=False,
+        default=Decimal("0.0000"),
+        server_default="0.0000",
+    )
     total_expenses: Mapped[Decimal] = mapped_column(sa.Numeric(18, 4), nullable=True)
 
     __table_args__ = (

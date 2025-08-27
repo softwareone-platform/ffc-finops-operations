@@ -205,7 +205,7 @@ async def store_datasource_expenses(
                     defaults,
                 )
     msg = (
-        f"{'Daily' and is_daily or 'Monthly'} expenses of {ds_count} datasources "
+        f"{'Daily' if is_daily else 'Monthly'} expenses of {ds_count} datasources "
         f"configured by {org_count} Organizations have been updated."
     )
     logger.info(msg)
