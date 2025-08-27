@@ -122,6 +122,38 @@ class MockOptscaleClient(BaseMockAPIClient[OptscaleClient]):
             status_code=status_code,
         )
 
+    def mock_fetch_daily_expenses_for_organization(
+        self,
+        organization: Organization,
+        start_period: int,
+        end_period: int,
+        expenses: dict[str, Any] | None = None,
+        status_code: int = status.HTTP_200_OK,
+    ):
+        if organization.linked_organization_id is None:
+            raise ValueError("Organization has no linked organization ID")
+
+        json = {
+            "counts": expenses,
+            "breakdown": {
+                "1754870400": expenses,
+            },
+            "start_date": start_period,
+            "end_date": end_period,
+            "total": 100.0,
+            "previous_total": 100.0,
+            "previous_range_start": start_period,
+            "breakdown_by": "cloud_account_id",
+        }
+
+        url = f"organizations/{organization.linked_organization_id}/breakdown_expenses"
+        self.add_mock_response(
+            "GET",
+            f"{url}?start_date={start_period}&end_date={end_period}&breakdown_by=cloud_account_id",
+            json=json,
+            status_code=status_code,
+        )
+
 
 @pytest.fixture
 def mock_optscale_client(test_settings: Settings, httpx_mock: HTTPXMock) -> MockOptscaleClient:

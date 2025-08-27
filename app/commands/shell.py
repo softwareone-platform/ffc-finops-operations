@@ -1,4 +1,6 @@
 # ruff: noqa T100
+import inspect
+
 from IPython.terminal.embed import InteractiveShellEmbed
 from rich import box
 from rich.console import Console
@@ -7,6 +9,21 @@ from rich.table import Table
 from app.conf import get_settings
 from app.db.base import session_factory
 from app.db import handlers
+from app.db import models
+
+
+def get_row(key, value):
+    if key == "models":
+        item_type = "ModelsPackage"
+    else:
+        item_type = type(value).__name__
+
+    if key == "session":
+        preview = "Asynchronous session to manage persistence operations for ORM-mapped objects"
+    else:
+        preview = inspect.getdoc(value) or repr(value)
+
+    return key, item_type, preview[:60]
 
 
 def command():
@@ -17,6 +34,7 @@ def command():
     namespace = {
         "settings": get_settings(),
         "session": session,
+        "models": models,
         "user_handler": handlers.UserHandler(session),
         "account_handler": handlers.AccountHandler(session),
         "account_user_handler": handlers.AccountUserHandler(session),
@@ -37,7 +55,7 @@ def command():
     table.add_column("Preview", style="dim")
 
     for key, val in namespace.items():
-        table.add_row(key, type(val).__name__, repr(val)[:60])
+        table.add_row(*get_row(key, val))
 
     console = Console()
     with console.capture() as capture:

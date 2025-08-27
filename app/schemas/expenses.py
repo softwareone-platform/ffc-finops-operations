@@ -15,3 +15,4 @@ class DatasourceExpenseRead(IdSchema, CommonEventsSchema):
     day: int
     month: int
     expenses: Decimal
+    total_expenses: Decimal

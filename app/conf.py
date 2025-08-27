@@ -8,6 +8,10 @@ PROJECT_ROOT = pathlib.Path(__file__).parent.parent
 
 
 class Settings(BaseSettings):
+    """
+    Project settings loaded from environment variables
+    """
+
     model_config = SettingsConfigDict(
         env_file=PROJECT_ROOT / ".env",
         env_file_encoding="utf-8",

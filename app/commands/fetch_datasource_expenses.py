@@ -2,8 +2,10 @@ import asyncio
 import logging
 from collections.abc import Sequence
 from datetime import UTC, datetime
+from typing import Annotated
 
 import typer
+from dateutil.relativedelta import relativedelta
 from fastapi import status
 from httpx import HTTPStatusError, ReadTimeout
 
@@ -37,11 +39,100 @@ def filter_relevant_datasources(datasources: list[dict]) -> list[dict]:
     return result
 
 
-async def fetch_datasources_for_organizations(
+async def fetch_daily_organization_expenses(
+    organization: Organization,
+    optscale_client: OptscaleClient,
+    day_start: int,
+    day_end: int,
+) -> list[dict]:
+    expenses: list[dict] = []
+
+    try:
+        logger.info("Fetching daily expenses for organization %s", organization.id)
+        response = await optscale_client.fetch_daily_expenses_for_organization(
+            organization.linked_organization_id,  # type: ignore[arg-type]
+            day_start,
+            day_end,
+        )
+
+        response_datasources = response.json()["counts"].values()
+        logger.info(
+            "Fetched %d daily datasources expenses for organization %s - %s",
+            len(response_datasources),
+            organization.id,
+            organization.name,
+        )
+
+        expenses = filter_relevant_datasources(response_datasources)
+    except (HTTPStatusError, ReadTimeout) as exc:
+        if isinstance(exc, HTTPStatusError) and exc.response.status_code in [
+            status.HTTP_404_NOT_FOUND,
+            status.HTTP_424_FAILED_DEPENDENCY,
+        ]:
+            logger.warning(
+                f"Organization {organization.id} not found or "
+                "organization doesn't have any cloud accounts connected in Optscale."
+            )
+        else:
+            msg = (
+                "Unexpected error occurred fetching daily "
+                f"expenses for organization {organization.id}"
+            )
+            logger.exception(msg)
+            await send_exception("Datasource Expenses Update Error", f"{msg}: {exc}")
+
+    return expenses
+
+
+async def fetch_total_monthly_organization_expenses(
+    organization: Organization,
+    optscale_client: OptscaleClient,
+) -> list[dict]:
+    expenses: list[dict] = []
+
+    try:
+        logger.info("Fetching monthly expenses for organization %s", organization.id)
+        response = await optscale_client.fetch_datasources_for_organization(
+            organization.linked_organization_id,  # type: ignore[arg-type]
+        )
+
+        response_datasources = response.json()["cloud_accounts"]
+        logger.info(
+            "Fetched %d datasources for organization %s - %s",
+            len(response_datasources),
+            organization.id,
+            organization.name,
+        )
+
+        expenses = filter_relevant_datasources(response_datasources)
+    except (HTTPStatusError, ReadTimeout) as exc:
+        if (
+            isinstance(exc, HTTPStatusError)
+            and exc.response.status_code == status.HTTP_404_NOT_FOUND
+        ):
+            msg = f"Organization {organization.id} not found on Optscale."
+            logger.warning(msg)
+        else:
+            msg = (
+                f"Unexpected error occurred fetching datasources for organization {organization.id}"
+            )
+            logger.exception(msg)
+            await send_exception("Datasource Expenses Update Error", f"{msg}: {exc}")
+
+    return expenses
+
+
+async def fetch_datasource_expenses(
     organizations: Sequence[Organization],
     optscale_client: OptscaleClient,
+    year: int,
+    month: int,
+    day: int,
+    is_daily: bool = False,
 ) -> dict[str, list[dict]]:
-    datasources_per_organization_id: dict[str, list[dict]] = {}
+    expenses: dict[str, list[dict]] = {}
+    day_start = int((datetime(year, month, day, 0, 0, 0, tzinfo=UTC)).timestamp())
+    day_end = int((datetime(year, month, day, 23, 59, 59, tzinfo=UTC)).timestamp())
 
     for organization in organizations:
         if organization.linked_organization_id is None:
@@ -52,86 +143,69 @@ async def fetch_datasources_for_organizations(
             )
             continue
 
-        try:
-            logger.info("Fetching datasources for organization %s", organization.id)
-            response = await optscale_client.fetch_datasources_for_organization(
-                organization.linked_organization_id
+        if is_daily:
+            organization_expenses = await fetch_daily_organization_expenses(
+                organization,
+                optscale_client,
+                day_start,
+                day_end,
             )
-        except (HTTPStatusError, ReadTimeout) as exc:
-            if (
-                isinstance(exc, HTTPStatusError)
-                and exc.response.status_code == status.HTTP_404_NOT_FOUND
-            ):
-                msg = f"Organization {organization.id} not found on Optscale."
-                logger.warning(msg)
-            else:
-                msg = (
-                    "Unexpected error occurred fetching "
-                    f"datasources for organization {organization.id}"
-                )
-                logger.exception(msg)
-                await send_exception("Datasource Expenses Update Error", f"{msg}: {exc}")
+        else:
+            organization_expenses = await fetch_total_monthly_organization_expenses(
+                organization,
+                optscale_client,
+            )
+        expenses[organization.id] = organization_expenses
 
-            continue
-
-        response_datasources = response.json()["cloud_accounts"]
-        logger.info(
-            "Fetched %d datasources for organization %s - %s",
-            len(response_datasources),
-            organization.id,
-            organization.name,
-        )
-
-        datasources_per_organization_id[organization.id] = filter_relevant_datasources(
-            response_datasources
-        )
-
-    return datasources_per_organization_id
+    return expenses
 
 
 async def store_datasource_expenses(
     datasource_expense_handler: DatasourceExpenseHandler,
-    datasources_per_organization_id: dict[str, list[dict]],
+    expenses_per_organization: dict[str, list[dict]],
     year: int,
     month: int,
     day: int,
+    is_daily: bool = False,
 ) -> None:
     org_count = 0
     ds_count = 0
-    for organization_id, datasources in datasources_per_organization_id.items():
+
+    for organization_id, datasources in expenses_per_organization.items():
         org_count += 1
         ds_count += len(datasources)
+
         for datasource in datasources:
+            defaults = {
+                "datasource_name": datasource["name"],
+                "linked_datasource_id": datasource["id"],
+                "linked_datasource_type": datasource["type"],
+            }
+            if is_daily:
+                defaults["expenses"] = datasource["total"]
+            else:
+                defaults["total_expenses"] = datasource["details"]["cost"]
+
             existing_datasource_expense, created = await datasource_expense_handler.get_or_create(
                 datasource_id=datasource["account_id"],
                 organization_id=organization_id,
                 year=year,
                 month=month,
                 day=day,
-                defaults={
-                    "expenses": datasource["details"]["cost"],
-                    "datasource_name": datasource["name"],
-                    "linked_datasource_id": datasource["id"],
-                    "linked_datasource_type": datasource["type"],
-                },
+                defaults=defaults,
                 extra_conditions=[
                     DatasourceExpense.linked_datasource_type.in_(
                         [DatasourceType.UNKNOWN, datasource["type"]]
-                    ),
+                    )
                 ],
             )
             if not created:
                 await datasource_expense_handler.update(
                     existing_datasource_expense,
-                    {
-                        "expenses": datasource["details"]["cost"],
-                        "datasource_name": datasource["name"],
-                        "linked_datasource_id": datasource["id"],
-                        "linked_datasource_type": datasource["type"],
-                    },
+                    defaults,
                 )
     msg = (
-        f"Expenses of {ds_count} Datasources "
+        f"{'Daily' if is_daily else 'Monthly'} expenses of {ds_count} datasources "
         f"configured by {org_count} Organizations have been updated."
     )
     logger.info(msg)
@@ -139,48 +213,72 @@ async def store_datasource_expenses(
 
 
 @capture_telemetry(__name__, "Update Current Month Datasource Expenses")
-async def main(settings: Settings) -> None:
+async def main(settings: Settings, organization_id: str | None = None) -> None:
     today = datetime.now(UTC).date()
+    yesterday = today - relativedelta(days=1)
 
     async with session_factory() as session:
         datasource_expense_handler = DatasourceExpenseHandler(session)
         organization_handler = OrganizationHandler(session)
 
         async with session.begin():
-            logger.info("Querying organizations with no recent datasource expenses")
-            organizations = await organization_handler.query_db()
+            if organization_id:
+                logger.info(f"Querying for provided organization {organization_id}")
+                organizations = await organization_handler.query_db(
+                    where_clauses=[Organization.id == organization_id],
+                )
+            else:
+                logger.info("Querying organizations")
+                organizations = await organization_handler.query_db()
             logger.info("Found %d organizations to process", len(organizations))
 
-        async with OptscaleClient(settings) as optscale_client:
-            logger.info("Fetching datasources for the organizations to process from Optscale")
-            datasources_per_organization_id = await fetch_datasources_for_organizations(
-                organizations,
-                optscale_client,
-            )
-            logger.info("Completed fetching datasources for organizations")
+        for day, is_daily, frq in [
+            (today, False, "monthly"),
+            (yesterday, True, "daily"),
+        ]:
+            async with OptscaleClient(settings) as optscale_client:
+                logger.info(
+                    f"Fetching {frq} datasources expenses for the organizations from Optscale"
+                )
+                expenses = await fetch_datasource_expenses(
+                    organizations, optscale_client, day.year, day.month, day.day, is_daily=is_daily
+                )
+                logger.info(f"Completed fetching {frq} expenses")
 
-        async with session.begin():
-            logger.info(
-                "Storing datasource expenses for %s organiziations for %s",
-                len(organizations),
-                today.strftime("%d %B %Y"),  # e.g. "March 2025"
-            )
-            await store_datasource_expenses(
-                datasource_expense_handler,
-                datasources_per_organization_id,
-                year=today.year,
-                month=today.month,
-                day=today.day,
-            )
+            async with session.begin():
+                logger.info(
+                    "Storing %s datasource expenses for %s organiziations for %s",
+                    frq,
+                    len(organizations),
+                    today.strftime("%d %B %Y"),  # e.g. "20 March 2025"
+                )
+                await store_datasource_expenses(
+                    datasource_expense_handler,
+                    expenses,
+                    year=day.year,
+                    month=day.month,
+                    day=day.day,
+                    is_daily=is_daily,
+                )
 
-            logger.info("Completed storing datasource expenses")
+                logger.info(f"Completed storing {frq} datasource expenses")
 
 
-def command(ctx: typer.Context) -> None:
+def command(
+    ctx: typer.Context,
+    organization: Annotated[
+        str | None,
+        typer.Option(
+            "--organization",
+            "-o",
+            help="Organization ID. Default: all organizations",
+        ),
+    ] = None,
+) -> None:
     """
     Fetch from Optscale all datasource expenses for the current month
     and store them in the database.
     """
     logger.info("Starting command function")
-    asyncio.run(main(ctx.obj))
+    asyncio.run(main(ctx.obj, organization))
     logger.info("Completed command function")
