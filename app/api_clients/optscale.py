@@ -65,6 +65,32 @@ class OptscaleClient(BaseAPIClient):
         response.raise_for_status()
         return response
 
+    async def fetch_daily_expenses_for_organization(
+        self, organization_id: UUID | str, start_period: int, end_period: int
+    ) -> httpx.Response:
+        """
+        Retrieves daily non-zero datasource expenses for the specified organization.
+        The response includes the total non-zero consumption per datasource within the given period,
+        along with a daily cost breakdown.
+        Parameters:
+        - organization_id (UUID | str): The target organization id.
+        - start_period (int): Start of the time range (Unix timestamp, inclusive).
+        - end_period (int): End of the time range (Unix timestamp, inclusive).
+        Notes:
+        - The breakdown granularity is one day.
+        - Only days with non-zero consumption are included in the response.
+        """
+        response = await self.httpx_client.get(
+            f"/organizations/{organization_id}/breakdown_expenses",
+            params={
+                "start_date": start_period,
+                "end_date": end_period,
+                "breakdown_by": "cloud_account_id",
+            },
+        )
+        response.raise_for_status()
+        return response
+
     async def fetch_datasource_by_id(self, datasource_id: UUID | str) -> httpx.Response:
         response = await self.httpx_client.get(
             f"/cloud_accounts/{datasource_id}",

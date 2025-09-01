@@ -404,7 +404,8 @@ def datasource_expense_factory(
         year: int = 2025,
         month: int = 3,
         day: int = 1,
-        expenses: float = 123.45,
+        total_expenses: float = 34567.89,
+        expenses: float | None = None,
         datasource_id: str | None = None,
         linked_datasource_id: str | None = None,
         linked_datasource_type: DatasourceType | None = None,
@@ -424,6 +425,7 @@ def datasource_expense_factory(
             month=month,
             day=day,
             expenses=expenses,
+            total_expenses=total_expenses,
             created_at=created_at or datetime.now(UTC) - timedelta(days=7),
             updated_at=updated_at or datetime.now(UTC) - timedelta(days=7),
         )
