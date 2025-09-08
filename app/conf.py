@@ -1,3 +1,4 @@
+import enum
 import pathlib
 from urllib.parse import quote
 
@@ -5,6 +6,12 @@ from pydantic import PostgresDsn, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = pathlib.Path(__file__).parent.parent
+
+
+class OpenTelemetryExporter(str, enum.Enum):
+    JAEGER = "jaeger"
+    AZURE_APP_INSIGHTS = "azure_app_insights"
+    CONSOLE = "console"
 
 
 class Settings(BaseSettings):
@@ -57,7 +64,9 @@ class Settings(BaseSettings):
     cli_rich_logging: bool = True
     debug: bool = False
 
-    azure_insights_connection_string: str | None = None
+    opentelemetry_exporter: OpenTelemetryExporter = OpenTelemetryExporter.JAEGER
+    opentelemetry_connection_string: str | None = "http://jaeger:4318/v1/traces"
+    opentelemetry_sqlalchemy_min_query_duration_ms: int | None = 100
 
     msteams_notifications_webhook_url: str | None = None
 
