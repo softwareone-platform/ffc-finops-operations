@@ -87,6 +87,7 @@ def setup_app():
         accounts.router,
         users.router,
         expenses.router,
+        systems.router,
     ):
         setup_custom_serialization(router)
 
@@ -135,10 +136,12 @@ def setup_app():
 
     app.include_router(auth.router, prefix="/auth", tags=["Auth"])
 
-    app.openapi = partial(generate_openapi_spec, app)
+    settings = get_settings()
+
+    app.openapi = partial(generate_openapi_spec, app, settings)
 
     setup_fastapi_instrumentor(
-        get_settings(),
+        settings,
         app,
     )
     return app

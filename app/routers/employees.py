@@ -1,6 +1,7 @@
 import secrets
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 
 from app.api_clients.optscale import UserDoesNotExist
 from app.dependencies.api_clients import APIModifierClient, OptscaleAuthClient, OptscaleClient
@@ -13,7 +14,21 @@ router = APIRouter(dependencies=[Depends(check_operations_account)])
 
 @router.post("", response_model=EmployeeRead, status_code=status.HTTP_201_CREATED)
 async def create_employee(
-    data: EmployeeCreate,
+    data: Annotated[
+        EmployeeCreate,
+        Body(
+            openapi_examples={
+                "create_employee": {
+                    "summary": "Create Employee.",
+                    "description": ("Create a new FinOps for Cloud Employee."),
+                    "value": {
+                        "display_name": "Harry James Potter",
+                        "email": "harry.potter@gryffindor.edu",
+                    },
+                }
+            }
+        ),
+    ],
     api_modifier_client: APIModifierClient,
     optscale_client: OptscaleClient,
 ):

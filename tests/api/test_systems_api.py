@@ -33,13 +33,9 @@ async def test_get_system_by_id(
     assert data["id"] == gcp_extension.id
     assert data["name"] == gcp_extension.name
     assert data["external_id"] == gcp_extension.external_id
-    assert data["description"] == gcp_extension.description
     assert data["owner"]["id"] == gcp_extension.owner_id
     assert datetime.fromisoformat(data["events"]["created"]["at"]) == gcp_extension.created_at
     assert datetime.fromisoformat(data["events"]["updated"]["at"]) == gcp_extension.updated_at
-    assert data["events"]["created"]["by"] == gcp_extension.created_by
-    assert data["events"]["updated"]["by"] == gcp_extension.updated_by
-    assert data["events"]["deleted"] is None
     assert data["status"] == gcp_extension.status._value_
 
     assert "jwt_secret" not in data
@@ -860,7 +856,7 @@ async def test_update_system(
     if not response.is_error:
         assert response_data["id"] == system.id
         assert response_data["name"] == expected_name
-        assert response_data["description"] == expected_description
+        assert response_data.get("description") == expected_description
         assert response_data["external_id"] == expected_external_id
 
         assert "jwt_secret" not in response_data

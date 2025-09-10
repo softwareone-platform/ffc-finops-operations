@@ -7,7 +7,6 @@ from typing import Final
 
 import jwt
 import pytest
-import stamina
 from asgi_lifespan import LifespanManager
 from faker import Faker
 from fastapi import FastAPI
@@ -553,15 +552,6 @@ async def apple_inc_organization(organization_factory: ModelFactory[Organization
         currency="USD",
         linked_organization_id=str(uuid.uuid4()),
     )
-
-
-@pytest.fixture(autouse=True, scope="session")
-def stamina_testing_mode():
-    stamina.set_testing(True, attempts=2)  # no backoff, maximum 2 attempts
-    try:
-        yield
-    finally:
-        stamina.set_testing(False)
 
 
 def assert_equal_or_raises[T](

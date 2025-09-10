@@ -14,11 +14,13 @@ class SystemBase(BaseSchema):
         Field(
             min_length=1,
             max_length=255,
-            examples=["FinOps For Cloud Marketplace Fulfillment Extension"],
+            examples=["IBM Extension"],
         ),
     ]
-    external_id: Annotated[str, Field(min_length=1, max_length=255)]
-    description: Annotated[str | None, Field(max_length=2000)] = None
+    external_id: Annotated[str, Field(min_length=1, max_length=255, examples=["IBM_EXTENSION"])]
+    description: Annotated[str | None, Field(max_length=2000, examples=["IBM Cloud Extension"])] = (
+        None
+    )
     owner: AccountReference
 
 
@@ -27,14 +29,14 @@ class SystemRead(IdSchema, CommonEventsSchema, SystemBase):
 
 
 class SystemCreate(SystemBase):
-    owner: IdSchema | None = None  # type: ignore[assignment]
+    owner: Annotated[IdSchema | None, Field(examples=["FACC-5810-4583"])] = None  # type: ignore[assignment]
     jwt_secret: Annotated[
         str | None,
         Field(
             min_length=64,
             default_factory=lambda: secrets.token_hex(64),
             examples=[
-                "eowlqbNqQiKVudOJ-x-nHE1MNQphe3llEzqCOR5FgnPgJj4gLIqD6utRB9qI-Lw64tR1_f3QEhoyJiyz1rsXAg"
+                "3e3068bfcacd587f75137afdead8f96adb016734a68630cac9e7a008458782a38ef61217d17406832f8fede61a7773866430f52084f8cac59311386e1b673261"
             ],
         ),
     ] = None
@@ -52,7 +54,7 @@ class SystemUpdate(BaseSchema):
         Field(
             min_length=1,
             max_length=255,
-            examples=["FinOps For Cloud Marketplace Fulfillment Extension"],
+            examples=["ibm extension"],
         ),
     ] = None
     external_id: Annotated[str | None, Field(min_length=1, max_length=255)] = None

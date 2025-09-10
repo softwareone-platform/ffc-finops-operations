@@ -13,6 +13,7 @@ from app.dependencies.auth import check_operations_account
 from app.dependencies.db import OrganizationRepository
 from app.dependencies.path import OrganizationId
 from app.enums import DatasourceType, OrganizationStatus
+from app.openapi import examples
 from app.pagination import LimitOffsetPage, paginate
 from app.rql import OrganizationRules, RQLQuery
 from app.schemas.core import convert_model_to_schema
@@ -28,7 +29,25 @@ from app.utils import wrap_exc_in_http_response, wrap_http_error_in_502
 router = APIRouter(dependencies=[Depends(check_operations_account)])
 
 
-@router.get("", response_model=LimitOffsetPage[OrganizationRead])
+@router.get(
+    "",
+    response_model=LimitOffsetPage[OrganizationRead],
+    responses={
+        200: {
+            "description": "List of Organizations",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "items": [examples.ORGANIZATION_RESPONSE],
+                        "total": 1,
+                        "limit": 10,
+                        "offset": 0,
+                    },
+                },
+            },
+        },
+    },
+)
 async def get_organizations(
     organization_repo: OrganizationRepository,
     base_query: Select = Depends(RQLQuery(OrganizationRules())),
@@ -36,7 +55,21 @@ async def get_organizations(
     return await paginate(organization_repo, OrganizationRead, base_query=base_query)
 
 
-@router.post("", response_model=OrganizationRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=OrganizationRead,
+    responses={
+        201: {
+            "description": "Organization",
+            "content": {
+                "application/json": {
+                    "example": examples.ORGANIZATION_RESPONSE,
+                }
+            },
+        },
+    },
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_organization(
     data: OrganizationCreate,
     organization_repo: OrganizationRepository,
@@ -97,7 +130,20 @@ async def fetch_organization_or_404(
         ) from e
 
 
-@router.get("/{organization_id}", response_model=OrganizationRead)
+@router.get(
+    "/{organization_id}",
+    response_model=OrganizationRead,
+    responses={
+        200: {
+            "description": "Organization",
+            "content": {
+                "application/json": {
+                    "example": examples.ORGANIZATION_RESPONSE,
+                }
+            },
+        },
+    },
+)
 async def get_organization_by_id(
     organization: Annotated[Organization, Depends(fetch_organization_or_404)],
 ):
@@ -222,7 +268,20 @@ async def make_organization_user_admin(
         )
 
 
-@router.put("/{organization_id}", response_model=OrganizationRead)
+@router.put(
+    "/{organization_id}",
+    response_model=OrganizationRead,
+    responses={
+        200: {
+            "description": "Organization",
+            "content": {
+                "application/json": {
+                    "example": examples.ORGANIZATION_UPDATE_RESPONSE,
+                }
+            },
+        },
+    },
+)
 async def update_organization(
     db_organization: Annotated[Organization, Depends(fetch_organization_or_404)],
     organization_repo: OrganizationRepository,
@@ -311,7 +370,7 @@ async def delete_organization_by_id(
         f"Error deleting organization {db_organization.linked_organization_id} in FinOps for Cloud."
     ):
         await optscale_client.suspend_organization(
-            organization_id=db_organization.linked_organization_id,
+            organization_id=db_organization.linked_organization_id,  # type: ignore
         )
 
     await organization_repo.delete(db_organization)

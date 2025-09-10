@@ -61,6 +61,7 @@ class Settings(BaseSettings):
     smtp_sender_email: str
     smtp_sender_name: str
 
+    api_base_url: str = "https://api.finops.softwareone.com/ops/v1"
     cli_rich_logging: bool = True
     debug: bool = False
 
