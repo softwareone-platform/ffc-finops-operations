@@ -80,6 +80,7 @@ class OrganizationRules(ModelRQLRules, AuditableMixin):
     billing_currency = FieldRule()
     status = FieldRule()
     operations_external_id = FieldRule()
+    linked_organization_id = FieldRule()
 
 
 class EntitlementRules(ModelRQLRules, AuditableMixin):
@@ -103,10 +104,13 @@ class EntitlementRules(ModelRQLRules, AuditableMixin):
 class DatasourceExpenseRules(ModelRQLRules, AuditableMixin):
     __model__ = DatasourceExpense
 
+    datasource_id = FieldRule()
     linked_datasource_id = FieldRule()
     day = FieldRule()
     month = FieldRule()
     year = FieldRule()
+    expenses = FieldRule()
+    total_expenses = FieldRule()
     organization = RelationshipRule(rules=OrganizationRules())
 
 
