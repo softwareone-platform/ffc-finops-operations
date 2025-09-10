@@ -333,3 +333,100 @@ async def test_get_all_expenses_with_expired_token(
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Unauthorized."
+
+
+async def test_get_all_expenses_with_datasource_id_filter(
+    datasource_expense_factory: ModelFactory[DatasourceExpense],
+    api_client: AsyncClient,
+    ffc_jwt_token: str,
+    faker: Faker,
+    db_session: AsyncSession,
+    get_organization,
+):
+    expense = await datasource_expense_factory(
+        organization=get_organization,
+        linked_datasource_id=faker.uuid4(str),
+        linked_datasource_type=DatasourceType.AWS_CNR,
+        datasource_name="First cloud account",
+        datasource_id="11111111",
+        year=2025,
+        month=4,
+        day=20,
+        expenses=Decimal("123.45"),
+        created_at=datetime(2025, 4, 20, 10, 0, 0, tzinfo=UTC),
+    )
+    await datasource_expense_factory(
+        organization=get_organization,
+        linked_datasource_id=faker.uuid4(str),
+        linked_datasource_type=DatasourceType.AWS_CNR,
+        datasource_name="First cloud account",
+        datasource_id="22222222",
+        year=2025,
+        month=4,
+        day=20,
+        expenses=Decimal("999.99"),
+        created_at=datetime(2025, 4, 20, 10, 0, 0, tzinfo=UTC),
+    )
+    response = await api_client.get(
+        "/expenses?eq(datasource_id,11111111)", headers={"Authorization": f"Bearer {ffc_jwt_token}"}
+    )
+
+    assert response.status_code == 200
+    ret = response.json()
+    assert ret["total"] == 1
+    assert ret["items"][0]["id"] == str(expense.id)
+
+
+@pytest.mark.parametrize(
+    "rql_filter",
+    [
+        "eq(expenses,123.45)",
+        "lt(expenses,200.00)",
+        "and(gte(expenses,100),lte(expenses,200))",
+        "eq(total_expenses,150)",
+        "and(gte(expenses,100),lte(total_expenses,200))",
+    ],
+)
+async def test_get_all_expenses_with_expenses_filter(
+    datasource_expense_factory: ModelFactory[DatasourceExpense],
+    api_client: AsyncClient,
+    ffc_jwt_token: str,
+    faker: Faker,
+    db_session: AsyncSession,
+    get_organization,
+    rql_filter: str,
+):
+    expense = await datasource_expense_factory(
+        organization=get_organization,
+        linked_datasource_id=faker.uuid4(str),
+        linked_datasource_type=DatasourceType.AWS_CNR,
+        datasource_name="First cloud account",
+        datasource_id="11111111",
+        year=2025,
+        month=4,
+        day=20,
+        expenses=Decimal("123.45"),
+        total_expenses=Decimal("150.00"),
+        created_at=datetime(2025, 4, 20, 10, 0, 0, tzinfo=UTC),
+    )
+    await datasource_expense_factory(
+        organization=get_organization,
+        linked_datasource_id=faker.uuid4(str),
+        linked_datasource_type=DatasourceType.AWS_CNR,
+        datasource_name="First cloud account",
+        datasource_id="22222222",
+        year=2025,
+        month=4,
+        day=20,
+        expenses=Decimal("999.99"),
+        total_expenses=Decimal("2000.00"),
+        created_at=datetime(2025, 4, 20, 10, 0, 0, tzinfo=UTC),
+    )
+    response = await api_client.get(
+        f"/expenses?{rql_filter}", headers={"Authorization": f"Bearer {ffc_jwt_token}"}
+    )
+
+    assert response.status_code == 200
+    ret = response.json()
+    assert ret["total"] == 1
+    assert ret["items"][0]["id"] == str(expense.id)
