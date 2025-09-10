@@ -907,3 +907,27 @@ async def test_delete_organization_optscale_issue(
     assert (
         f"Error deleting organization {db_org.linked_organization_id} in FinOps for Cloud."
     ) in response.json()["detail"]
+
+
+async def test_get_organization_with_linked_organization_id_filter(
+    organization_factory: ModelFactory[Organization], api_client: AsyncClient, ffc_jwt_token: str
+):
+    await organization_factory(
+        name="First Test Organization",
+        operations_external_id="EXTERNAL_ID_1",
+        linked_organization_id="UUID-1234-5678-9098-7654",
+    )
+    await organization_factory(
+        name="Second Test Organization",
+        operations_external_id="EXTERNAL_ID_2",
+        linked_organization_id="UUID-5678-1234-9098-7654",
+    )
+    response = await api_client.get(
+        "/organizations?eq(linked_organization_id,UUID-1234-5678-9098-7654)",
+        headers={"Authorization": f"Bearer {ffc_jwt_token}"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+    assert data["items"][0]["name"] == "First Test Organization"
