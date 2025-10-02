@@ -183,25 +183,40 @@ async def store_datasource_expenses(
             }
             if is_daily:
                 defaults["expenses"] = datasource["total"]
+
+                existing_ds_expense = await datasource_expense_handler.first(
+                    where_clauses=[
+                        DatasourceExpense.datasource_id == datasource["account_id"],
+                        DatasourceExpense.organization_id == organization_id,
+                        DatasourceExpense.year == year,
+                        DatasourceExpense.month == month,
+                        DatasourceExpense.day == day,
+                        DatasourceExpense.linked_datasource_type.in_(
+                            [DatasourceType.UNKNOWN, datasource["type"]]
+                        ),
+                    ],
+                )
+                created = False
             else:
                 defaults["total_expenses"] = datasource["details"]["cost"]
 
-            existing_datasource_expense, created = await datasource_expense_handler.get_or_create(
-                datasource_id=datasource["account_id"],
-                organization_id=organization_id,
-                year=year,
-                month=month,
-                day=day,
-                defaults=defaults,
-                extra_conditions=[
-                    DatasourceExpense.linked_datasource_type.in_(
-                        [DatasourceType.UNKNOWN, datasource["type"]]
-                    )
-                ],
-            )
-            if not created:
+                existing_ds_expense, created = await datasource_expense_handler.get_or_create(
+                    datasource_id=datasource["account_id"],
+                    organization_id=organization_id,
+                    year=year,
+                    month=month,
+                    day=day,
+                    defaults=defaults,
+                    extra_conditions=[
+                        DatasourceExpense.linked_datasource_type.in_(
+                            [DatasourceType.UNKNOWN, datasource["type"]]
+                        )
+                    ],
+                )
+
+            if not created and existing_ds_expense:
                 await datasource_expense_handler.update(
-                    existing_datasource_expense,
+                    existing_ds_expense,
                     defaults,
                 )
     msg = (

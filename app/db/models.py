@@ -310,7 +310,7 @@ class DatasourceExpense(Base, HumanReadablePKMixin, TimestampMixin):
         default=Decimal("0.0000"),
         server_default="0.0000",
     )
-    total_expenses: Mapped[Decimal] = mapped_column(sa.Numeric(18, 4), nullable=True)
+    total_expenses: Mapped[Decimal] = mapped_column(sa.Numeric(18, 4), nullable=False)
 
     __table_args__ = (
         Index("ix_datasource_expenses_year_and_month", year, month),
