@@ -37,6 +37,7 @@ async def test_create_new_datasource_expenses_single_organization(
     mock_optscale_client: MockOptscaleClient,
     organization_factory: ModelFactory[Organization],
     organization_status: OrganizationStatus,
+    datasource_expense_factory: ModelFactory[DatasourceExpense],
 ):
     mocker.patch("app.commands.fetch_datasource_expenses.send_info")
     datasource_expense_handler = DatasourceExpenseHandler(db_session)
@@ -47,6 +48,18 @@ async def test_create_new_datasource_expenses_single_organization(
 
     datasource_id1 = str(uuid.uuid4())
     datasource_id2 = str(uuid.uuid4())
+
+    existing_datasource_expense1 = await datasource_expense_factory(
+        organization=organization,
+        linked_datasource_id=datasource_id1,
+        linked_datasource_type=DatasourceType.AZURE_CNR,
+        datasource_name="First cloud account",
+        datasource_id="123456",
+        year=2025,
+        month=3,
+        day=19,
+        total_expenses=Decimal("123.45"),
+    )
 
     mock_optscale_client.mock_fetch_datasources_for_organization(
         organization,
@@ -89,12 +102,12 @@ async def test_create_new_datasource_expenses_single_organization(
     )
 
     existing_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
-    assert len(existing_datasource_expenses) == 0
+    assert len(existing_datasource_expenses) == 1
 
     await fetch_datasource_expenses.main(test_settings, organization.id)
 
     new_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
-    assert len(new_datasource_expenses) == 4
+    assert len(new_datasource_expenses) == 3
 
     ds_exp1_total = next(
         ds_exp
@@ -112,11 +125,7 @@ async def test_create_new_datasource_expenses_single_organization(
         for ds_exp in new_datasource_expenses
         if ds_exp.linked_datasource_id == datasource_id1 and ds_exp.day == 19
     )
-    ds_exp2_daily = next(
-        ds_exp
-        for ds_exp in new_datasource_expenses
-        if ds_exp.linked_datasource_id == datasource_id2 and ds_exp.day == 19
-    )
+    await db_session.refresh(existing_datasource_expense1)
 
     assert ds_exp1_total.organization_id == organization.id
     assert ds_exp1_total.year == 2025
@@ -141,14 +150,6 @@ async def test_create_new_datasource_expenses_single_organization(
     assert ds_exp1_daily.expenses == Decimal("12.34")
     assert ds_exp1_daily.datasource_name == "First cloud account"
     assert ds_exp1_daily.datasource_id == "123456"
-
-    assert ds_exp2_daily.organization_id == organization.id
-    assert ds_exp2_daily.year == 2025
-    assert ds_exp2_daily.month == 3
-    assert ds_exp2_daily.day == 19
-    assert ds_exp2_daily.expenses == Decimal("56.78")
-    assert ds_exp2_daily.datasource_name == "Second cloud account"
-    assert ds_exp2_daily.datasource_id == "654321"
 
 
 @time_machine.travel("2025-03-20T10:00:00Z", tick=False)
@@ -206,6 +207,18 @@ async def test_datasource_expenses_are_updated_for_current_month(
         total_expenses=Decimal("123.45"),
     )
 
+    existing_datasource_expense4 = await datasource_expense_factory(
+        organization=organization,
+        linked_datasource_id=datasource_id2,
+        linked_datasource_type=DatasourceType.AZURE_CNR,
+        datasource_name="Second cloud account",
+        datasource_id="22222222",
+        year=2025,
+        month=3,
+        day=19,
+        total_expenses=Decimal("123.45"),
+    )
+
     mock_optscale_client.mock_fetch_datasources_for_organization(
         organization,
         [
@@ -249,7 +262,7 @@ async def test_datasource_expenses_are_updated_for_current_month(
     )
 
     existing_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
-    assert len(existing_datasource_expenses) == 3
+    assert len(existing_datasource_expenses) == 4
 
     await fetch_datasource_expenses.main(test_settings)
 
@@ -289,6 +302,7 @@ async def test_datasource_expenses_are_updated_for_current_month(
 
     await db_session.refresh(existing_datasource_expense1)
     await db_session.refresh(existing_datasource_expense3)
+    await db_session.refresh(existing_datasource_expense4)
 
     assert ds_exp1.id == existing_datasource_expense1.id
     assert ds_exp1.datasource_name == "First cloud account"
@@ -328,7 +342,7 @@ async def test_datasource_expenses_are_updated_for_current_month(
     assert ds_exp4_this_month.datasource_name == "Second cloud account"
     assert ds_exp4_this_month.month == 3
     assert ds_exp4_this_month.day == 19
-    assert ds_exp4_this_month.total_expenses is None
+    assert ds_exp4_this_month.total_expenses == Decimal("123.45")
     assert ds_exp4_this_month.expenses == Decimal("56.78")
 
 
@@ -548,8 +562,41 @@ async def test_multiple_datasources_are_handled_correctly(
         expenses=Decimal("56.78"),
     )
 
+    existing_datasource_expense1 = await datasource_expense_factory(
+        organization=organization1,
+        linked_datasource_id=org1_datasource_id1,
+        linked_datasource_type=DatasourceType.AWS_CNR,
+        datasource_id="11111111",
+        year=2025,
+        month=3,
+        day=19,
+        total_expenses=Decimal("123.45"),
+    )
+
+    existing_datasource_expense2 = await datasource_expense_factory(
+        organization=organization2,
+        linked_datasource_id=org2_datasource_id1,
+        linked_datasource_type=DatasourceType.AWS_CNR,
+        datasource_id="21111111",
+        year=2025,
+        month=3,
+        day=19,
+        total_expenses=Decimal("123.45"),
+    )
+
+    existing_datasource_expense3 = await datasource_expense_factory(
+        organization=organization3,
+        linked_datasource_id=org3_datasource_id1,
+        linked_datasource_type=DatasourceType.AWS_CNR,
+        datasource_id="31111111",
+        year=2025,
+        month=3,
+        day=19,
+        total_expenses=Decimal("123.45"),
+    )
+
     existing_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
-    assert len(existing_datasource_expenses) == 4
+    assert len(existing_datasource_expenses) == 7
 
     mock_optscale_client.mock_fetch_datasources_for_organization(
         organization1,
@@ -669,6 +716,10 @@ async def test_multiple_datasources_are_handled_correctly(
 
     new_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
 
+    await db_session.refresh(existing_datasource_expense1)
+    await db_session.refresh(existing_datasource_expense2)
+    await db_session.refresh(existing_datasource_expense3)
+
     expenses_data = {
         (
             ds_exp.organization_id,
@@ -744,9 +795,36 @@ async def test_multiple_datasources_are_handled_correctly(
             Decimal("777.8800"),
             Decimal("0.0000"),
         ),
-        (organization1.id, org1_datasource_id1, "11111111", 2025, 3, 19, None, Decimal("12.3400")),
-        (organization2.id, org2_datasource_id1, "21111111", 2025, 3, 19, None, Decimal("12.3400")),
-        (organization3.id, org3_datasource_id1, "31111111", 2025, 3, 19, None, Decimal("12.3400")),
+        (
+            organization1.id,
+            org1_datasource_id1,
+            "11111111",
+            2025,
+            3,
+            19,
+            Decimal("123.4500"),
+            Decimal("12.3400"),
+        ),
+        (
+            organization2.id,
+            org2_datasource_id1,
+            "21111111",
+            2025,
+            3,
+            19,
+            Decimal("123.4500"),
+            Decimal("12.3400"),
+        ),
+        (
+            organization3.id,
+            org3_datasource_id1,
+            "31111111",
+            2025,
+            3,
+            19,
+            Decimal("123.4500"),
+            Decimal("12.3400"),
+        ),
     }
 
 
