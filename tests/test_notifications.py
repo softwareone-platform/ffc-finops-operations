@@ -71,58 +71,103 @@ async def test_send_notification_full(httpx_mock: HTTPXMock, mocker: MockerFixtu
                                 "wrap": True,
                             },
                             {
-                                "type": "ColumnSet",
-                                "columns": [
+                                "items": [
                                     {
-                                        "type": "Column",
-                                        "items": [
+                                        "type": "ColumnSet",
+                                        "columns": [
                                             {
-                                                "text": "Header 1",
-                                                "type": "TextBlock",
-                                                "weight": "bolder",
-                                                "wrap": True,
+                                                "type": "Column",
+                                                "items": [
+                                                    {
+                                                        "text": "Header 1",
+                                                        "type": "TextBlock",
+                                                        "color": "accent",
+                                                        "weight": "bolder",
+                                                        "wrap": True,
+                                                    },
+                                                ],
+                                                "width": "auto",
                                             },
                                             {
-                                                "text": "Row 1 Col 1",
-                                                "type": "TextBlock",
-                                                "color": "default",
-                                                "wrap": True,
-                                            },
-                                            {
-                                                "text": "Row 2 Col 1",
-                                                "type": "TextBlock",
-                                                "color": "accent",
-                                                "wrap": True,
+                                                "type": "Column",
+                                                "items": [
+                                                    {
+                                                        "text": "Header 2",
+                                                        "type": "TextBlock",
+                                                        "color": "accent",
+                                                        "weight": "bolder",
+                                                        "wrap": True,
+                                                    },
+                                                ],
+                                                "width": "auto",
                                             },
                                         ],
-                                        "width": "auto",
                                     },
                                     {
-                                        "type": "Column",
-                                        "items": [
+                                        "spacing": "small",
+                                        "type": "ColumnSet",
+                                        "columns": [
                                             {
-                                                "text": "Header 2",
-                                                "type": "TextBlock",
-                                                "weight": "bolder",
-                                                "wrap": True,
+                                                "type": "Column",
+                                                "items": [
+                                                    {
+                                                        "text": "Row 1 Col 1",
+                                                        "type": "TextBlock",
+                                                        "color": "default",
+                                                        "wrap": True,
+                                                    },
+                                                ],
+                                                "width": "auto",
                                             },
                                             {
-                                                "text": "Row 1 Col 2",
-                                                "type": "TextBlock",
-                                                "color": "default",
-                                                "wrap": True,
-                                            },
-                                            {
-                                                "text": "Row 2 Col 2",
-                                                "type": "TextBlock",
-                                                "color": "accent",
-                                                "wrap": True,
+                                                "type": "Column",
+                                                "items": [
+                                                    {
+                                                        "text": "Row 1 Col 2",
+                                                        "type": "TextBlock",
+                                                        "color": "default",
+                                                        "wrap": True,
+                                                    },
+                                                ],
+                                                "width": "auto",
                                             },
                                         ],
-                                        "width": "auto",
+                                    },
+                                    {
+                                        "spacing": "small",
+                                        "type": "ColumnSet",
+                                        "columns": [
+                                            {
+                                                "type": "Column",
+                                                "items": [
+                                                    {
+                                                        "text": "Row 2 Col 1",
+                                                        "type": "TextBlock",
+                                                        "color": "default",
+                                                        "wrap": True,
+                                                    },
+                                                ],
+                                                "width": "auto",
+                                            },
+                                            {
+                                                "type": "Column",
+                                                "items": [
+                                                    {
+                                                        "text": "Row 2 Col 2",
+                                                        "type": "TextBlock",
+                                                        "color": "default",
+                                                        "wrap": True,
+                                                    },
+                                                ],
+                                                "width": "auto",
+                                            },
+                                        ],
                                     },
                                 ],
+                                "type": "Container",
                             },
+                        ],
+                        "actions": [
                             {
                                 "title": "Open",
                                 "mode": "primary",
@@ -182,6 +227,7 @@ async def test_send_notification_simple(httpx_mock: HTTPXMock, mocker: MockerFix
                                 "wrap": True,
                             },
                         ],
+                        "actions": [],
                         "msteams": {"width": "Full"},
                     },
                 }
