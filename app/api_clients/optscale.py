@@ -54,12 +54,12 @@ class OptscaleClient(BaseAPIClient):
         return response
 
     async def fetch_datasources_for_organization(
-        self, organization_id: UUID | str
+        self, organization_id: UUID | str, details: bool = True
     ) -> httpx.Response:
         response = await self.httpx_client.get(
             f"/organizations/{organization_id}/cloud_accounts",
             params={
-                "details": "true",
+                "details": "true" if details else "false",
             },
         )
         response.raise_for_status()
