@@ -13,6 +13,7 @@ from app.commands.redeem_entitlements import fetch_datasources_for_organization,
 from app.conf import Settings
 from app.db.models import Entitlement, Organization
 from app.enums import DatasourceType, EntitlementStatus
+from app.notifications import ColumnHeader
 
 
 @time_machine.travel("2025-03-07T10:00:00Z", tick=False)
@@ -97,10 +98,10 @@ async def test_redeeem_entitlements(
         "2 Entitlements have been successfully redeemed.",
     )
     assert mocked_send_info.await_args.kwargs["details"].header == (
-        "Entitlement",
-        "Owner",
-        "Organization",
-        "Datasource",
+        ColumnHeader("Entitlement", width="stretch"),
+        ColumnHeader("Owner", width="stretch"),
+        ColumnHeader("Organization", width="stretch"),
+        ColumnHeader("Datasource", width="stretch"),
     )
     assert len(mocked_send_info.await_args.kwargs["details"].rows) == 2
 
@@ -130,7 +131,10 @@ async def test_redeeem_entitlements_error_fetching_datasources(
     assert entitlement_aws.redeemed_by is None
     mocker_send_exception.assert_awaited_once_with(
         "Redeem Entitlements Error",
-        (f"Failed to fetch datasources for organization {apple_inc_organization.id}: timed out"),
+        (
+            f"Failed to fetch datasources for organization "
+            f"{apple_inc_organization.id} (ReadTimeout): timed out"
+        ),
     )
 
 
@@ -144,7 +148,7 @@ async def test_fetch_datasources_for_organization(
     ]
     httpx_mock.add_response(
         method="GET",
-        url=f"{test_settings.optscale_rest_api_base_url}/organizations/linked_organization_id/cloud_accounts?details=true",
+        url=f"{test_settings.optscale_rest_api_base_url}/organizations/linked_organization_id/cloud_accounts?details=false",
         match_headers={"Secret": test_settings.optscale_cluster_secret},
         json={
             "cloud_accounts": datasources,
@@ -164,7 +168,7 @@ async def test_fetch_datasources_for_organization_error(
 ):
     httpx_mock.add_response(
         method="GET",
-        url=f"{test_settings.optscale_rest_api_base_url}/organizations/linked_organization_id/cloud_accounts?details=true",
+        url=f"{test_settings.optscale_rest_api_base_url}/organizations/linked_organization_id/cloud_accounts?details=false",
         status_code=500,
     )
 

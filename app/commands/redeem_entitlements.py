@@ -12,7 +12,12 @@ from app.db.base import session_factory
 from app.db.handlers import EntitlementHandler, OrganizationHandler
 from app.db.models import Entitlement, Organization
 from app.enums import EntitlementStatus, OrganizationStatus
-from app.notifications import NotificationDetails, send_exception, send_info
+from app.notifications import (
+    ColumnHeader,
+    NotificationDetails,
+    send_exception,
+    send_info,
+)
 from app.telemetry import capture_telemetry_cli_command
 
 logger = logging.getLogger(__name__)
@@ -22,7 +27,7 @@ BATCH_SIZE = 100
 
 async def fetch_datasources_for_organization(settings: Settings, organization_id: str) -> dict:
     client = OptscaleClient(settings)
-    response = await client.fetch_datasources_for_organization(organization_id)
+    response = await client.fetch_datasources_for_organization(organization_id, details=False)
     return response.json()["cloud_accounts"]
 
 
@@ -117,7 +122,10 @@ async def redeem_entitlements(settings: Settings):
                     organization.linked_organization_id,  # type: ignore
                 )
             except (httpx.HTTPError, httpx.ReadTimeout) as e:
-                message = f"Failed to fetch datasources for organization {organization.id}: {e}"
+                message = (
+                    f"Failed to fetch datasources for organization {organization.id} "
+                    f"({type(e).__name__}): {str(e) or repr(e)}"
+                )
                 logger.error(message)
                 await send_exception("Redeem Entitlements Error", message)
                 continue
@@ -138,13 +146,18 @@ async def redeem_entitlements(settings: Settings):
                     "Redeem Entitlements Success",
                     msg,
                     details=NotificationDetails(
-                        header=("Entitlement", "Owner", "Organization", "Datasource"),
+                        header=(
+                            ColumnHeader("Entitlement", width="stretch"),
+                            ColumnHeader("Owner", width="stretch"),
+                            ColumnHeader("Organization", width="stretch"),
+                            ColumnHeader("Datasource", width="stretch"),
+                        ),
                         rows=[
                             (
-                                f"{ent.id}\n\n{ent.name}",
-                                f"{ent.owner.id}\n\n{ent.owner.name}",
-                                f"{ent.redeemed_by.id}\n\n{ent.redeemed_by.name}",  # type: ignore
-                                f"{ent.datasource_id}\n\n{ent.linked_datasource_name}",
+                                f"{ent.id}\t/\t{ent.name}",
+                                f"{ent.owner.id}\t/\t{ent.owner.name}",
+                                f"{ent.redeemed_by.id}\t/\t{ent.redeemed_by.name}",  # type: ignore
+                                f"{ent.datasource_id}\t/\t{ent.linked_datasource_name}",
                             )
                             for ent in redeemed_entitlements
                         ],
