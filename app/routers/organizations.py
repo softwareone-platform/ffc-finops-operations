@@ -118,6 +118,16 @@ async def create_organization(
         return convert_model_to_schema(OrganizationRead, db_organization)
 
 
+def validate_linked_organization_id(organization: Organization):
+    if organization.linked_organization_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Organization {organization.name} has no associated FinOps for Cloud organization."
+            ),
+        )
+
+
 async def fetch_organization_or_404(
     organization_id: OrganizationId, organization_repo: OrganizationRepository
 ) -> Organization:
@@ -155,13 +165,7 @@ async def get_datasources_by_organization_id(
     organization: Annotated[Organization, Depends(fetch_organization_or_404)],
     optscale_client: OptscaleClient,
 ):
-    if organization.linked_organization_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                f"Organization {organization.name} has no associated FinOps for Cloud organization."
-            ),
-        )
+    validate_linked_organization_id(organization)
 
     with wrap_http_error_in_502(f"Error fetching datasources for organization {organization.name}"):
         response = await optscale_client.fetch_datasources_for_organization(
@@ -190,13 +194,7 @@ async def get_datasource_by_id(
     datasource_id: UUID,
     optscale_client: OptscaleClient,
 ):
-    if organization.linked_organization_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                f"Organization {organization.name} has no associated FinOps for Cloud organization."
-            ),
-        )
+    validate_linked_organization_id(organization)
 
     with wrap_http_error_in_502(f"Error fetching cloud account with ID {datasource_id}"):
         response = await optscale_client.fetch_datasource_by_id(datasource_id)
@@ -214,19 +212,35 @@ async def get_datasource_by_id(
     )
 
 
+@router.post(
+    "/{organization_id}/datasources/{datasource_id}/force-reimport",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def force_reimport_datasource(
+    organization: Annotated[Organization, Depends(fetch_organization_or_404)],
+    datasource_id: UUID,
+    optscale_client: OptscaleClient,
+):
+    validate_linked_organization_id(organization)
+    with wrap_http_error_in_502(
+        f"Error scheduling import of cloud account with ID {datasource_id}"
+    ):
+        await optscale_client.update_datasource(
+            datasource_id=datasource_id,
+            payload={
+                "last_import_at": 0,
+                "last_import_modified_at": 0,
+            },
+        )
+        await optscale_client.force_reimport_datasource(datasource_id)
+
+
 @router.get("/{organization_id}/employees", response_model=list[EmployeeRead])
 async def get_employees_by_organization_id(
     organization: Annotated[Organization, Depends(fetch_organization_or_404)],
     optscale_client: OptscaleClient,
 ):
-    if organization.linked_organization_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                f"Organization {organization.name} has no associated FinOps for Cloud organization."
-            ),
-        )
-
+    validate_linked_organization_id(organization)
     with wrap_http_error_in_502(f"Error fetching employees for organization {organization.name}"):
         response = await optscale_client.fetch_users_for_organization(
             organization_id=organization.linked_organization_id

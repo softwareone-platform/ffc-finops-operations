@@ -351,3 +351,83 @@ async def test_get_datasource_by_id_for_organization_with_no_organization_id(
     assert response.json() == {
         "detail": f"Organization {org.name} has no associated FinOps for Cloud organization."
     }
+
+
+async def test_force_reimport_datasource(
+    organization_factory: ModelFactory[Organization],
+    test_settings: Settings,
+    httpx_mock: HTTPXMock,
+    operations_client: AsyncClient,
+):
+    org = await organization_factory(
+        linked_organization_id=str(uuid.uuid4()),
+    )
+    datasource_id = str(uuid.uuid4())
+    httpx_mock.add_response(
+        method="PATCH",
+        url=f"{test_settings.optscale_rest_api_base_url}/cloud_accounts/{datasource_id}",
+        match_headers={"Secret": test_settings.optscale_cluster_secret},
+        status_code=200,
+    )
+    httpx_mock.add_response(
+        method="POST",
+        url=f"{test_settings.optscale_rest_api_base_url}/schedule_imports",
+        match_headers={"Secret": test_settings.optscale_cluster_secret},
+        status_code=200,
+    )
+
+    response = await operations_client.post(
+        f"/organizations/{org.id}/datasources/{datasource_id}/force-reimport",
+    )
+
+    assert response.status_code == 204
+
+
+async def test_force_reimport_datasource_no_linked_organization_id(
+    organization_factory: ModelFactory[Organization],
+    test_settings: Settings,
+    operations_client: AsyncClient,
+):
+    org = await organization_factory(
+        linked_organization_id=None,
+    )
+
+    response = await operations_client.post(
+        f"/organizations/{org.id}/datasources/{str(uuid.uuid4())}/force-reimport",
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": f"Organization {org.name} has no associated FinOps for Cloud organization."
+    }
+
+
+async def test_force_reimport_datasource_optscale_error(
+    organization_factory: ModelFactory[Organization],
+    test_settings: Settings,
+    httpx_mock: HTTPXMock,
+    operations_client: AsyncClient,
+):
+    org = await organization_factory(
+        linked_organization_id=str(uuid.uuid4()),
+    )
+    datasource_id = str(uuid.uuid4())
+    httpx_mock.add_response(
+        method="PATCH",
+        url=f"{test_settings.optscale_rest_api_base_url}/cloud_accounts/{datasource_id}",
+        match_headers={"Secret": test_settings.optscale_cluster_secret},
+        status_code=200,
+    )
+    httpx_mock.add_response(
+        method="POST",
+        url=f"{test_settings.optscale_rest_api_base_url}/schedule_imports",
+        match_headers={"Secret": test_settings.optscale_cluster_secret},
+        status_code=400,
+    )
+
+    response = await operations_client.post(
+        f"/organizations/{org.id}/datasources/{datasource_id}/force-reimport",
+    )
+
+    assert response.status_code == 502
+    assert "Error scheduling import" in response.json()["detail"]
