@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from typing import Any
 from uuid import UUID
 
 import httpx
@@ -103,6 +104,18 @@ class OptscaleClient(BaseAPIClient):
         response.raise_for_status()
         return response
 
+    async def update_datasource(
+        self,
+        datasource_id: UUID | str,
+        payload: dict[str, Any],
+    ) -> httpx.Response:
+        response = await self.httpx_client.patch(
+            f"/cloud_accounts/{datasource_id}",
+            data=payload,
+        )
+        response.raise_for_status()
+        return response
+
     async def fetch_users_for_organization(self, organization_id: UUID | str) -> httpx.Response:
         response = await self.httpx_client.get(
             f"/organizations/{organization_id}/employees",
@@ -139,6 +152,17 @@ class OptscaleClient(BaseAPIClient):
         response = await self.httpx_client.patch(
             f"/organizations/{organization_id}",
             json={"disabled": True},
+        )
+        response.raise_for_status()
+        return response
+
+    async def force_reimport_datasource(self, datasource_id: UUID | str):
+        response = await self.httpx_client.post(
+            "/schedule_imports",
+            json={
+                "cloud_account_id": str(datasource_id),
+                "priority": 5,
+            },
         )
         response.raise_for_status()
         return response
