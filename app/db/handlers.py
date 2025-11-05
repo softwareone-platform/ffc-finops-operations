@@ -400,7 +400,7 @@ class EntitlementHandler(ModelHandler[Entitlement]):
             entitlement,
             data={
                 "status": EntitlementStatus.ACTIVE,
-                "redeemed_at": datetime.now(UTC),
+                "redeemed_at": entitlement.redeem_at or datetime.now(UTC),
                 "redeemed_by": redeemer_organization,
                 "linked_datasource_id": str(datasource_id),
                 "linked_datasource_type": datasource_type,

@@ -23,6 +23,7 @@ class EntitlementBase(BaseSchema):
     datasource_id: Annotated[
         str, Field(min_length=1, max_length=255, examples=["1098a2fa-07c0-4f40-96c7-3bf32a213e0e"])
     ]
+    redeem_at: datetime.datetime | None = None
 
 
 class EntitlementCreate(EntitlementBase):

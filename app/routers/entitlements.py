@@ -89,6 +89,11 @@ async def create_entitlement(
                 detail="Affiliate accounts cannot provide an owner for an Entitlement.",
             )
         owner = auth_context.account  # type: ignore
+        if data.redeem_at:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Affiliate accounts cannot provide a redeem_at for an Entitlement.",
+            )
     else:
         if not data.owner:
             raise HTTPException(

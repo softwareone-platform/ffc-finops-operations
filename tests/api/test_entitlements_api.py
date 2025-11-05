@@ -133,6 +133,27 @@ async def test_create_entitlement_by_affiliate_with_owner(
     assert error_msg == "Affiliate accounts cannot provide an owner for an Entitlement."
 
 
+async def test_create_entitlement_by_affiliate_with_redeem_at(
+    api_client: AsyncClient,
+    gcp_jwt_token: str,
+):
+    response = await api_client.post(
+        "/entitlements",
+        headers={"Authorization": f"Bearer {gcp_jwt_token}"},
+        json={
+            "name": "AWS",
+            "affiliate_external_id": "EXTERNAL_ID_987123",
+            "datasource_id": "ds-id",
+            "redeem_at": datetime.now(UTC).isoformat(),
+        },
+    )
+
+    assert response.status_code == 400
+    error_msg = response.json()["detail"]
+
+    assert error_msg == "Affiliate accounts cannot provide a redeem_at for an Entitlement."
+
+
 async def test_create_entitlement_by_operations_with_owner(
     api_client: AsyncClient,
     ffc_jwt_token: str,
@@ -146,12 +167,14 @@ async def test_create_entitlement_by_operations_with_owner(
             "affiliate_external_id": "EXTERNAL_ID_987123",
             "datasource_id": "ds-id",
             "owner": {"id": affiliate_account.id},
+            "redeem_at": datetime.now(UTC).isoformat(),
         },
     )
 
     assert response.status_code == 201
     entitlement = response.json()
     assert entitlement["owner"]["id"] == affiliate_account.id
+    assert entitlement["redeem_at"] is not None
 
 
 async def test_create_entitlement_by_operations_without_owner(
@@ -679,6 +702,60 @@ async def test_redeem_entitlement_success(
     assert entitlement_gcp.linked_datasource_id == entitlement_gcp.datasource_id
     assert entitlement_gcp.linked_datasource_name == "GCP Dev Project"
     assert entitlement_gcp.linked_datasource_type == DatasourceType.GCP_CNR
+
+
+async def test_redeem_entitlement_with_set_redeem_at(
+    operations_client: AsyncClient,
+    entitlement_gcp_with_redeem_at: Entitlement,
+    organization_factory,
+    db_session: AsyncSession,
+    httpx_mock: HTTPXMock,
+    test_settings: Settings,
+):
+    organization = await organization_factory(
+        name="Test Organization",
+        currency="USD",
+        operations_external_id="ORG-123456",
+        linked_organization_id="FORG-123456789012",
+    )
+
+    httpx_mock.add_response(
+        method="GET",
+        url=(
+            f"{test_settings.optscale_rest_api_base_url}/cloud_accounts/"
+            f"{entitlement_gcp_with_redeem_at.datasource_id}?details=true"
+        ),
+        match_headers={"Secret": test_settings.optscale_cluster_secret},
+        json={
+            "id": entitlement_gcp_with_redeem_at.datasource_id,
+            "name": "GCP Dev Project",
+            "type": "gcp_cnr",
+            "organization_id": "FORG-123456789012",
+        },
+    )
+
+    response = await operations_client.post(
+        f"/entitlements/{entitlement_gcp_with_redeem_at.id}/redeem",
+        json={
+            "organization": {"id": organization.id},
+            "datasource": {
+                "id": entitlement_gcp_with_redeem_at.datasource_id,
+                "name": "GCP Dev",
+                "type": "gcp_cnr",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["id"] == str(entitlement_gcp_with_redeem_at.id)
+    assert data["status"] == "active"
+
+    await db_session.refresh(entitlement_gcp_with_redeem_at)
+    redeemed = data["events"]["redeemed"]["at"]
+    assert datetime.fromisoformat(redeemed) == entitlement_gcp_with_redeem_at.redeem_at
+    assert entitlement_gcp_with_redeem_at.status == EntitlementStatus.ACTIVE
 
 
 async def test_redeem_entitlement_by_affiliate(
