@@ -70,7 +70,7 @@ async def process_datasource(
                 instance,
                 data={
                     "status": EntitlementStatus.ACTIVE,
-                    "redeemed_at": datetime.now(UTC),
+                    "redeemed_at": instance.redeem_at or datetime.now(UTC),
                     "redeemed_by": organization,
                     "linked_datasource_id": datasource["id"],
                     "linked_datasource_type": datasource["type"],
