@@ -356,3 +356,5 @@ class Entitlement(Base, HumanReadablePKMixin, AuditableMixin):
     terminated_at: Mapped[datetime.datetime | None] = mapped_column(sa.DateTime(timezone=True))
     terminated_by_id: Mapped[str | None] = mapped_column(ForeignKey("actors.id"))
     terminated_by: Mapped[Actor | None] = relationship(foreign_keys=[terminated_by_id])
+
+    redeem_at: Mapped[datetime.datetime | None] = mapped_column(sa.DateTime(timezone=True))

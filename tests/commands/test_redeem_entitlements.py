@@ -24,6 +24,7 @@ async def test_redeeem_entitlements(
     apple_inc_organization: Organization,
     entitlement_aws: Entitlement,
     entitlement_gcp: Entitlement,
+    entitlement_gcp_with_redeem_at: Entitlement,
 ):
     mocker.patch(
         "app.commands.redeem_entitlements.fetch_datasources_for_organization",
@@ -38,7 +39,7 @@ async def test_redeeem_entitlements(
                 "id": "ds2",
                 "name": "azure ds",
                 "type": "azure_cnr",
-                "account_id": "azure-account-id",
+                "account_id": entitlement_gcp_with_redeem_at.datasource_id,
             },
             {"id": "ds3", "name": "gcp ds", "type": "gcp_cnr", "account_id": "gcp-account-id"},
             {
@@ -91,11 +92,19 @@ async def test_redeeem_entitlements(
     assert entitlement_gcp.redeemed_at is not None
     assert entitlement_gcp.redeemed_at == datetime.now(UTC)
 
+    await db_session.refresh(entitlement_gcp_with_redeem_at)
+    assert entitlement_gcp_with_redeem_at.linked_datasource_id == "ds2"
+    assert entitlement_gcp_with_redeem_at.linked_datasource_name == "azure ds"
+    assert entitlement_gcp_with_redeem_at.linked_datasource_type == DatasourceType.AZURE_CNR
+    assert entitlement_gcp_with_redeem_at.status == EntitlementStatus.ACTIVE
+    assert entitlement_gcp_with_redeem_at.redeemed_by == apple_inc_organization
+    assert entitlement_gcp_with_redeem_at.redeemed_at == entitlement_gcp_with_redeem_at.redeem_at
+
     assert mocked_send_info.await_count == 1
     assert mocked_send_info.await_args is not None
     assert mocked_send_info.await_args.args == (
         "Redeem Entitlements Success",
-        "2 Entitlements have been successfully redeemed.",
+        "3 Entitlements have been successfully redeemed.",
     )
     assert mocked_send_info.await_args.kwargs["details"].header == (
         ColumnHeader("Entitlement", width="stretch"),
@@ -103,7 +112,7 @@ async def test_redeeem_entitlements(
         ColumnHeader("Organization", width="stretch"),
         ColumnHeader("Datasource", width="stretch"),
     )
-    assert len(mocked_send_info.await_args.kwargs["details"].rows) == 2
+    assert len(mocked_send_info.await_args.kwargs["details"].rows) == 3
 
 
 async def test_redeeem_entitlements_error_fetching_datasources(

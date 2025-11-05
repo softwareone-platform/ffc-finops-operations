@@ -201,6 +201,7 @@ def entitlement_factory(
         updated_by: Actor | None = None,
         owner: Account | None = None,
         status: EntitlementStatus | None = None,
+        redeem_at: datetime | None = None,
     ) -> Entitlement:
         entitlement = Entitlement(
             name=name or "AWS",
@@ -212,6 +213,7 @@ def entitlement_factory(
             updated_by=updated_by,
             status=status or EntitlementStatus.NEW,
             owner=owner or await account_factory(),
+            redeem_at=redeem_at,
         )
         db_session.add(entitlement)
         await db_session.commit()
@@ -530,6 +532,20 @@ async def entitlement_gcp(
         owner=gcp_extension.owner,
         created_by=gcp_extension,
         updated_by=gcp_extension,
+    )
+
+
+@pytest.fixture
+async def entitlement_gcp_with_redeem_at(
+    entitlement_factory: ModelFactory[Entitlement],
+    gcp_extension: System,
+) -> Entitlement:
+    return await entitlement_factory(
+        name="GCP",
+        owner=gcp_extension.owner,
+        created_by=gcp_extension,
+        updated_by=gcp_extension,
+        redeem_at=datetime.now(UTC) - timedelta(days=1),
     )
 
 
