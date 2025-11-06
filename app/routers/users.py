@@ -112,7 +112,7 @@ async def get_users(
     2. Authentication is provided, and the Account is AFFILIATE. In this case, the query is run only
     if the Account User status is not DELETED and the users belong to the authenticated account
      if the account is affiliated, the query will return all the users in the DB that
-     satisfie the condition that the User's account is the same as the authenticated account
+     satisfies the condition that the User's account is the same as the authenticated account
      and the account's status is not DELETED.
 
 
@@ -730,7 +730,7 @@ async def accept_user_invitation(
             logger.info("Set invitation to expired")
             account_user.status = AccountUserStatus.INVITATION_EXPIRED
             await accountuser_handler.update(account_user)
-            # this commmit must be forced otherwise the exception
+            # this commit must be forced otherwise the exception
             # raised just after make the session to rollback the transaction
             await db_session.commit()
         raise HTTPException(
