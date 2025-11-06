@@ -42,6 +42,11 @@ from app.enums import (
     UserStatus,
 )
 
+FKEY_ORGANIZATION = "organizations.id"
+FKEY_ACTOR = "actors.id"
+FKEY_ACCOUNT = "accounts.id"
+FKEY_USER = "users.id"
+
 
 class Base(DeclarativeBase):
     id: Mapped[str] = mapped_column(
@@ -88,9 +93,9 @@ class Actor(Base, HumanReadablePKMixin):
 
 
 class AuditableMixin(TimestampMixin):
-    created_by_id: Mapped[str | None] = mapped_column(ForeignKey("actors.id"), name="created_by")
-    updated_by_id: Mapped[str | None] = mapped_column(ForeignKey("actors.id"), name="updated_by")
-    deleted_by_id: Mapped[str | None] = mapped_column(ForeignKey("actors.id"), name="deleted_by")
+    created_by_id: Mapped[str | None] = mapped_column(ForeignKey(FKEY_ACTOR), name="created_by")
+    updated_by_id: Mapped[str | None] = mapped_column(ForeignKey(FKEY_ACTOR), name="updated_by")
+    deleted_by_id: Mapped[str | None] = mapped_column(ForeignKey(FKEY_ACTOR), name="deleted_by")
 
     @declared_attr
     def created_by(cls) -> Mapped[Actor]:
@@ -157,7 +162,7 @@ class System(Actor, AuditableMixin):
     PK_PREFIX = "FTKN"
     PK_NUM_LENGTH = 8
 
-    id: Mapped[str] = mapped_column(ForeignKey("actors.id"), primary_key=True)
+    id: Mapped[str] = mapped_column(ForeignKey(FKEY_ACTOR), primary_key=True)
     description: Mapped[str | None] = mapped_column(Text(), nullable=True)
     external_id: Mapped[str] = mapped_column(String(255), nullable=False)
     jwt_secret: Mapped[str] = mapped_column(
@@ -166,7 +171,7 @@ class System(Actor, AuditableMixin):
         ),
         nullable=False,
     )
-    owner_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"))
+    owner_id: Mapped[str] = mapped_column(ForeignKey(FKEY_ACCOUNT))
     owner: Mapped[Account] = relationship(foreign_keys=[owner_id])
     status: Mapped[SystemStatus] = mapped_column(
         Enum(SystemStatus, values_callable=lambda obj: [e.value for e in obj]),
@@ -197,13 +202,13 @@ class User(Actor, HumanReadablePKMixin, AuditableMixin):
     PK_PREFIX = "FUSR"
     PK_NUM_LENGTH = 8
 
-    id: Mapped[str] = mapped_column(ForeignKey("actors.id"), primary_key=True)
+    id: Mapped[str] = mapped_column(ForeignKey(FKEY_ACTOR), primary_key=True)
     email: Mapped[str] = mapped_column(String(255), nullable=False)
     password: Mapped[str | None] = mapped_column(String(255), nullable=True)
     last_login_at: Mapped[datetime.datetime | None] = mapped_column(
         sa.DateTime(timezone=True), nullable=True
     )
-    last_used_account_id: Mapped[str | None] = mapped_column(ForeignKey("accounts.id"))
+    last_used_account_id: Mapped[str | None] = mapped_column(ForeignKey(FKEY_ACCOUNT))
     last_used_account: Mapped[Account | None] = relationship(foreign_keys=[last_used_account_id])
     pwd_reset_token: Mapped[str | None] = mapped_column(String(255), nullable=True)
     pwd_reset_token_expires_at: Mapped[datetime.datetime | None] = mapped_column(
@@ -238,8 +243,8 @@ class AccountUser(Base, AuditableMixin, HumanReadablePKMixin):
     PK_PREFIX = "FAUR"
     PK_NUM_LENGTH = 12
 
-    account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"))
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    account_id: Mapped[str] = mapped_column(ForeignKey(FKEY_ACCOUNT))
+    user_id: Mapped[str] = mapped_column(ForeignKey(FKEY_USER))
     account: Mapped[Account] = relationship(back_populates="users", foreign_keys=[account_id])
     user: Mapped[User] = relationship(back_populates="accounts", foreign_keys=[user_id])
     invitation_token: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -297,7 +302,7 @@ class DatasourceExpense(Base, HumanReadablePKMixin, TimestampMixin):
         Enum(DatasourceType, values_callable=lambda obj: [e.value for e in obj]),
     )
     datasource_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"))
+    organization_id: Mapped[str] = mapped_column(ForeignKey(FKEY_ORGANIZATION))
 
     organization: Mapped[Organization] = relationship(lazy="noload", foreign_keys=[organization_id])
 
@@ -341,7 +346,7 @@ class Entitlement(Base, HumanReadablePKMixin, AuditableMixin):
         nullable=True,
     )
     linked_datasource_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    owner_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), nullable=False)
+    owner_id: Mapped[str] = mapped_column(ForeignKey(FKEY_ACCOUNT), nullable=False)
     owner: Mapped[Account] = relationship(foreign_keys=[owner_id], lazy="joined")
     status: Mapped[EntitlementStatus] = mapped_column(
         Enum(EntitlementStatus, values_callable=lambda obj: [e.value for e in obj]),
@@ -350,11 +355,23 @@ class Entitlement(Base, HumanReadablePKMixin, AuditableMixin):
         server_default=EntitlementStatus.NEW.value,
     )
     redeemed_at: Mapped[datetime.datetime | None] = mapped_column(sa.DateTime(timezone=True))
-    redeemed_by_id: Mapped[str | None] = mapped_column(ForeignKey("organizations.id"))
+    redeemed_by_id: Mapped[str | None] = mapped_column(ForeignKey(FKEY_ORGANIZATION))
     redeemed_by: Mapped[Organization | None] = relationship(foreign_keys=[redeemed_by_id])
 
     terminated_at: Mapped[datetime.datetime | None] = mapped_column(sa.DateTime(timezone=True))
-    terminated_by_id: Mapped[str | None] = mapped_column(ForeignKey("actors.id"))
+    terminated_by_id: Mapped[str | None] = mapped_column(ForeignKey(FKEY_ACTOR))
     terminated_by: Mapped[Actor | None] = relationship(foreign_keys=[terminated_by_id])
 
     redeem_at: Mapped[datetime.datetime | None] = mapped_column(sa.DateTime(timezone=True))
+
+
+class AdditionalAdminRequest(Base, HumanReadablePKMixin, AuditableMixin):
+    __tablename__ = "additionaladminrequests"
+    PK_PREFIX = "FAAR"
+    PK_NUM_LENGTH = 8
+
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    notes: Mapped[str] = mapped_column(Text(), nullable=False)
+    display_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    organization_id: Mapped[str] = mapped_column(ForeignKey(FKEY_ORGANIZATION))
+    organization: Mapped[Organization] = relationship(foreign_keys=[organization_id], lazy="joined")

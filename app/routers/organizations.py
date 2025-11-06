@@ -1,3 +1,5 @@
+import logging
+import secrets
 from typing import Annotated
 from uuid import UUID
 
@@ -5,12 +7,12 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import Select
 
-from app.auth.context import auth_context
+from app.api_clients.optscale import UserDoesNotExist
 from app.db.handlers import ConstraintViolationError, NotFoundError
-from app.db.models import Organization
+from app.db.models import AdditionalAdminRequest, Organization
 from app.dependencies.api_clients import APIModifierClient, OptscaleAuthClient, OptscaleClient
 from app.dependencies.auth import check_operations_account
-from app.dependencies.db import OrganizationRepository
+from app.dependencies.db import AdditionalAdminRequestRepository, OrganizationRepository
 from app.dependencies.path import OrganizationId
 from app.enums import DatasourceType, OrganizationStatus
 from app.openapi import examples
@@ -19,6 +21,8 @@ from app.rql import OrganizationRules, RQLQuery
 from app.schemas.core import convert_model_to_schema
 from app.schemas.employees import EmployeeRead
 from app.schemas.organizations import (
+    AdditionalAdminRequestCreate,
+    AdditionalAdminRequestRead,
     DatasourceRead,
     OrganizationCreate,
     OrganizationRead,
@@ -27,6 +31,7 @@ from app.schemas.organizations import (
 from app.utils import wrap_exc_in_http_response, wrap_http_error_in_502
 
 router = APIRouter(dependencies=[Depends(check_operations_account)])
+logger = logging.getLogger(__name__)
 
 
 @router.get(
@@ -77,8 +82,6 @@ async def create_organization(
 ):
     db_organization: Organization | None = None
     defaults = data.model_dump(exclude_unset=True, exclude={"user_id"})
-    defaults["created_by"] = auth_context.get().get_actor()
-    defaults["updated_by"] = auth_context.get().get_actor()
     db_organization, created = await organization_repo.get_or_create(
         defaults=defaults,
         operations_external_id=data.operations_external_id,
@@ -169,7 +172,7 @@ async def get_datasources_by_organization_id(
 
     with wrap_http_error_in_502(f"Error fetching datasources for organization {organization.name}"):
         response = await optscale_client.fetch_datasources_for_organization(
-            organization_id=organization.linked_organization_id
+            organization_id=organization.linked_organization_id  # type: ignore
         )
 
     datasources = response.json()["cloud_accounts"]
@@ -243,7 +246,7 @@ async def get_employees_by_organization_id(
     validate_linked_organization_id(organization)
     with wrap_http_error_in_502(f"Error fetching employees for organization {organization.name}"):
         response = await optscale_client.fetch_users_for_organization(
-            organization_id=organization.linked_organization_id
+            organization_id=organization.linked_organization_id  # type: ignore
         )
 
     users = response.json()["employees"]
@@ -273,11 +276,11 @@ async def make_organization_user_admin(
 ):
     with wrap_http_error_in_502("Error making employee admin in FinOps for Cloud"):
         # check user exists in optscale
-        response = await optscale_client.fetch_user_by_id(str(user_id))
+        response = await optscale_client.fetch_user_by_id(user_id)
         user = response.json()
         # assign admin role of current organization to the user
         await optscale_auth_client.make_user_admin(
-            str(organization.linked_organization_id),
+            organization.linked_organization_id,  # type: ignore
             user["auth_user_id"],
         )
 
@@ -388,3 +391,81 @@ async def delete_organization_by_id(
         )
 
     await organization_repo.delete(db_organization)
+
+
+@router.post("/{organization_id}/add-admin", status_code=status.HTTP_200_OK)
+async def add_additional_admin(
+    db_organization: Annotated[Organization, Depends(fetch_organization_or_404)],
+    optscale_client: OptscaleClient,
+    optscale_auth_client: OptscaleAuthClient,
+    api_modifier_client: APIModifierClient,
+    additional_admin_repo: AdditionalAdminRequestRepository,
+    data: AdditionalAdminRequestCreate,
+):
+    """
+    This endpoint adds additional admins to FinOps for Cloud.
+    If the user to be added as an admin does not exist, it will be created and added to
+    the given organization's id, and the reset flow will also be triggered
+    to allow the user to set a new password.
+    """
+    new_user_created = False
+    if db_organization.status == OrganizationStatus.DELETED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot add administrator: organization {db_organization.name} is deleted.",
+        )
+    # fetch user by email
+    with wrap_http_error_in_502("Error checking or creating user in FinOps for Cloud"):
+        try:
+            response = await optscale_auth_client.get_existing_user_info(data.email)
+            user_data = response.json()["user_info"]
+        except UserDoesNotExist:
+            response = await api_modifier_client.create_user(
+                email=data.email,
+                display_name=data.display_name,
+                password=secrets.token_urlsafe(128),
+            )
+
+            logger.info(f"User {data.display_name} - {data.email} created in FinOps for Cloud.")
+            new_user_created = True
+            user_data = response.json()
+
+    with wrap_http_error_in_502(
+        f"Error Adding Employee {data.display_name} "
+        f"to FinOps for Cloud Organization {db_organization.name}."
+    ):
+        await optscale_client.create_org_employee(
+            organization_id=db_organization.linked_organization_id,  # type: ignore
+            user_id=user_data["id"],
+            name=data.display_name,
+        )
+
+    with wrap_http_error_in_502(
+        f"Error Promoting User {data.display_name} "
+        f"to Admin in FinOps for Cloud {db_organization.name}."
+    ):
+        # promote the new user to admin
+        await optscale_auth_client.make_user_admin(
+            organization_id=db_organization.linked_organization_id,  # type: ignore
+            user_id=user_data["id"],
+        )
+    if new_user_created:
+        # start the reset password processes for the new created user
+        with wrap_http_error_in_502(
+            "Error resetting the password for employee in FinOps for Cloud"
+        ):
+            await optscale_client.reset_password(data.email)
+
+    logger.info(
+        f"The user {data.display_name} - {data.email} has been successfully added as "
+        f"admin to the organization {db_organization.id} ."
+    )
+
+    user_admin_data = AdditionalAdminRequest(
+        email=data.email,
+        display_name=data.display_name,
+        notes=data.notes,
+        organization_id=db_organization.id,
+    )
+    additional_admin = await additional_admin_repo.create(user_admin_data)
+    return convert_model_to_schema(AdditionalAdminRequestRead, additional_admin)

@@ -536,13 +536,13 @@ async def test_get_organization_by_id(
 
 
 async def test_get_non_existant_organization(api_client: AsyncClient, ffc_jwt_token: str):
-    id = "FORG-1234-5678-9012"
+    not_found_id = "FORG-1234-5678-9012"
     response = await api_client.get(
-        f"/organizations/{id}", headers={"Authorization": f"Bearer {ffc_jwt_token}"}
+        f"/organizations/{not_found_id}", headers={"Authorization": f"Bearer {ffc_jwt_token}"}
     )
 
     assert response.status_code == 404
-    assert response.json()["detail"] == f"Organization with ID `{id}` wasn't found."
+    assert response.json()["detail"] == f"Organization with ID `{not_found_id}` wasn't found."
 
 
 async def test_get_invalid_id_format(api_client: AsyncClient, ffc_jwt_token: str):
