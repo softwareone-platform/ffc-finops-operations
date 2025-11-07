@@ -81,8 +81,8 @@ async def test_create_new_datasource_expenses_single_organization(
 
     mock_optscale_client.mock_fetch_daily_expenses_for_organization(
         organization,
-        int(datetime(2025, 3, 19, 0, 0, 0).timestamp()),
-        int(datetime(2025, 3, 19, 23, 59, 59).timestamp()),
+        int(datetime(2025, 3, 19, 0, 0, 0, tzinfo=UTC).timestamp()),
+        int(datetime(2025, 3, 19, 23, 59, 59, tzinfo=UTC).timestamp()),
         {
             datasource_id1: {
                 "total": 12.34,
@@ -241,8 +241,8 @@ async def test_datasource_expenses_are_updated_for_current_month(
 
     mock_optscale_client.mock_fetch_daily_expenses_for_organization(
         organization,
-        int(datetime(2025, 3, 19, 0, 0, 0).timestamp()),
-        int(datetime(2025, 3, 19, 23, 59, 59).timestamp()),
+        int(datetime(2025, 3, 19, 0, 0, 0, tzinfo=UTC).timestamp()),
+        int(datetime(2025, 3, 19, 23, 59, 59, tzinfo=UTC).timestamp()),
         {
             datasource_id1: {
                 "total": 12.34,
@@ -451,8 +451,8 @@ async def test_optscale_api_returns_exception(
     )
     mock_optscale_client.mock_fetch_daily_expenses_for_organization(
         organization,
-        int(datetime(2025, 3, 19, 0, 0, 0).timestamp()),
-        int(datetime(2025, 3, 19, 23, 59, 59).timestamp()),
+        int(datetime(2025, 3, 19, 0, 0, 0, tzinfo=UTC).timestamp()),
+        int(datetime(2025, 3, 19, 23, 59, 59, tzinfo=UTC).timestamp()),
         {},
         status_code=status_code,
     )
@@ -620,8 +620,8 @@ async def test_multiple_datasources_are_handled_correctly(
 
     mock_optscale_client.mock_fetch_daily_expenses_for_organization(
         organization1,
-        int(datetime(2025, 3, 19, 0, 0, 0).timestamp()),
-        int(datetime(2025, 3, 19, 23, 59, 59).timestamp()),
+        int(datetime(2025, 3, 19, 0, 0, 0, tzinfo=UTC).timestamp()),
+        int(datetime(2025, 3, 19, 23, 59, 59, tzinfo=UTC).timestamp()),
         {
             org1_datasource_id1: {
                 "total": 12.34,
@@ -653,8 +653,8 @@ async def test_multiple_datasources_are_handled_correctly(
 
     mock_optscale_client.mock_fetch_daily_expenses_for_organization(
         organization2,
-        int(datetime(2025, 3, 19, 0, 0, 0).timestamp()),
-        int(datetime(2025, 3, 19, 23, 59, 59).timestamp()),
+        int(datetime(2025, 3, 19, 0, 0, 0, tzinfo=UTC).timestamp()),
+        int(datetime(2025, 3, 19, 23, 59, 59, tzinfo=UTC).timestamp()),
         {
             org2_datasource_id1: {
                 "total": 12.34,
@@ -680,8 +680,8 @@ async def test_multiple_datasources_are_handled_correctly(
 
     mock_optscale_client.mock_fetch_daily_expenses_for_organization(
         organization3,
-        int(datetime(2025, 3, 19, 0, 0, 0).timestamp()),
-        int(datetime(2025, 3, 19, 23, 59, 59).timestamp()),
+        int(datetime(2025, 3, 19, 0, 0, 0, tzinfo=UTC).timestamp()),
+        int(datetime(2025, 3, 19, 23, 59, 59, tzinfo=UTC).timestamp()),
         {
             org3_datasource_id1: {
                 "total": 12.34,
@@ -697,8 +697,8 @@ async def test_multiple_datasources_are_handled_correctly(
 
     mock_optscale_client.mock_fetch_daily_expenses_for_organization(
         organization4,
-        int(datetime(2025, 3, 19, 0, 0, 0).timestamp()),
-        int(datetime(2025, 3, 19, 23, 59, 59).timestamp()),
+        int(datetime(2025, 3, 19, 0, 0, 0, tzinfo=UTC).timestamp()),
+        int(datetime(2025, 3, 19, 23, 59, 59, tzinfo=UTC).timestamp()),
         {},
         status_code=424,
     )
