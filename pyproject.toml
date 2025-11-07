@@ -129,9 +129,6 @@ addopts = "--cov=app --cov-report=term-missing --cov-report=html --cov-report=xm
 cache_dir = ".cache/pytest"
 env_override_existing_values = 1
 env_files = [".env", ".env.test"]
-markers = """
-    fixed_random_seed: Set the randomly_seed to a fixed value to tests using random values deterministic
-"""
 
 [tool.coverage.run]
 branch = true
