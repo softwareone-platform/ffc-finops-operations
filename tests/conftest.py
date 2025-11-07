@@ -3,7 +3,6 @@ import secrets
 import uuid
 from collections.abc import AsyncGenerator, Callable, Generator
 from datetime import UTC, datetime, timedelta
-from typing import Final
 
 import jwt
 import pytest
@@ -603,28 +602,3 @@ def assert_equal_or_raises[T](
             func()
     else:
         assert func() == expected
-
-
-FIXED_SEED: Final[int] = 42
-
-
-@pytest.hookimpl(hookwrapper=True)
-def _set_fixed_random_seed(item: pytest.Item) -> Generator:
-    """Set the randomly_seed to a fixed value for tests with the `fixed_random_seed` marker."""
-
-    marker = item.get_closest_marker("fixed_random_seed")
-    if not marker:
-        yield
-        return
-
-    orig_randomly_seed = item.config.getoption("randomly_seed")
-
-    item.config.option.randomly_seed = FIXED_SEED
-    try:
-        yield
-    finally:
-        item.config.option.randomly_seed = orig_randomly_seed
-
-
-pytest_runtest_call = _set_fixed_random_seed
-pytest_runtest_setup = _set_fixed_random_seed
