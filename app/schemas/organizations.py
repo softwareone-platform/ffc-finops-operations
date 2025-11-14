@@ -92,3 +92,17 @@ class DatasourceRead(BaseSchema):
     resources_charged_this_month: int
     expenses_so_far_this_month: float
     expenses_forecast_this_month: float
+
+
+class AdditionalAdminRequestBase(BaseSchema):
+    email: str
+    notes: Annotated[str, Field(min_length=1, max_length=100, examples=["What a wonderful world"])]
+    display_name: Annotated[str, Field(min_length=1, max_length=50, examples=["Perter Parker"])]
+
+
+class AdditionalAdminRequestCreate(AdditionalAdminRequestBase):
+    pass
+
+
+class AdditionalAdminRequestRead(IdSchema, CommonEventsSchema, AdditionalAdminRequestBase):
+    pass

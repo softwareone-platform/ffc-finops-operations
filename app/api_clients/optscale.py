@@ -1,11 +1,15 @@
+import logging
 from collections.abc import Generator
 from typing import Any
 from uuid import UUID
 
 import httpx
+from httpx import codes
 
 from app.api_clients.base import APIClientError, BaseAPIClient
 from app.conf import Settings
+
+logger = logging.getLogger(__name__)
 
 OPT_RESOURCE_TYPE_ORGANIZATION = 2
 OPT_ROLE_ORGANIZATION_ADMIN = 3
@@ -165,6 +169,28 @@ class OptscaleClient(BaseAPIClient):
             },
         )
         response.raise_for_status()
+        return response
+
+    async def create_org_employee(
+        self,
+        organization_id: str,
+        user_id: str,
+        name: str,
+    ) -> httpx.Response:
+        response = await self.httpx_client.post(
+            f"/organizations/{organization_id}/employees",
+            json={"name": name, "auth_user_id": user_id},
+        )
+        if response.status_code != codes.CONFLICT:
+            # If the user already belongs to the org,
+            # this API returns 409. We use it to know that the user is
+            # already an employee of the given org.
+            response.raise_for_status()
+        else:
+            logger.warning(
+                f"The User {name} ({user_id}) already belongs to the "
+                f"Organization {organization_id}."
+            )
         return response
 
 
