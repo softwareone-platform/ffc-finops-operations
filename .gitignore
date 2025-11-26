@@ -184,3 +184,8 @@ taplo.toml
 
 # MacOS
 .DS_Store
+
+# playwright test e2e artifacts
+**/node_modules
+**/results.json
+**/playwright-report
