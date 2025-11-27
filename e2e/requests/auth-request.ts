@@ -4,6 +4,7 @@ import { ERequestMethod } from '../types/enums';
 import { debugLog } from '../utils/debug-logging';
 
 export class AuthRequest extends OpsBaseRequest {
+  readonly request: APIRequestContext;
   readonly tokensEndpoint: string;
   readonly passwordRecoveryEndpoint: string;
 
@@ -18,7 +19,7 @@ export class AuthRequest extends OpsBaseRequest {
    */
   constructor(request: APIRequestContext) {
     super(request);
-
+    this.request = request;
     this.tokensEndpoint = `${this.opsUrl}/auth/tokens`;
     this.passwordRecoveryEndpoint = `${this.opsUrl}/auth/password-recovery-requests/`;
   }

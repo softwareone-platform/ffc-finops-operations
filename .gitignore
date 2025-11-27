@@ -189,3 +189,4 @@ taplo.toml
 **/node_modules
 **/results.json
 **/playwright-report
+**/test-results
