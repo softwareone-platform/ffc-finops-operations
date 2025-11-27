@@ -3,14 +3,14 @@ import { debugLog } from '../../utils/debug-logging';
 import { expect } from 'playwright/test';
 
 test.describe('Authentication API Tests', () => {
-  test.describe.configure({ mode: 'default' });
+  test.describe.configure({ mode: 'parallel' });
   const email = process.env.DEFAULT_USER_EMAIL;
   const password = process.env.DEFAULT_USER_PASSWORD;
   const accountId = process.env.DEFAULT_ACCOUNT_ID;
   let accessToken: string;
   let refreshToken: string;
 
-  test('Get token for Operations API', async ({ authRequest }) => {
+  test('Get token for Operations API', { tag: '@p1' }, async ({ authRequest }) => {
     accessToken = await authRequest.getTokenForSpecificAccount(email, password, accountId);
     debugLog(`Access Token: ${accessToken}`);
     expect(accessToken).toBeTruthy();
