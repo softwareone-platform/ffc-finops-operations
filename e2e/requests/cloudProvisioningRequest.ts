@@ -146,4 +146,21 @@ export class CloudProvisioningRequest extends OpsBaseRequest {
     }
     return response;
   }
+
+  /**
+   * Retrieves the data sources for a specific organization.
+   *
+   * @param {{ [key: string]: string }} headers - The headers to include in the request.
+   * @param {string} orgId - The ID of the organization whose data sources are to be retrieved.
+   * @returns {Promise<APIResponse>} - A promise that resolves to the API response containing the data sources.
+   * @throws {Error} - Throws an error if the request fails with a status other than 200.
+   */
+  async getDataSources(headers: { [key: string]: string }, orgId: string): Promise<APIResponse> {
+    const endpoint = `${this.organizationsEndpoint}/${orgId}/datasources`;
+    const response = await this.getResponse(endpoint, ERequestMethod.GET, headers);
+    if (response.status() !== 200) {
+      throw new Error(`Failed to get data sources: ${response.status()}`);
+    }
+    return response;
+  }
 }

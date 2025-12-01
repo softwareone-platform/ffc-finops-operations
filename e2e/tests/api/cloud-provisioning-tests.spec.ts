@@ -8,6 +8,8 @@ import { getNewEmployeeID } from '../../utils/getNewEmployeeID';
 import { GetEmployeesByOrganisationIDResponse } from '../../types/get-employees-by-organization-id';
 import { deleteOrganization } from '../../utils/delete-organization';
 import { GetOrganizationByIDResponse } from '../../types/get-organizations-by-id-response';
+import { GetDatasourcesByOrganizationIDResponse } from '../../types/get-datasources-by-organization-id';
+import { isDatasourceType } from '../../utils/is-datasource-type';
 
 let createEmployeeData: {
   display_name: string;
@@ -39,7 +41,7 @@ async function setNewOrganizationData() {
   };
 }
 
-test.describe('Cloud Provisioning tests', { tag: '@cloud-provisioning' }, () => {
+test.describe('[MPT-15877] Cloud Provisioning tests', { tag: '@cloud-provisioning' }, () => {
   let headers: { [key: string]: string };
   let organizationID: string;
 
@@ -59,7 +61,7 @@ test.describe('Cloud Provisioning tests', { tag: '@cloud-provisioning' }, () => 
     }
   });
 
-  test('Create a new employee', { tag: '@p1' }, async ({ cloudProvisioningRequest }) => {
+  test('[231971] Create a new employee', { tag: '@p1' }, async ({ cloudProvisioningRequest }) => {
     await setNewEmployeeData();
     const response = await cloudProvisioningRequest.createEmployee(headers, createEmployeeData);
     const { email, display_name, roles_count, id } = await response.json();
@@ -73,7 +75,7 @@ test.describe('Cloud Provisioning tests', { tag: '@cloud-provisioning' }, () => 
     expect(roles_count).toBeFalsy();
   });
 
-  test('Create Organization', { tag: '@p1' }, async ({ cloudProvisioningRequest }) => {
+  test('[231972] Create Organization', { tag: '@p1' }, async ({ cloudProvisioningRequest }) => {
     await setNewOrganizationData();
     const response = await cloudProvisioningRequest.createOrganization(headers, createOrgData);
     const { id } = await response.json();
@@ -84,7 +86,7 @@ test.describe('Cloud Provisioning tests', { tag: '@cloud-provisioning' }, () => 
     expect(id).toMatch(/^FORG-\d{4}-\d{4}-\d{4}$/);
   });
 
-  test('Update Organization', { tag: '@p1' }, async ({ cloudProvisioningRequest }) => {
+  test('[231973] Update Organization', { tag: '@p1' }, async ({ cloudProvisioningRequest }) => {
     await setNewOrganizationData();
     organizationID = await cloudProvisioningRequest.getNewOrganizationID(headers, createOrgData);
     const updateData = {
@@ -99,7 +101,7 @@ test.describe('Cloud Provisioning tests', { tag: '@cloud-provisioning' }, () => 
     expect(operations_external_id).toBe(updateData.operations_external_id);
   });
 
-  test('Delete Organization by ID', { tag: '@p1' }, async ({ cloudProvisioningRequest }) => {
+  test('[231974] Delete Organization by ID', { tag: '@p1' }, async ({ cloudProvisioningRequest }) => {
     await setNewOrganizationData();
     organizationID = await cloudProvisioningRequest.getNewOrganizationID(headers, createOrgData);
     const response = await cloudProvisioningRequest.deleteOrganization(headers, organizationID);
@@ -108,7 +110,7 @@ test.describe('Cloud Provisioning tests', { tag: '@cloud-provisioning' }, () => 
     organizationID = '';
   });
 
-  test('Get Employees by Organization ID', { tag: '@p1' }, async ({ cloudProvisioningRequest }) => {
+  test('[231975] Get Employees by Organization ID', { tag: '@p1' }, async ({ cloudProvisioningRequest }) => {
     await setNewEmployeeData();
     const employeeId = await cloudProvisioningRequest.getCreateEmployeeID(headers, createEmployeeData);
     debugLog(`Created Employee ID: ${employeeId}`);
@@ -131,7 +133,7 @@ test.describe('Cloud Provisioning tests', { tag: '@cloud-provisioning' }, () => 
     expect.soft(payload[0].display_name).toBe(createEmployeeData.display_name);
   });
 
-  test('Get Employee by email', { tag: '@p1' }, async ({ cloudProvisioningRequest }) => {
+  test('[231976] Get Employee by email', { tag: '@p1' }, async ({ cloudProvisioningRequest }) => {
     await setNewEmployeeData();
     await cloudProvisioningRequest.createEmployee(headers, createEmployeeData);
 
@@ -143,7 +145,7 @@ test.describe('Cloud Provisioning tests', { tag: '@cloud-provisioning' }, () => 
     expect(payload.display_name).toBe(createEmployeeData.display_name);
   });
 
-  test('Get all organizations', async ({ cloudProvisioningRequest }) => {
+  test('[231977] Get all organizations', async ({ cloudProvisioningRequest }) => {
     const response = await cloudProvisioningRequest.getOrganizations(headers, 200);
     const organizations = await response.json();
 
@@ -152,7 +154,7 @@ test.describe('Cloud Provisioning tests', { tag: '@cloud-provisioning' }, () => 
     expect(response.status()).toBe(200);
   });
 
-  test('Get organization by ID', async ({ cloudProvisioningRequest }) => {
+  test('[231978] Get organization by ID', async ({ cloudProvisioningRequest }) => {
     const id = process.env.OPS_ORG_ID;
     const response = await cloudProvisioningRequest.getOrganizationById(headers, id);
     const payload = (await response.json()) as GetOrganizationByIDResponse;
@@ -160,5 +162,23 @@ test.describe('Cloud Provisioning tests', { tag: '@cloud-provisioning' }, () => 
     expect(response.status()).toBe(200);
     expect(payload.id).toBe(id);
     expect(payload.name).toBe('SoftwareOne (Test Environment)');
+  });
+
+  test('[231983] Get data sources', { tag: '@p1' }, async ({ cloudProvisioningRequest }) => {
+    const id = process.env.OPS_ORG_ID;
+    const response = await cloudProvisioningRequest.getDataSources(headers, id);
+    const payload = (await response.json()) as GetDatasourcesByOrganizationIDResponse;
+
+    debugLog(`Data Sources Response: ${JSON.stringify(payload)}`);
+    for (const ds of payload) {
+      expect(ds.id).toBeTruthy();
+      expect(ds.name).toBeTruthy();
+      expect(isDatasourceType(ds.type)).toBe(true);
+      expect(ds.resources_charged_this_month).toBeGreaterThanOrEqual(0);
+      expect(ds.expenses_so_far_this_month).toBeGreaterThanOrEqual(0);
+      expect(ds.expenses_forecast_this_month).toBeGreaterThanOrEqual(0);
+    }
+
+    expect(response.status()).toBe(200);
   });
 });
