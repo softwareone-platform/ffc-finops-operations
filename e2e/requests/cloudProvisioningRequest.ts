@@ -80,6 +80,13 @@ export class CloudProvisioningRequest extends OpsBaseRequest {
     return await this.getResponse(endpointWithParams, ERequestMethod.GET, headers);
   }
 
+  /**
+   * Retrieves the details of an organization by its ID.
+   *
+   * @param {{ [key: string]: string }} headers - The headers to include in the request.
+   * @param {string} organizationId - The ID of the organization to retrieve.
+   * @returns {Promise<APIResponse>} - A promise that resolves to the API response containing the organization's details.
+   */
   async getOrganizationById(headers: { [key: string]: string }, organizationId: string): Promise<APIResponse> {
     const endpoint = `${this.organizationsEndpoint}/${organizationId}`;
     return await this.getResponse(endpoint, ERequestMethod.GET, headers);
@@ -94,6 +101,23 @@ export class CloudProvisioningRequest extends OpsBaseRequest {
    */
   async createOrganization(headers: { [key: string]: string }, data: unknown): Promise<APIResponse> {
     return await this.getResponse(this.organizationsEndpoint, ERequestMethod.POST, headers, data);
+  }
+
+  /**
+   * Retrieves a list of employees for a specific organization by its ID.
+   *
+   * @param {{ [key: string]: string }} headers - The headers to include in the request.
+   * @param {string} orgId - The ID of the organization whose employees are to be retrieved.
+   * @returns {Promise<APIResponse>} - A promise that resolves to the API response containing the employees.
+   * @throws {Error} - Throws an error if the request fails with a status other than 200.
+   */
+  async getEmployeesByOrgId(headers: { [key: string]: string }, orgId: string): Promise<APIResponse> {
+    const endpoint = `${this.organizationsEndpoint}/${orgId}/employees`;
+    const response = await this.getResponse(endpoint, ERequestMethod.GET, headers);
+    if (response.status() !== 200) {
+      throw new Error(`Failed to get employees by org ID: ${response.status()}`);
+    }
+    return response;
   }
 
   /**
@@ -165,6 +189,15 @@ export class CloudProvisioningRequest extends OpsBaseRequest {
     return response;
   }
 
+  /**
+   * Forces the reimport of a data source for a specific organization.
+   *
+   * @param {{ [key: string]: string }} headers - The headers to include in the request.
+   * @param {string} orgId - The ID of the organization to which the data source belongs.
+   * @param {string} dsId - The ID of the data source to force reimport.
+   * @returns {Promise<APIResponse>} - A promise that resolves to the API response.
+   * @throws {Error} - Throws an error if the reimport operation fails with a status other than 204.
+   */
   async getForceReimportDataSource(headers: { [key: string]: string }, orgId: string, dsId: string): Promise<APIResponse> {
     const endpoint = `${this.organizationsEndpoint}/${orgId}/datasources/${dsId}/force-reimport`;
     debugLog(`Force reimport data source endpoint: ${endpoint}`);
@@ -172,6 +205,35 @@ export class CloudProvisioningRequest extends OpsBaseRequest {
     const response = await this.getResponse(endpoint, ERequestMethod.POST, headers);
     if (response.status() !== 204) {
       throw new Error(`Failed to force reimport data source: ${response.status()}`);
+    }
+    return response;
+  }
+
+  /**
+   * Sends a request to add an additional admin to an organization.
+   *
+   * @param {{ [key: string]: string }} headers - The headers to include in the request.
+   * @param {string} organizationId - The ID of the organization to which the admin will be added.
+   * @param {string} email - The email address of the admin to be added.
+   * @param {string} name - The display name of the admin to be added.
+   * @returns {Promise<APIResponse>} - A promise that resolves to the API response.
+   * @throws {Error} - Throws an error if the request fails with a status other than 200.
+   */
+  async getAddAdditionalAdminResponse(
+    headers: { [key: string]: string },
+    organizationId: string,
+    email: string,
+    name: string
+  ): Promise<APIResponse> {
+    const endpoint = `${this.organizationsEndpoint}/${organizationId}/add-admin`;
+    const data = {
+      email: email,
+      notes: `Added admin user ${name}`,
+      display_name: name,
+    };
+    const response = await this.getResponse(endpoint, ERequestMethod.POST, headers, data);
+    if (response.status() !== 200) {
+      throw new Error(`Failed to add additional admin: ${response.status()}`);
     }
     return response;
   }

@@ -190,4 +190,33 @@ test.describe('[MPT-15877] Cloud Provisioning tests', { tag: '@cloud-provisionin
     debugLog(`Force Reimport Response Status: ${response.status()}`);
     expect(response.status()).toBe(204);
   });
+
+  test('[] Add a new user as organization admin', { tag: '@p1' }, async ({ cloudProvisioningRequest }) => {
+    await test.step('Create Organization', async () => {
+      await setNewOrganizationData();
+      organizationID = await cloudProvisioningRequest.getNewOrganizationID(headers, createOrgData);
+    });
+
+    const email = generateRandomEmail();
+    const displayName = `Org Admin ${Date.now()}`;
+
+    await test.step('Add Additional Admin to Organization', async () => {
+      const response = await cloudProvisioningRequest.getAddAdditionalAdminResponse(headers, organizationID, email, displayName);
+
+      debugLog(`Add Additional Admin Response Status: ${response.status()}`);
+      expect(response.status()).toBe(200);
+    });
+
+    await test.step('Verify New Admin in Organization Employees', async () => {
+      const organizationResponse = await cloudProvisioningRequest.getEmployeesByOrganizationId(headers, organizationID);
+      const body = (await organizationResponse.json()) as GetEmployeesByOrganisationIDResponse;
+
+      debugLog(`Organization Details Response body: ${JSON.stringify(body)}`);
+
+      expect(body.length).toBe(2);
+      const newAdmin = body.find(emp => emp.email === email);
+      expect(newAdmin).toBeDefined();
+      expect(newAdmin.display_name).toBe(displayName);
+    });
+  });
 });
