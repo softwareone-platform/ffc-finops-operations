@@ -115,7 +115,7 @@ class OptscaleClient(BaseAPIClient):
     ) -> httpx.Response:
         response = await self.httpx_client.patch(
             f"/cloud_accounts/{datasource_id}",
-            data=payload,
+            json=payload,
         )
         response.raise_for_status()
         return response
