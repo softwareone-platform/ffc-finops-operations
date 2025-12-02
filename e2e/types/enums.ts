@@ -13,3 +13,17 @@ export enum EDatasourceType {
   GCP_CNR = 'gcp_cnr',
   UNKNOWN = 'unknown',
 }
+
+export enum EUserStatus {
+  INVITED = 'invited',
+  INVITATION_EXPIRED = 'invitation-expired',
+  ACTIVE = 'active',
+  DELETED = 'deleted',
+}
+
+export enum EStatus {
+  DRAFT = 'draft',
+  ACTIVE = 'active',
+  DISABLED = 'disabled',
+  DELETED = 'deleted',
+}

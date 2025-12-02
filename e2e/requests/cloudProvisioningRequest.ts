@@ -1,6 +1,7 @@
 import { OpsBaseRequest } from './ops-base-request';
 import { APIRequestContext, APIResponse } from 'playwright-core';
 import { ERequestMethod } from '../types/enums';
+import { debugLog } from '../utils/debug-logging';
 
 export class CloudProvisioningRequest extends OpsBaseRequest {
   readonly request: APIRequestContext;
@@ -160,6 +161,17 @@ export class CloudProvisioningRequest extends OpsBaseRequest {
     const response = await this.getResponse(endpoint, ERequestMethod.GET, headers);
     if (response.status() !== 200) {
       throw new Error(`Failed to get data sources: ${response.status()}`);
+    }
+    return response;
+  }
+
+  async getForceReimportDataSource(headers: { [key: string]: string }, orgId: string, dsId: string): Promise<APIResponse> {
+    const endpoint = `${this.organizationsEndpoint}/${orgId}/datasources/${dsId}/force-reimport`;
+    debugLog(`Force reimport data source endpoint: ${endpoint}`);
+
+    const response = await this.getResponse(endpoint, ERequestMethod.POST, headers);
+    if (response.status() !== 204) {
+      throw new Error(`Failed to force reimport data source: ${response.status()}`);
     }
     return response;
   }

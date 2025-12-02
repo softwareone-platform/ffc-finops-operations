@@ -9,7 +9,7 @@ import { GetEmployeesByOrganisationIDResponse } from '../../types/get-employees-
 import { deleteOrganization } from '../../utils/delete-organization';
 import { GetOrganizationByIDResponse } from '../../types/get-organizations-by-id-response';
 import { GetDatasourcesByOrganizationIDResponse } from '../../types/get-datasources-by-organization-id';
-import { isDatasourceType } from '../../utils/is-datasource-type';
+import { isDatasourceType } from '../../utils/is-valid-type';
 
 let createEmployeeData: {
   display_name: string;
@@ -125,12 +125,12 @@ test.describe('[MPT-15877] Cloud Provisioning tests', { tag: '@cloud-provisionin
 
     organizationID = await cloudProvisioningRequest.getNewOrganizationID(headers, orgData);
     const orgResponse = await cloudProvisioningRequest.getEmployeesByOrganizationId(headers, organizationID);
-    const payload = JSON.parse(await orgResponse.text()) as GetEmployeesByOrganisationIDResponse;
+    const body = JSON.parse(await orgResponse.text()) as GetEmployeesByOrganisationIDResponse;
 
     expect(orgResponse.status()).toBe(200);
-    expect.soft(payload.length).toBe(1);
-    expect.soft(payload[0].email).toBe(createEmployeeData.email);
-    expect.soft(payload[0].display_name).toBe(createEmployeeData.display_name);
+    expect.soft(body.length).toBe(1);
+    expect.soft(body[0].email).toBe(createEmployeeData.email);
+    expect.soft(body[0].display_name).toBe(createEmployeeData.display_name);
   });
 
   test('[231976] Get Employee by email', { tag: '@p1' }, async ({ cloudProvisioningRequest }) => {
@@ -138,11 +138,11 @@ test.describe('[MPT-15877] Cloud Provisioning tests', { tag: '@cloud-provisionin
     await cloudProvisioningRequest.createEmployee(headers, createEmployeeData);
 
     const response = await cloudProvisioningRequest.getEmployeeByEmail(headers, createEmployeeData.email);
-    const payload = await response.json();
+    const body = await response.json();
 
     expect(response.status()).toBe(200);
-    expect(payload.email).toBe(createEmployeeData.email);
-    expect(payload.display_name).toBe(createEmployeeData.display_name);
+    expect(body.email).toBe(createEmployeeData.email);
+    expect(body.display_name).toBe(createEmployeeData.display_name);
   });
 
   test('[231977] Get all organizations', async ({ cloudProvisioningRequest }) => {
@@ -157,20 +157,20 @@ test.describe('[MPT-15877] Cloud Provisioning tests', { tag: '@cloud-provisionin
   test('[231978] Get organization by ID', async ({ cloudProvisioningRequest }) => {
     const id = process.env.OPS_ORG_ID;
     const response = await cloudProvisioningRequest.getOrganizationById(headers, id);
-    const payload = (await response.json()) as GetOrganizationByIDResponse;
+    const body = (await response.json()) as GetOrganizationByIDResponse;
 
     expect(response.status()).toBe(200);
-    expect(payload.id).toBe(id);
-    expect(payload.name).toBe('SoftwareOne (Test Environment)');
+    expect(body.id).toBe(id);
+    expect(body.name).toBe('SoftwareOne (Test Environment)');
   });
 
   test('[231983] Get data sources', { tag: '@p1' }, async ({ cloudProvisioningRequest }) => {
     const id = process.env.OPS_ORG_ID;
     const response = await cloudProvisioningRequest.getDataSources(headers, id);
-    const payload = (await response.json()) as GetDatasourcesByOrganizationIDResponse;
+    const body = (await response.json()) as GetDatasourcesByOrganizationIDResponse;
 
-    debugLog(`Data Sources Response: ${JSON.stringify(payload)}`);
-    for (const ds of payload) {
+    debugLog(`Data Sources Response: ${JSON.stringify(body)}`);
+    for (const ds of body) {
       expect(ds.id).toBeTruthy();
       expect(ds.name).toBeTruthy();
       expect(isDatasourceType(ds.type)).toBe(true);
@@ -180,5 +180,14 @@ test.describe('[MPT-15877] Cloud Provisioning tests', { tag: '@cloud-provisionin
     }
 
     expect(response.status()).toBe(200);
+  });
+
+  test('[] Force reimport of data sources', { tag: '@p1' }, async ({ cloudProvisioningRequest }) => {
+    const orgId = process.env.OPS_ORG_ID;
+    const dsId = process.env.MPT_DEV_ID;
+    const response = await cloudProvisioningRequest.getForceReimportDataSource(headers, orgId, dsId);
+
+    debugLog(`Force Reimport Response Status: ${response.status()}`);
+    expect(response.status()).toBe(204);
   });
 });
