@@ -17,6 +17,7 @@ from app.auth.context import auth_context
 from app.db.models import (
     Account,
     AccountUser,
+    AdditionalAdminRequest,
     AuditableMixin,
     DatasourceExpense,
     Entitlement,
@@ -524,3 +525,7 @@ class DatasourceExpenseHandler(ModelHandler[DatasourceExpense]):
         self.default_options = [
             joinedload(DatasourceExpense.organization),
         ]
+
+
+class AdditionalAdminRequestHandler(ModelHandler[AdditionalAdminRequest]):
+    pass

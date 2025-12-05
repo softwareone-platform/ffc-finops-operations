@@ -44,3 +44,7 @@ SystemRepository = Annotated[
 DatasourceExpenseRepository = Annotated[
     handlers.DatasourceExpenseHandler, Depends(HandlerFactory(handlers.DatasourceExpenseHandler))
 ]
+AdditionalAdminRequestRepository = Annotated[
+    handlers.AdditionalAdminRequestHandler,
+    Depends(HandlerFactory(handlers.AdditionalAdminRequestHandler)),
+]
