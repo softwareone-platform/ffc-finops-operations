@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 from pytest_mock import MockerFixture
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,6 +35,22 @@ async def test_create_op_account(
         )
         == 1
     )
+
+
+async def test_concurrent_op_account(
+    test_settings: Settings, concurrent_session_factory: AsyncSession, capsys: pytest.CaptureFixture
+):
+    # This test shows how to run concurrent tasks using the concurrent_session_factory fixture.
+    # We will modify some functions to work with tasks. This test is to show that the fixture works
+    async def _create_operations_account():
+        await create_operations_account(
+            test_settings,
+            "ACC-1234-5678",
+        )
+
+    tasks = [asyncio.create_task(_create_operations_account()) for _ in range(10)]
+    results = await asyncio.gather(*tasks)
+    assert len(results) == 10
 
 
 async def test_create_op_account_exist(
