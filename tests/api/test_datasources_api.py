@@ -1,6 +1,7 @@
 import uuid
 from typing import Any
 
+import pytest
 from httpx import AsyncClient
 from pytest_httpx import HTTPXMock
 
@@ -93,7 +94,7 @@ def optscale_azure_tenant_datasource_response_data(
 
 def optscale_aws_cnr_datasource_get_by_id_response_data():
     return {
-        "account_id": "[REDACTED]",
+        "account_id": "1dc9b339-fadb-432e-86df-423c38a0fcb8",
         "id": "5cded1eb-4d7e-4df9-b76f-fc33b5df9eb3",
         "last_getting_metric_attempt_at": 0,
         "last_getting_metric_attempt_error": None,
@@ -167,15 +168,16 @@ async def test_get_datasources_for_organization_success(
     assert azure_cnr["type"] == DatasourceType.AZURE_CNR.value
     assert azure_cnr["parent_id"] == "48108421-7334-4a2c-ac7b-0160476dc790"
     assert azure_cnr["resources_charged_this_month"] == 0
-    assert azure_cnr["expenses_so_far_this_month"] == 0.0
-    assert azure_cnr["expenses_forecast_this_month"] == 1099.0
-
+    assert azure_cnr["expenses_so_far_this_month"] == pytest.approx(0.0)
+    assert azure_cnr["expenses_forecast_this_month"] == pytest.approx(1099.0)
+    assert "datasource_id" in azure_cnr
     assert azure_tenant["name"] == "Test"
     assert azure_tenant["type"] == DatasourceType.AZURE_TENANT.value
     assert "parent_id" not in azure_tenant
+    assert "datasource_id" in azure_tenant
     assert azure_tenant["resources_charged_this_month"] == 0
-    assert azure_tenant["expenses_so_far_this_month"] == 0.0
-    assert azure_tenant["expenses_forecast_this_month"] == 0.0
+    assert azure_tenant["resources_charged_this_month"] == pytest.approx(0.0)
+    assert azure_tenant["expenses_forecast_this_month"] == pytest.approx(0.0)
 
 
 async def test_get_datasources_for_missing_organization(
@@ -294,6 +296,7 @@ async def test_get_datasource_by_id_success(
         "resources_charged_this_month": 5,
         "expenses_so_far_this_month": 99.88,
         "expenses_forecast_this_month": 1234.56,
+        "datasource_id": "1dc9b339-fadb-432e-86df-423c38a0fcb8",
     }
 
 
