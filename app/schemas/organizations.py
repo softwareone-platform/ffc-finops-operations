@@ -92,6 +92,7 @@ class DatasourceRead(BaseSchema):
     resources_charged_this_month: int
     expenses_so_far_this_month: float
     expenses_forecast_this_month: float
+    datasource_id: str
 
 
 class AdditionalAdminRequestBase(BaseSchema):
