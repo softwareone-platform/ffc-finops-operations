@@ -179,15 +179,16 @@ async def get_datasources_by_organization_id(
 
     return [
         DatasourceRead(
-            id=acc["id"],
-            name=acc["name"],
-            type=DatasourceType(acc["type"]),
-            parent_id=acc["parent_id"],
-            resources_charged_this_month=acc["details"]["resources"],
-            expenses_so_far_this_month=acc["details"]["cost"],
-            expenses_forecast_this_month=acc["details"]["forecast"],
+            id=datasource["id"],
+            name=datasource["name"],
+            type=DatasourceType(datasource["type"]),
+            parent_id=datasource["parent_id"],
+            resources_charged_this_month=datasource["details"]["resources"],
+            expenses_so_far_this_month=datasource["details"]["cost"],
+            expenses_forecast_this_month=datasource["details"]["forecast"],
+            datasource_id=datasource["account_id"],
         )
-        for acc in datasources
+        for datasource in datasources
     ]
 
 
@@ -212,6 +213,7 @@ async def get_datasource_by_id(
         resources_charged_this_month=datasource["details"]["resources"],
         expenses_so_far_this_month=datasource["details"]["cost"],
         expenses_forecast_this_month=datasource["details"]["forecast"],
+        datasource_id=datasource["account_id"],
     )
 
 
