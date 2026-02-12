@@ -14,7 +14,7 @@ from app.conf import Settings
 from app.db.base import session_factory
 from app.db.handlers import DatasourceExpenseHandler, OrganizationHandler
 from app.db.models import DatasourceExpense, Organization
-from app.enums import DatasourceType
+from app.enums import DatasourceType, OrganizationStatus
 from app.notifications import send_exception, send_info
 from app.telemetry import capture_telemetry_cli_command
 
@@ -240,11 +240,16 @@ async def main(settings: Settings, organization_id: str | None = None) -> None:
             if organization_id:
                 logger.info(f"Querying for provided organization {organization_id}")
                 organizations = await organization_handler.query_db(
-                    where_clauses=[Organization.id == organization_id],
+                    where_clauses=[
+                        Organization.id == organization_id,
+                        Organization.status != OrganizationStatus.DELETED,
+                    ],
                 )
             else:
                 logger.info("Querying organizations")
-                organizations = await organization_handler.query_db()
+                organizations = await organization_handler.query_db(
+                    where_clauses=[Organization.status != OrganizationStatus.DELETED]
+                )
             logger.info("Found %d organizations to process", len(organizations))
 
         for day, is_daily, frq in [

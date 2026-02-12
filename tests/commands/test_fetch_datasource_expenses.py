@@ -27,7 +27,6 @@ from tests.types import ModelFactory
     [
         OrganizationStatus.ACTIVE,
         OrganizationStatus.CANCELLED,
-        OrganizationStatus.DELETED,
     ],
 )
 async def test_create_new_datasource_expenses_single_organization(
@@ -151,6 +150,82 @@ async def test_create_new_datasource_expenses_single_organization(
     assert ds_exp1_daily.expenses == Decimal("12.34")
     assert ds_exp1_daily.datasource_name == "First cloud account"
     assert ds_exp1_daily.datasource_id == "123456"
+
+
+async def test_create_new_datasource_expenses_single_organization_deleted(
+    mocker: MockerFixture,
+    test_settings: Settings,
+    db_session: AsyncSession,
+    mock_optscale_client: MockOptscaleClient,
+    organization_factory: ModelFactory[Organization],
+    datasource_expense_factory: ModelFactory[DatasourceExpense],
+):
+    mocker.patch("app.commands.fetch_datasource_expenses.send_info")
+    datasource_expense_handler = DatasourceExpenseHandler(db_session)
+    organization = await organization_factory(
+        linked_organization_id=str(uuid.uuid4()),
+        status=OrganizationStatus.DELETED,
+    )
+
+    datasource_id1 = str(uuid.uuid4())
+
+    await datasource_expense_factory(
+        organization=organization,
+        linked_datasource_id=datasource_id1,
+        linked_datasource_type=DatasourceType.AZURE_CNR,
+        datasource_name="First cloud account",
+        datasource_id="123456",
+        year=2025,
+        month=3,
+        day=19,
+        total_expenses=Decimal("123.45"),
+    )
+
+    existing_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
+    assert len(existing_datasource_expenses) == 1
+
+    await fetch_datasource_expenses.main(test_settings, organization.id)
+
+    new_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
+    assert len(new_datasource_expenses) == 1
+
+
+async def test_create_new_datasource_expenses_organization_deleted(
+    mocker: MockerFixture,
+    test_settings: Settings,
+    db_session: AsyncSession,
+    mock_optscale_client: MockOptscaleClient,
+    organization_factory: ModelFactory[Organization],
+    datasource_expense_factory: ModelFactory[DatasourceExpense],
+):
+    mocker.patch("app.commands.fetch_datasource_expenses.send_info")
+    datasource_expense_handler = DatasourceExpenseHandler(db_session)
+    organization = await organization_factory(
+        linked_organization_id=str(uuid.uuid4()),
+        status=OrganizationStatus.DELETED,
+    )
+
+    datasource_id1 = str(uuid.uuid4())
+
+    await datasource_expense_factory(
+        organization=organization,
+        linked_datasource_id=datasource_id1,
+        linked_datasource_type=DatasourceType.AZURE_CNR,
+        datasource_name="First cloud account",
+        datasource_id="123456",
+        year=2025,
+        month=3,
+        day=19,
+        total_expenses=Decimal("123.45"),
+    )
+
+    existing_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
+    assert len(existing_datasource_expenses) == 1
+
+    await fetch_datasource_expenses.main(test_settings)
+
+    new_datasource_expenses = await datasource_expense_handler.query_db(unique=True)
+    assert len(new_datasource_expenses) == 1
 
 
 @time_machine.travel("2025-03-20T10:00:00Z", tick=False)
