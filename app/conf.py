@@ -61,6 +61,11 @@ class Settings(BaseSettings):
     smtp_sender_email: str
     smtp_sender_name: str
 
+    mpt_api_base_url: str
+    mpt_extension_id: str
+    mpt_extension_token: str
+    mpt_api_rows_per_page: int = 100
+
     api_base_url: str = "https://api.finops.softwareone.com/ops/v1"
     cli_rich_logging: bool = True
     debug: bool = False

@@ -12,13 +12,10 @@ from app.dependencies.auth import authentication_required, check_operations_acco
 from app.openapi import generate_openapi_spec
 from app.routers import (
     accounts,
-    auth,
     employees,
     entitlements,
     expenses,
     organizations,
-    systems,
-    users,
 )
 from app.telemetry import setup_fastapi_instrumentor
 
@@ -75,66 +72,57 @@ def setup_app():
         swagger_ui_parameters={"showExtensions": False, "showCommonExtensions": False},
         openapi_tags=tags_metadata,
         version="4.0.0",
-        root_path="/ops/v1",
+        docs_url="/bypass/docs",
+        redoc_url="/bypass/redoc",
+        openapi_url="/bypass/openapi.json",
         lifespan=lifespan,
     )
     fastapi_pagination.add_pagination(app)
+
+    v1_router = APIRouter(prefix="/ops/v1")
 
     for router in (
         entitlements.router,
         organizations.router,
         employees.router,
         accounts.router,
-        users.router,
         expenses.router,
-        systems.router,
     ):
         setup_custom_serialization(router)
 
     # TODO: Add healthcheck
-    app.include_router(
+    v1_router.include_router(
         expenses.router,
         prefix="/expenses",
         dependencies=[Depends(check_operations_account)],
         tags=["Billing"],
     )
-    app.include_router(
+    v1_router.include_router(
         entitlements.router,
         prefix="/entitlements",
         dependencies=[Depends(authentication_required)],
         tags=["Billing"],
     )
-    app.include_router(
+    v1_router.include_router(
         organizations.router,
         prefix="/organizations",
         dependencies=[Depends(authentication_required)],
         tags=["FinOps for Cloud Provisioning"],
     )
-    app.include_router(
+    v1_router.include_router(
         employees.router,
         prefix="/employees",
         dependencies=[Depends(authentication_required)],
         tags=["FinOps for Cloud Provisioning"],
     )
-    app.include_router(
+    v1_router.include_router(
         accounts.router,
         prefix="/accounts",
         dependencies=[Depends(authentication_required)],
         tags=["Portal Administration"],
     )
-    app.include_router(
-        users.router,
-        prefix="/users",
-        tags=["Portal Settings"],
-    )
-    app.include_router(
-        systems.router,
-        prefix="/systems",
-        dependencies=[Depends(authentication_required)],
-        tags=["Portal Settings"],
-    )
 
-    app.include_router(auth.router, prefix="/auth", tags=["Auth"])
+    app.include_router(v1_router)
 
     settings = get_settings()
 

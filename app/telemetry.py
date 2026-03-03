@@ -3,21 +3,16 @@ from collections.abc import Callable, Coroutine
 from functools import wraps
 from typing import Any
 
-from azure.monitor.opentelemetry.exporter import AzureMonitorTraceExporter
+# from azure.monitor.opentelemetry.exporter import AzureMonitorTraceExporter
 from fastapi import FastAPI
 from opentelemetry import trace
 from opentelemetry.context import Context
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
-from opentelemetry.instrumentation.logging import LoggingInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor, TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter, SpanExporter
+from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from app.conf import OpenTelemetryExporter, Settings
+from app.conf import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -68,42 +63,43 @@ class FilteredSpanProcessor(SpanProcessor):  # pragma: no cover
 
 
 def setup_telemetry(settings: Settings) -> None:  # pragma: no cover
-    if settings.opentelemetry_exporter is None:
-        return
+    return
+    # if settings.opentelemetry_exporter is None:
+    #     return
 
-    resource = Resource(
-        attributes={"service.name": "ffc-operations-api"},
-    )
-    trace_provider = TracerProvider(resource=resource)
+    # resource = Resource(
+    #     attributes={"service.name": "ffc-operations-api"},
+    # )
+    # trace_provider = TracerProvider(resource=resource)
 
-    exporter: SpanExporter
+    # exporter: SpanExporter
 
-    if settings.opentelemetry_exporter == OpenTelemetryExporter.AZURE_APP_INSIGHTS:
-        exporter = AzureMonitorTraceExporter(
-            connection_string=settings.opentelemetry_connection_string
-        )
-    elif settings.opentelemetry_exporter == OpenTelemetryExporter.JAEGER:
-        exporter = OTLPSpanExporter(endpoint=settings.opentelemetry_connection_string)  # type: ignore[arg-type]
-    elif settings.opentelemetry_exporter == OpenTelemetryExporter.CONSOLE:
-        exporter = ConsoleSpanExporter()
-    else:
-        raise ValueError(f"Unsupported OpenTelemetry exporter: {settings.opentelemetry_exporter}")
+    # if settings.opentelemetry_exporter == OpenTelemetryExporter.AZURE_APP_INSIGHTS:
+    #     exporter = AzureMonitorTraceExporter(
+    #         connection_string=settings.opentelemetry_connection_string
+    #     )
+    # elif settings.opentelemetry_exporter == OpenTelemetryExporter.JAEGER:
+    #     exporter = OTLPSpanExporter(endpoint=settings.opentelemetry_connection_string)
+    # elif settings.opentelemetry_exporter == OpenTelemetryExporter.CONSOLE:
+    #     exporter = ConsoleSpanExporter()
+    # else:
+    #     raise ValueError(f"Unsupported OpenTelemetry exporter: {settings.opentelemetry_exporter}")
 
-    span_processor: SpanProcessor = BatchSpanProcessor(exporter)
+    # span_processor: SpanProcessor = BatchSpanProcessor(exporter)
 
-    if settings.opentelemetry_sqlalchemy_min_query_duration_ms is not None:
-        span_processor = FilteredSpanProcessor(
-            span_processor,
-            slow_sqlalchemy_queries(
-                min_duration_ms=settings.opentelemetry_sqlalchemy_min_query_duration_ms
-            ),
-        )
-    trace_provider.add_span_processor(span_processor)
+    # if settings.opentelemetry_sqlalchemy_min_query_duration_ms is not None:
+    #     span_processor = FilteredSpanProcessor(
+    #         span_processor,
+    #         slow_sqlalchemy_queries(
+    #             min_duration_ms=settings.opentelemetry_sqlalchemy_min_query_duration_ms
+    #         ),
+    #     )
+    # trace_provider.add_span_processor(span_processor)
 
-    trace.set_tracer_provider(trace_provider)
+    # trace.set_tracer_provider(trace_provider)
 
-    HTTPXClientInstrumentor().instrument()
-    LoggingInstrumentor().instrument(set_logging_format=True)
+    # HTTPXClientInstrumentor().instrument()
+    # LoggingInstrumentor().instrument(set_logging_format=True)
 
 
 def setup_fastapi_instrumentor(settings: Settings, app: FastAPI) -> None:  # pragma: no cover

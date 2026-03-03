@@ -5,6 +5,8 @@ from fastapi import Depends
 
 from app.api_clients import api_modifier, optscale
 from app.api_clients.base import BaseAPIClient
+from app.api_clients.mpt import MPTClient, get_installation_client
+from app.auth.auth import MPTAuthContext
 from app.dependencies.core import AppSettings
 
 
@@ -30,3 +32,10 @@ OptscaleAuthClient = Annotated[
     optscale.OptscaleAuthClient,
     Depends(APIClientFactory(optscale.OptscaleAuthClient)),
 ]
+
+
+def _get_installation_client(ctx: MPTAuthContext) -> MPTClient:
+    return get_installation_client(ctx.installation_id)
+
+
+InstallationClient = Annotated[MPTClient, Depends(_get_installation_client)]

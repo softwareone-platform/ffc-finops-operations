@@ -25,10 +25,7 @@ from sqlalchemy.orm import (
     mapped_column,
     relationship,
 )
-from sqlalchemy_utils import StringEncryptedType
-from sqlalchemy_utils.types.encrypted.encrypted_type import FernetEngine
 
-from app.conf import get_settings
 from app.db.human_readable_pk import HumanReadablePKMixin
 from app.enums import (
     AccountStatus,
@@ -86,6 +83,7 @@ class Actor(Base, HumanReadablePKMixin):
         server_default=ActorType.USER.value,
         index=True,
     )
+    external_id: Mapped[str] = mapped_column(String(255), nullable=True)
 
     __mapper_args__ = {
         "polymorphic_on": "type",
@@ -160,17 +158,11 @@ class System(Actor, AuditableMixin):
     __tablename__ = "systems"
 
     PK_PREFIX = "FTKN"
+    MPT_PREFIX = "TKN"
     PK_NUM_LENGTH = 8
 
     id: Mapped[str] = mapped_column(ForeignKey(FKEY_ACTOR), primary_key=True)
     description: Mapped[str | None] = mapped_column(Text(), nullable=True)
-    external_id: Mapped[str] = mapped_column(String(255), nullable=False)
-    jwt_secret: Mapped[str] = mapped_column(
-        StringEncryptedType(
-            String(255), lambda: get_settings().secrets_encryption_key, FernetEngine
-        ),
-        nullable=False,
-    )
     owner_id: Mapped[str] = mapped_column(ForeignKey(FKEY_ACCOUNT))
     owner: Mapped[Account] = relationship(foreign_keys=[owner_id])
     status: Mapped[SystemStatus] = mapped_column(
@@ -186,34 +178,16 @@ class System(Actor, AuditableMixin):
         "polymorphic_load": "inline",
     }
 
-    __table_args__ = (
-        Index(
-            "ix_systems_external_id_for_non_deleted",
-            external_id,
-            unique=True,
-            postgresql_where=(status != SystemStatus.DELETED),
-        ),
-    )
-
 
 class User(Actor, HumanReadablePKMixin, AuditableMixin):
     __tablename__ = "users"
 
     PK_PREFIX = "FUSR"
+    MPT_PREFIX = "USR"
     PK_NUM_LENGTH = 8
 
     id: Mapped[str] = mapped_column(ForeignKey(FKEY_ACTOR), primary_key=True)
     email: Mapped[str] = mapped_column(String(255), nullable=False)
-    password: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    last_login_at: Mapped[datetime.datetime | None] = mapped_column(
-        sa.DateTime(timezone=True), nullable=True
-    )
-    last_used_account_id: Mapped[str | None] = mapped_column(ForeignKey(FKEY_ACCOUNT))
-    last_used_account: Mapped[Account | None] = relationship(foreign_keys=[last_used_account_id])
-    pwd_reset_token: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    pwd_reset_token_expires_at: Mapped[datetime.datetime | None] = mapped_column(
-        sa.DateTime(timezone=True), nullable=True
-    )
     status: Mapped[UserStatus] = mapped_column(
         Enum(UserStatus, values_callable=lambda obj: [e.value for e in obj]),
         nullable=False,
@@ -247,11 +221,6 @@ class AccountUser(Base, AuditableMixin, HumanReadablePKMixin):
     user_id: Mapped[str] = mapped_column(ForeignKey(FKEY_USER))
     account: Mapped[Account] = relationship(back_populates="users", foreign_keys=[account_id])
     user: Mapped[User] = relationship(back_populates="accounts", foreign_keys=[user_id])
-    invitation_token: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    invitation_token_expires_at: Mapped[datetime.datetime | None] = mapped_column(
-        sa.DateTime(timezone=True), nullable=True
-    )
-    joined_at: Mapped[datetime.datetime | None] = mapped_column(sa.DateTime(timezone=True))
     status: Mapped[AccountUserStatus] = mapped_column(
         Enum(AccountUserStatus, values_callable=lambda obj: [e.value for e in obj]),
         nullable=False,

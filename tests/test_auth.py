@@ -27,7 +27,11 @@ from tests.types import JWTTokenFactory, ModelFactory
 async def test_jwt_bearer(mocker: MockerFixture, jwt_token_factory: JWTTokenFactory):
     bearer = JWTBearer()
     request = mocker.Mock()
-    request.headers = {"Authorization": f"Bearer {jwt_token_factory('test', 'secret')}"}
+    token = jwt_token_factory(
+        "test",
+        "secretsecretsecretsecretsecretsecretsecretsecret",
+    )
+    request.headers = {"Authorization": f"Bearer {token}"}
     credentials = await bearer(request)
     assert credentials is not None
     assert isinstance(credentials, JWTCredentials)
@@ -101,9 +105,12 @@ async def test_get_authentication_context_system_not_active(
 ):
     system = await system_factory(
         status=system_status,
-        jwt_secret="secret",
+        jwt_secret="secretsecretsecretsecretsecretsecretsecretsecretsecretsecret",
     )
-    jwt_token = jwt_token_factory(system.id, "secret")
+    jwt_token = jwt_token_factory(
+        system.id,
+        "secretsecretsecretsecretsecretsecretsecretsecretsecretsecret",
+    )
     bearer = JWTBearer()
     request = mocker.Mock()
     request.headers = {"Authorization": f"Bearer {jwt_token}"}
@@ -132,11 +139,11 @@ async def test_get_authentication_context_system_jwt_lifespan_exceeded(
     test_settings: Settings,
 ):
     system = await system_factory(
-        jwt_secret="secret",
+        jwt_secret="secretsecretsecretsecretsecretsecretsecretsecretsecretsecret",
     )
     jwt_token = jwt_token_factory(
         system.id,
-        "secret",
+        "secretsecretsecretsecretsecretsecretsecretsecretsecretsecret",
         nbf=datetime.now(UTC),
         exp=(
             datetime.now(UTC)

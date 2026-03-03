@@ -8,7 +8,7 @@ from app.enums import ActorType
 @dataclass
 class AuthenticationContext:
     account: Account
-    actor_type: ActorType
+    actor_type: ActorType | None = None
     system: System | None = None
     user: User | None = None
 
@@ -16,6 +16,15 @@ class AuthenticationContext:
         if self.actor_type == ActorType.SYSTEM:
             return self.system
         return self.user
+
+
+@dataclass
+class MPTAuthContext:
+    account_id: str
+    account_type: str
+    installation_id: str
+    user_id: str | None = None
+    token_id: str | None = None
 
 
 auth_context = ContextVar[AuthenticationContext]("auth_context")

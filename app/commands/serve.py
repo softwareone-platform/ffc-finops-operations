@@ -1,35 +1,13 @@
 import multiprocessing
-from collections.abc import Callable
-from typing import Annotated, Any
+from typing import Annotated
 
 import typer
-from gunicorn.app.base import BaseApplication
 
-from app.logging import get_logging_config
-from app.main import app
+from app.bootstrap import bootstrap
 
 
 def number_of_workers():
     return (multiprocessing.cpu_count() * 2) + 1
-
-
-class StandaloneApplication(BaseApplication):  # pragma: no cover
-    def __init__(self, application: Callable, options: dict[str, Any] | None = None):
-        self.options = options or {}
-        self.application = application
-        super().__init__()
-
-    def load_config(self):
-        config = {
-            key: value
-            for key, value in self.options.items()
-            if key in self.cfg.settings and value is not None
-        }
-        for key, value in config.items():
-            self.cfg.set(key.lower(), value)
-
-    def load(self):
-        return self.application
 
 
 default_workers = number_of_workers()
@@ -37,49 +15,106 @@ default_workers = number_of_workers()
 
 def command(
     ctx: typer.Context,
-    host: Annotated[
-        str,
-        typer.Option(
-            "--host",
-            "-h",
-            help="Host to bind to. Default: 127.0.0.1",
-            show_default=True,
-        ),
-    ] = "127.0.0.1",
-    port: Annotated[
+    ziti_load_timeout_ms: Annotated[
         int,
         typer.Option(
-            "--port",
-            "-p",
-            help="Port to bind to. Default: 8000",
+            "--ziti-load-timeout-ms",
+            help="Timeout (ms) waiting for Ziti to load.",
             show_default=True,
         ),
-    ] = 8000,
-    workers: Annotated[
+    ] = 5000,
+    server_workers: Annotated[
         int,
         typer.Option(
-            "--workers",
+            "--server-workers",
             "-w",
             help=f"Number of workers. Default: {default_workers}",
             show_default=True,
         ),
     ] = default_workers,
-    dev: Annotated[
+    server_backlog: Annotated[
+        int,
+        typer.Option(
+            "--server-backlog",
+            help="TCP socket listen backlog.",
+            show_default=True,
+        ),
+    ] = 2048,
+    server_timeout_keep_alive: Annotated[
+        int,
+        typer.Option(
+            "--server-timeout-keep-alive",
+            help="Seconds to keep idle HTTP connections open.",
+            show_default=True,
+        ),
+    ] = 5,
+    server_limit_concurrency: Annotated[
+        int | None,
+        typer.Option(
+            "--server-limit-concurrency",
+            help="Maximum number of concurrent requests per worker.",
+            show_default=True,
+        ),
+    ] = None,
+    server_limit_max_requests: Annotated[
+        int | None,
+        typer.Option(
+            "--server-limit-max-requests",
+            help="Restart a worker after handling this many requests.",
+            show_default=True,
+        ),
+    ] = None,
+    server_reload: Annotated[
         bool,
         typer.Option(
-            "--reload",
+            "--server-reload",
             "-r",
-            help="Enable auto-reload. Default: False",
+            help="Enable server auto-reload. Default: False",
             show_default=True,
         ),
     ] = False,
+    events_publishers_port: Annotated[
+        int,
+        typer.Option(
+            "--events-publishers-port",
+            help=(
+                "TCP port where the mrok agent "
+                "should connect to publish to request/response messages."
+            ),
+            show_default=True,
+        ),
+    ] = 50000,
+    events_subscribers_port: Annotated[
+        int,
+        typer.Option(
+            "--events-subscribers-port",
+            help=(
+                "TCP port where the mrok agent should listen for incoming subscribers "
+                "connections for request/response messages."
+            ),
+            show_default=True,
+        ),
+    ] = 50001,
+    events_metrics_collect_interval: Annotated[
+        float,
+        typer.Option(
+            "--events-metrics-collect-interval",
+            help="Interval in seconds between events metrics collect.",
+            show_default=True,
+        ),
+    ] = 5.0,
 ):
-    """Run the application with Gunicorn and Uvicorn workers."""
-    options = {
-        "bind": f"{host}:{port}",
-        "workers": workers,
-        "worker_class": "uvicorn.workers.UvicornWorker",
-        "logconfig_dict": get_logging_config(ctx.obj),
-        "reload": dev,
-    }
-    StandaloneApplication(app, options).run()
+    """Run the extension."""
+    bootstrap(
+        ctx.obj,
+        ziti_load_timeout_ms=ziti_load_timeout_ms,
+        server_workers=server_workers,
+        server_reload=server_reload,
+        server_backlog=server_backlog,
+        server_timeout_keep_alive=server_timeout_keep_alive,
+        server_limit_concurrency=server_limit_concurrency,
+        server_limit_max_requests=server_limit_max_requests,
+        events_metrics_collect_interval=events_metrics_collect_interval,
+        events_publishers_port=events_publishers_port,
+        events_subscribers_port=events_subscribers_port,
+    )

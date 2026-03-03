@@ -39,7 +39,7 @@ class SystemCreate(SystemBase):
                 "3e3068bfcacd587f75137afdead8f96adb016734a68630cac9e7a008458782a38ef61217d17406832f8fede61a7773866430f52084f8cac59311386e1b673261"
             ],
         ),
-    ] = None
+    ]
 
 
 class SystemUpdate(BaseSchema):
