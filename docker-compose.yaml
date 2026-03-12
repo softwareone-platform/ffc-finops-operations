@@ -8,29 +8,16 @@ services:
     depends_on:
       db:
         condition: "service_healthy"
-    command: bash -c "uv run ffcops serve"
+    command: bash -c "uv run ffcops serve -w2"
     environment:
       FFC_OPERATIONS_POSTGRES_HOST: db
     env_file:
       - .env
     ports:
       - "8000:8000"
-    healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "8000"]
-      interval: 1s
-      timeout: 1s
-      retries: 15
-    develop:
-      watch:
-        - action: rebuild
-          path: uv.lock
-        - action: rebuild
-          path: Dockerfile
-        - action: rebuild
-          path: dev.Dockerfile
-        - action: sync+restart
-          path: app/
-          target: /app/app
+    volumes:
+      - .:/app
+    
   jaeger:
     image: jaegertracing/all-in-one:latest
     ports:

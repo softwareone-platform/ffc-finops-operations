@@ -1,10 +1,12 @@
 import logging
 from contextlib import asynccontextmanager
 from functools import partial
+from pathlib import Path
 
 import fastapi_pagination
 from fastapi import Depends, FastAPI
 from fastapi.routing import APIRoute, APIRouter
+from fastapi.staticfiles import StaticFiles
 
 from app.conf import get_settings
 from app.db.base import configure_db_engine, verify_db_connection
@@ -76,6 +78,14 @@ def setup_app():
         redoc_url="/bypass/redoc",
         openapi_url="/bypass/openapi.json",
         lifespan=lifespan,
+    )
+    app.mount(
+        "/static",
+        StaticFiles(
+            directory=Path(__file__).parent.parent.resolve() / "static",
+            html=True,
+        ),
+        name="static",
     )
     fastapi_pagination.add_pagination(app)
 

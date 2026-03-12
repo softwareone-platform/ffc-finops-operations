@@ -455,7 +455,6 @@ class UserHandler(ModelHandler[User]):
     def __init__(self, session):
         super().__init__(session)
         self.default_options = [
-            joinedload(User.last_used_account),
             joinedload(User.created_by),
             joinedload(User.updated_by),
             joinedload(User.deleted_by),
