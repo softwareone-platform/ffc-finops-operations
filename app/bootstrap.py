@@ -42,10 +42,66 @@ def bootstrap(
         "externalId": external_id,
         "meta": {
             "version": __version__,
-            "placeholders": [],
             "openapi": "/public/v1/openapi.json",
             "events": [],
-            "plugs": [],
+            "plugs": [
+                {
+                    "id": "entitlements",
+                    "name": "Entitlements",
+                    "description": "Check sockets",
+                    "icon": "adobe.png",
+                    "socket": "portal.standalone.ffc.admin",
+                    "href": "/static/index.js"
+                },
+                {
+                    "id": "organization",
+                    "name": "FFC Admin Portal",
+                    "description": "Check sockets",
+                    "icon": "adobe.png",
+                    "socket": "portal.standalone.ffc.admin",
+                    "href": "/static/index.js",
+                    "data": {
+                        "test": "testing"
+                    }
+                },
+                {
+                    "id": "admin",
+                    "name": "FinOps for Cloud Admin Portal",
+                    "description": "Check sockets",
+                    "icon": "adobe.png",
+                    "socket": "portal.standalone.ffc",
+                    "href": "/static/index.js"
+                },
+                {
+                    "id": "header-action",
+                    "name": "FFC Admin Portal",
+                    "description": "Check sockets",
+                    "icon": "adobe.png",
+                    "socket": "portal.standalone.headerAction",
+                    "href": "/static/index.js",
+                    "data": {
+                        "test": "testing"
+                    }
+                },
+                {
+                    "id": "header-action",
+                    "name": "FFC Admin Portal",
+                    "description": "Check sockets",
+                    "icon": "adobe.png",
+                    "socket": "portal.standalone.headerAction.add",
+                    "href": "/static/index.js",
+                    "data": {
+                        "test": "testing"
+                    }
+                },
+                {
+                    "id": "modal",
+                    "name": "Just a modal",
+                    "description": "Check sockets",
+                    "icon": "adobe.png",
+                    "href": "/static/index.js"
+                }
+            ],
         },
     }
     for evtinfo in data["meta"]["events"]:

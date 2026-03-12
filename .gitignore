@@ -193,3 +193,5 @@ taplo.toml
 
 # extension's instance identity file
 *_identity.json
+
+/static/*
