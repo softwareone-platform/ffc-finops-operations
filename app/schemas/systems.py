@@ -1,4 +1,3 @@
-import secrets
 from typing import Annotated
 
 from pydantic import Field
@@ -34,7 +33,6 @@ class SystemCreate(SystemBase):
         str | None,
         Field(
             min_length=64,
-            default_factory=lambda: secrets.token_hex(64),
             examples=[
                 "3e3068bfcacd587f75137afdead8f96adb016734a68630cac9e7a008458782a38ef61217d17406832f8fede61a7773866430f52084f8cac59311386e1b673261"
             ],
