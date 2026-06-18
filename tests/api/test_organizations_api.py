@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 import pytest
 from httpx import AsyncClient
 from pytest_httpx import HTTPXMock
@@ -6,8 +8,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conf import Settings
-from app.db.models import Organization, System
-from app.enums import OrganizationStatus
+from app.db.handlers import EntitlementHandler
+from app.db.models import Entitlement, Organization, System
+from app.enums import EntitlementStatus, OrganizationStatus
 from tests.types import ModelFactory
 
 # =================
@@ -931,3 +934,69 @@ async def test_get_organization_with_linked_organization_id_filter(
     data = response.json()
     assert data["total"] == 1
     assert data["items"][0]["name"] == "First Test Organization"
+
+
+async def test_delete_organization_with_active_entitlements(
+    test_settings: Settings,
+    organization_factory: ModelFactory[Organization],
+    entitlement_factory: ModelFactory[Entitlement],
+    operations_client: AsyncClient,
+    httpx_mock: HTTPXMock,
+    db_session: AsyncSession,
+):
+    entitlement_handler = EntitlementHandler(db_session)
+    db_org = await organization_factory(
+        name="Test organization",
+        linked_organization_id="UUID-1234-5678-9098-7654",
+    )
+    old_entitlenment = await entitlement_factory()
+
+    old_entitlenment = await entitlement_handler.update(
+        old_entitlenment,
+        data={
+            "status": EntitlementStatus.ACTIVE,
+            "redeemed_at": datetime.now(UTC),
+            "redeemed_by": db_org,
+            "linked_datasource_id": "linked_datasource_id",
+            "linked_datasource_type": "aws_cnr",
+            "linked_datasource_name": "linked_datasource_name",
+        },
+    )
+
+    httpx_mock.add_response(
+        method="PATCH",
+        headers={"Authorization": operations_client.headers["Authorization"]},
+        url=f"{test_settings.optscale_rest_api_base_url}/organizations/{db_org.linked_organization_id}",
+        status_code=200,
+        json={
+            "id": db_org.linked_organization_id,
+            "disabled": True,
+        },
+    )
+
+    assert db_org.status == OrganizationStatus.ACTIVE
+    assert db_org.deleted_at is None
+
+    response = await operations_client.delete(f"/organizations/{db_org.id}")
+    assert response.status_code == 204
+    assert bool(httpx_mock.get_request())
+
+    await db_session.refresh(db_org)
+    assert db_org.status == OrganizationStatus.DELETED
+    assert db_org.deleted_at is not None
+
+    await db_session.refresh(old_entitlenment)
+    assert old_entitlenment.status == EntitlementStatus.TERMINATED
+
+    assert (
+        await entitlement_handler.count(
+            where_clauses=[
+                Entitlement.name == old_entitlenment.name,
+                Entitlement.affiliate_external_id == old_entitlenment.affiliate_external_id,
+                Entitlement.datasource_id == old_entitlenment.datasource_id,
+                Entitlement.owner == old_entitlenment.owner,
+                Entitlement.status == EntitlementStatus.NEW,
+            ],
+        )
+        == 1
+    )

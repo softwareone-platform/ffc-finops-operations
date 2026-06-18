@@ -1031,7 +1031,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "adaptive-cards-py", specifier = ">=0.3.0,<1" },
+    { name = "adaptive-cards-py", specifier = "==0.3.0" },
     { name = "aiofiles", specifier = ">=24.1.0,<25" },
     { name = "alembic", specifier = ">=1.14.1,<2" },
     { name = "asyncpg", specifier = ">=0.30.0,<1" },

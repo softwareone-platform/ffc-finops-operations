@@ -1,3 +1,4 @@
+import secrets
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status
@@ -127,7 +128,7 @@ async def create_system(
                 name=data.name,
                 description=data.description,
                 external_id=data.external_id,
-                jwt_secret=data.jwt_secret,
+                jwt_secret=data.jwt_secret or secrets.token_hex(64),
                 owner=system_owner,
                 status=SystemStatus.ACTIVE,
             )

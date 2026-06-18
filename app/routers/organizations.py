@@ -9,12 +9,16 @@ from sqlalchemy import Select
 
 from app.api_clients.optscale import UserDoesNotExist
 from app.db.handlers import ConstraintViolationError, NotFoundError
-from app.db.models import AdditionalAdminRequest, Organization
+from app.db.models import AdditionalAdminRequest, Entitlement, Organization
 from app.dependencies.api_clients import APIModifierClient, OptscaleAuthClient, OptscaleClient
 from app.dependencies.auth import check_operations_account
-from app.dependencies.db import AdditionalAdminRequestRepository, OrganizationRepository
+from app.dependencies.db import (
+    AdditionalAdminRequestRepository,
+    EntitlementRepository,
+    OrganizationRepository,
+)
 from app.dependencies.path import OrganizationId
-from app.enums import DatasourceType, OrganizationStatus
+from app.enums import DatasourceType, EntitlementStatus, OrganizationStatus
 from app.openapi import examples
 from app.pagination import LimitOffsetPage, paginate
 from app.rql import OrganizationRules, RQLQuery
@@ -377,6 +381,7 @@ async def update_organization(
 async def delete_organization_by_id(
     db_organization: Annotated[Organization, Depends(fetch_organization_or_404)],
     organization_repo: OrganizationRepository,
+    entitlement_repo: EntitlementRepository,
     optscale_client: OptscaleClient,
 ):
     if db_organization.status == OrganizationStatus.DELETED:
@@ -393,6 +398,22 @@ async def delete_organization_by_id(
         )
 
     await organization_repo.delete(db_organization)
+    entitlements = await entitlement_repo.query_db(
+        where_clauses=[
+            Entitlement.status == EntitlementStatus.ACTIVE,
+            Entitlement.redeemed_by == db_organization,
+        ]
+    )
+    for entitlement in entitlements:
+        entitlement = await entitlement_repo.terminate(entitlement)
+        await entitlement_repo.create(
+            Entitlement(
+                name=entitlement.name,
+                affiliate_external_id=entitlement.affiliate_external_id,
+                datasource_id=entitlement.datasource_id,
+                owner=entitlement.owner,
+            )
+        )
 
 
 @router.post("/{organization_id}/add-admin", status_code=status.HTTP_200_OK)
