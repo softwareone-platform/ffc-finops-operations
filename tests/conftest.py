@@ -267,7 +267,7 @@ def system_factory(
         system = System(
             name=name or faker.company(),
             external_id=external_id or str(uuid.uuid4()),
-            jwt_secret=jwt_secret or secrets.token_hex(32),
+            jwt_secret=jwt_secret or secrets.token_hex(64),
             owner=owner or await account_factory(),
             status=status,
         )
