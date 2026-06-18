@@ -34,7 +34,7 @@ dependencies = [
     "jinja2>=3.1.6,<4",
     "rich>=14.0.0,<15",
     "pyfiglet>=1.0.2,<2",
-    "adaptive-cards-py>=0.3.0,<1",
+    "adaptive-cards-py==0.3.0",
     "opentelemetry-api==1.33.*",
     "opentelemetry-exporter-otlp-proto-http==1.33.*",
     "opentelemetry-instrumentation-fastapi==0.54b0",
@@ -111,6 +111,7 @@ ignore = [
     "PT023", # @pytest.mark.parametrize` is missing required arguments
     "B008",  # do not perform function calls in argument defaults
     "B904",  # Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+    "UP042", # Checks for classes that inherit from both str and enum.Enum.
 ]
 
 [tool.ruff.format]
